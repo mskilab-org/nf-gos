@@ -3,6 +3,10 @@
 //
 
 include { JABBA } from '../../../modules/local/jabba/main.nf'
+include { COERCE_SEQNAMES as COERCE_SEQNAMES_COV } from '../../../modules/local/jabba/main.nf'
+include { COERCE_SEQNAMES as COERCE_SEQNAMES_SOM_SV } from '../../../modules/local/jabba/main.nf'
+include { COERCE_SEQNAMES as COERCE_SEQNAMES_UNFIL_SOM_SV } from '../../../modules/local/jabba/main.nf'
+include { COERCE_SEQNAMES as COERCE_SEQNAMES_HETS } from '../../../modules/local/jabba/main.nf'
 
 workflow COV_JUNC_JABBA {
 
@@ -52,13 +56,33 @@ workflow COV_JUNC_JABBA {
     jabba_seg           = Channel.empty()
     karyograph          = Channel.empty()
 
-    JABBA(cov_rds_jabba, junction_jabba, ploidy_jabba, het_pileups_wgs_jabba,
-    cbs_seg_rds_jabba, cbs_nseg_rds_jabba, j_supp_jabba, blacklist_junctions_jabba,
+    // Add channels for the outputs of COERCE_SEQNAMES
+    chr_coerced_cov_rds_jabba          = Channel.empty()
+    chr_coerced_junction_jabba         = Channel.empty()
+    chr_coerced_j_supp_jabba           = Channel.empty()
+    chr_coerced_het_pileups_wgs_jabba  = Channel.empty()
+
+
+    // Run COERCE_SEQNAMES to force inputs to be in common
+    COERCE_SEQNAMES_COV(cov_rds_jabba)
+    chr_coerced_cov_rds_jabba = COERCE_SEQNAMES_COV.out.file
+
+    COERCE_SEQNAMES_SOM_SV(junction_jabba)
+    chr_coerced_junction_jabba = COERCE_SEQNAMES_SOM_SV.out.file
+
+    COERCE_SEQNAMES_UNFIL_SOM_SV(j_supp_jabba)
+    chr_coerced_j_supp_jabba = COERCE_SEQNAMES_UNFIL_SOM_SV.out.file
+
+    COERCE_SEQNAMES_HETS(het_pileups_wgs_jabba)
+    chr_coerced_het_pileups_wgs_jabba = COERCE_SEQNAMES_HETS.out.file
+
+    JABBA(chr_coerced_cov_rds_jabba, chr_coerced_junction_jabba, ploidy_jabba, chr_coerced_het_pileups_wgs_jabba,
+    cbs_seg_rds_jabba, cbs_nseg_rds_jabba, chr_coerced_j_supp_jabba, blacklist_junctions_jabba,
     geno_jabba, indel_jabba, tfield_jabba,
     iter_jabba, rescue_window_jabba, rescue_all_jabba, nudgebalanced_jabba,
     edgenudge_jabba, strict_jabba, allin_jabba, field_jabba, maxna_jabba,
     blacklist_coverage_jabba, purity_jabba, pp_method_jabba, cnsignif_jabba,
-    slack_jabba, linear_jabba, tilim_jabba, epgap_jabba, fix_thres_jabba, lp_jabba, 
+    slack_jabba, linear_jabba, tilim_jabba, epgap_jabba, fix_thres_jabba, lp_jabba,
     ism_jabba, filter_loose_jabba, gurobi_jabba, verbose_jabba)
 
     jabba_rds           = JABBA.out.jabba_rds
@@ -82,4 +106,3 @@ workflow COV_JUNC_JABBA {
 
     versions
 }
-

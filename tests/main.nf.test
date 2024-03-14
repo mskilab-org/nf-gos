@@ -1,0 +1,22 @@
+nextflow_pipeline {
+
+    name "Test pipeline"
+    script "../main.nf"
+
+    test("Should run entire nf-jabba pipeline without failure") {
+
+        when {
+            params {
+                outdir  = "results"
+                input   = "$projectDir/tests/test_runs/integration_test_samplesheet.csv"
+                step    = "sv_calling"
+            }
+        }
+
+        then {
+            assert workflow.success
+        }
+
+    }
+
+}
