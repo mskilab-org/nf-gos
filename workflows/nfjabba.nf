@@ -442,6 +442,10 @@ include { BAM_SVCALLING_SVABA                         } from '../subworkflows/lo
 include { BAM_SVCALLING_GRIDSS                        } from '../subworkflows/local/bam_svcalling_gridss/main'
 include { BAM_SVCALLING_GRIDSS_SOMATIC                } from '../subworkflows/local/bam_svcalling_gridss/main'
 
+//STRELKA2
+include { BAM_SOMATIC_STRELKA                        } from '../subworkflows/local/bam_somatic_strelka/main'
+include { BAM_GERMLINE_STRELKA                       } from '../subworkflows/local/bam_germline_strelka/main'
+
 // HETPILEUPS
 include { BAM_HETPILEUPS                              } from '../subworkflows/local/bam_hetpileups/main'
 
@@ -1094,7 +1098,7 @@ workflow NFJABBA {
             versions = versions.mix(BAM_HETPILEUPS.out.versions)
 
             sites_from_het_pileups_wgs = Channel.empty().mix(BAM_HETPILEUPS.out.het_pileups_wgs)
-            
+
             //Getting the meta.patient id out to aid in crossing JaBbA and ASCAT inputs
             het_pileups_to_cross = sites_from_het_pileups_wgs.map { tuple ->
                                                             def (meta, hets) = tuple
@@ -1148,13 +1152,13 @@ workflow NFJABBA {
             normal_dryclean_cov_to_cross = normal_dryclean_cov.map { tuple ->
                                                                 def (meta, cov) = tuple
                                                                 [meta.patient, meta + [id: meta.sample], cov] }
-                                                                
+
             tumor_dryclean_cov_to_cross = tumor_dryclean_cov.map { tuple ->
                                                                 def (meta, cov) = tuple
                                                                 [meta.patient, meta + [id: meta.sample], cov] }
 
             if (params.tools && (params.tools.split(',').contains('ascat') && params.tools.split(',').contains('hetpileups'))) {
-                
+
                 input_ascat = tumor_dryclean_cov_to_cross.cross(het_pileups_to_cross)
                         .map { cov, hets ->
                             def meta = [:]
@@ -1164,7 +1168,7 @@ workflow NFJABBA {
 
                                 [ meta, cov[2], hets[2] ]
                         }
-            }                                                       
+            }
         }
 
         // TODO: Add a subworkflow to write the output file paths into a csv
@@ -1263,7 +1267,7 @@ workflow NFJABBA {
             purity = Channel.empty().mix(COV_ASCAT.out.purity)
             ploidy = Channel.empty().mix(COV_ASCAT.out.ploidy)
             ploidy_to_cross = ploidy.map{ meta, ploidy -> [ meta.patient, meta, ploidy ] }
-            
+
         }
         // TODO: Add a subworkflow to write the output file paths into a csv
     }
@@ -1279,7 +1283,7 @@ workflow NFJABBA {
         if (params.tools && params.tools.split(',').contains('jabba')) {
 
             ploidy_jabba = input_sample.map{ tuple -> [ tuple[0], ploidy_jab ] }
-            
+
             if (params.tools && params.tools.split(',').contains('svaba')) {
 
                 if (params.tools && params.tools.split(',').contains('ascat')) {
@@ -1296,12 +1300,12 @@ workflow NFJABBA {
 
                     input_jabba1_final = input_jabba1.join(ploidy_jabba).map{ tuples ->
                                                             [tuples[1]] + [tuples[2]] + [tuples[3]] + [tuples[4]] + [tuples[5]] + [tuples[6]] + [tuples[7]] + [tuples[9]]
-                                                        } 
+                                                        }
                     input_ploidy_jabba = input_jabba1_final.map{ meta, cov, hets, vcf, vcf2, seg, nseg, ploidy -> [ meta, ploidy ] }
                 }
 
                 input_cov_jabba = input_jabba1_final.map{ meta, cov, hets, vcf, vcf2, seg, nseg, ploidy -> [ meta, cov ] }
-                
+
                 input_hets_jabba = input_jabba1_final.map{ meta, cov, hets, vcf, vcf2, seg, nseg, ploidy -> [ meta, hets ] }
 
                 input_vcf_jabba  = input_jabba1_final.map{ meta, cov, hets, vcf, vcf2, seg, nseg, ploidy -> [ meta, vcf ] }
@@ -1311,8 +1315,8 @@ workflow NFJABBA {
                 input_seg_jabba  = input_jabba1_final.map{ meta, cov, hets, vcf, vcf2, seg, nseg, ploidy -> [ meta, seg ] }
 
                 input_nseg_jabba = input_jabba1_final.map{ meta, cov, hets, vcf, vcf2, seg, nseg, ploidy -> [ meta, nseg ] }
-                
-                
+
+
 
                 JABBA_WITH_SVABA(input_cov_jabba, input_vcf_jabba, input_ploidy_jabba,
                 input_hets_jabba, input_seg_jabba, input_nseg_jabba,
@@ -1353,12 +1357,12 @@ workflow NFJABBA {
 
                     input_jabba2_final = input_jabba2.join(ploidy_jabba).map{ tuples ->
                                                             [tuples[1]] + [tuples[2]] + [tuples[3]] + [tuples[4]] + [tuples[5]] + [tuples[6]] + [tuples[7]] + [tuples[9]]
-                                                        } 
+                                                        }
                     input_ploidy_jabba = input_jabba2_final.map{ meta, cov, hets, vcf, vcf2, seg, nseg, ploidy -> [ meta, ploidy ] }
                 }
 
                 input_cov_jabba = input_jabba2_final.map{ meta, cov, hets, vcf, vcf2, seg, nseg, ploidy -> [ meta, cov ] }
-                
+
                 input_hets_jabba = input_jabba2_final.map{ meta, cov, hets, vcf, vcf2, seg, nseg, ploidy -> [ meta, hets ] }
 
                 input_vcf_jabba  = input_jabba2_final.map{ meta, cov, hets, vcf, vcf2, seg, nseg, ploidy -> [ meta, vcf ] }
@@ -1411,7 +1415,7 @@ workflow NFJABBA {
                                     .map{ meta, cov, hets, vcf, vcf2, seg, nseg -> [ meta, seg ] }
 
                 input_nseg_jabba = input_jabba
-                                    .map{ meta, cov, hets, vcf, vcf2, seg, nseg -> [ meta, nseg ] }            
+                                    .map{ meta, cov, hets, vcf, vcf2, seg, nseg -> [ meta, nseg ] }
 
                 tumor_dryclean_cov          = Channel.empty().mix(input_cov_jabba)
                 sites_from_het_pileups_wgs  = Channel.empty().mix(input_hets_jabba)
@@ -1444,7 +1448,7 @@ workflow NFJABBA {
             }
 
 
-            
+
         }
 
     }
