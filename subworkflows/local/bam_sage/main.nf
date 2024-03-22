@@ -7,8 +7,9 @@ include { SAGE } from '../../../modules/local/sage/main.nf'
 workflow BAM_SAGE {
     // defining inputs
     take:
-    inputs      // [meta, tumor bam, normal bam]
+    inputs      // [meta, tumor bam, tumor bai, normal bam, normal bai]
     ref
+    ref_fai
     ref_genome_version
     ensembl_data_dir
     somatic_hotspots
@@ -23,6 +24,7 @@ workflow BAM_SAGE {
     SAGE(
         inputs,
         ref,
+        ref_fai,
         ref_genome_version,
         ensembl_data_dir,
         somatic_hotspots,

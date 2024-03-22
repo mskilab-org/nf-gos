@@ -8,10 +8,11 @@ process SAGE {
         'mskilab/sage:latest' }"
 
     input:
-    tuple val(meta), path(tumor_bam_wgs, stageAs: "tumor.bam"), path(normal_bam_wgs, stageAs: "normal.bam")
+    tuple val(meta), path(tumor_bam_wgs, stageAs: "tumor.bam"), path(tumor_bai, stageAs: "tumor.bam.bai"), path(normal_bam_wgs, stageAs: "normal.bam"), path(normal_bai, stageAs: "normal.bam.bai")
     path(ref)
+    path(ref_fai)
     val(ref_genome_version)
-    path(ensembl_data_dir)
+    val(ensembl_data_dir) // set as val but is actually a path to a directory
     path(somatic_hotspots)
     path(panel_bed)
     path(high_confidence_bed)

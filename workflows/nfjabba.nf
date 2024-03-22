@@ -59,6 +59,7 @@ def toolParamMap = [
     "svaba"      : [params.indel_mask, params.germ_sv_db, params.simple_seq_db],
     "gridss"     : [params.blacklist_gridss, params.pon_gridss],
     "hetpileups" : [params.hapmap_sites],
+    "sage"       : [params.somatic_hotspots, params.panel_bed, params.high_confidence_bed],
     "fusions"    : [params.gencode_fusions],
     "allelic_cn" : [params.mask_non_integer_balance, params.mask_lp_phased_balance]
 ]
@@ -280,6 +281,12 @@ gcmapdir_frag      = params.gcmapdir_frag      ? Channel.fromPath(params.gcmapdi
 // HetPileups
 hapmap_sites       = params.hapmap_sites       ? Channel.fromPath(params.hapmap_sites).collect()      : Channel.empty()
 
+// Sage
+somatic_hotspots_sage        = params.somatic_hotspots       ? Channel.fromPath(params.somatic_hotspots).collect()       : Channel.empty()
+panel_bed_sage               = params.panel_bed              ? Channel.fromPath(params.panel_bed).collect()              : Channel.empty()
+high_confidence_bed_sage     = params.high_confidence_bed    ? Channel.fromPath(params.high_confidence_bed).collect()    : Channel.empty()
+
+
 // Dryclean
 pon_dryclean      = params.pon_dryclean      ? Channel.fromPath(params.pon_dryclean).collect()     : Channel.empty()   // This is the path to the PON for Dryclean.
 blacklist_path_dryclean      = params.blacklist_path_dryclean      ? Channel.fromPath(params.blacklist_path_dryclean).collect()     : Channel.empty()   // This is the path to the blacklist for Dryclean (optional).
@@ -309,6 +316,10 @@ error_rate         = params.error_rate         ?: Channel.empty()               
 // Hetpileups
 filter_hets         = params.filter_hets       ?: Channel.empty()
 max_depth           = params.max_depth         ?: Channel.empty()
+
+// Sage
+ref_genome_version_sage       = params.ref_genome_version   ?: Channel.empty()
+ensembl_data_dir_sage         = params.ensembl_data_dir       ?: Channel.empty()
 
 // FragCounter
 windowsize_frag    = params.windowsize_frag    ?: Channel.empty()                                                         // For fragCounter
@@ -509,6 +520,9 @@ include { BAM_GERMLINE_STRELKA                       } from '../subworkflows/loc
 // HETPILEUPS
 include { BAM_HETPILEUPS                              } from '../subworkflows/local/bam_hetpileups/main'
 
+// SAGE
+include { BAM_SAGE                              } from '../subworkflows/local/bam_sage/main'
+
 // fragCounter
 include { BAM_FRAGCOUNTER as TUMOR_FRAGCOUNTER         } from '../subworkflows/local/bam_fragCounter/main'
 include { BAM_FRAGCOUNTER as NORMAL_FRAGCOUNTER        } from '../subworkflows/local/bam_fragCounter/main'
@@ -671,9 +685,9 @@ workflow NFJABBA {
     boolean runPrepareRecalibration = false
     boolean runRecalibrate = false
     boolean runSvCalling = false
-    boolean runStrelka = false
     boolean runFragCounter = false
     boolean runHetPileups = false
+    boolean runSnvCalling = false
     boolean runDryClean = false
     boolean runAscat = false
     boolean runJabba = false
@@ -694,12 +708,12 @@ workflow NFJABBA {
             runRecalibrate = true
         case 'sv_calling':
             runSvCalling = true
-        case 'strelka':
-            runStrelka = true
         case 'fragcounter':
             runFragCounter = true
         case 'hetpileups':
             runHetPileups = true
+        case 'snv_calling':
+            runSnvCalling = true
         case 'dryclean':
             runDryClean = true
         case 'ascat':
@@ -1146,66 +1160,6 @@ workflow NFJABBA {
         bam_fragcounter_calling = bam_sv_calling
     }
 
-    if (runStrelka) {
-        //when starting from strelka
-        if (params.step == 'strelka') {
-            input_snv_calling_convert = input_sample.branch{
-                bam:  it[0].data_type == "bam"
-                cram: it[0].data_type == "cram"
-            }
-            // BAM files first must be converted to CRAM files since from this step on we base everything on CRAM format
-            CRAM_TO_BAM(input_snv_calling_convert.cram, fasta, fasta_fai)
-            versions = versions.mix(CRAM_TO_BAM.out.versions)
-
-            bam_snv_calling = Channel.empty().mix(CRAM_TO_BAM.out.alignment_index, input_snv_calling_convert.bam)
-                                .map{ meta, bam, bai -> [ meta + [data_type: "bam"], bam, bai ] }           //making sure that the input data_type is correct
-
-        }
-
-        // getting the tumor and normal cram files separated
-        bam_snv_calling_status = bam_snv_calling.branch{
-            normal: it[0].status == 0
-            tumor:  it[0].status == 1
-        }
-
-
-        // All normal samples
-        bam_snv_calling_normal_to_cross = bam_snv_calling_status.normal.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
-
-        // All tumor samples
-        bam_snv_calling_tumor_to_cross = bam_snv_calling_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
-
-        // Crossing the normal and tumor samples to create tumor and normal pairs
-        bam_snv_calling_pair = bam_snv_calling_normal_to_cross.cross(bam_snv_calling_tumor_to_cross)
-            .map { normal, tumor ->
-                def meta = [:]
-
-                meta.id         = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
-                meta.normal_id  = normal[1].sample
-                meta.patient    = normal[0]
-                meta.sex        = normal[1].sex
-                meta.tumor_id   = tumor[1].sample
-
-                [ meta, normal[2], normal[3], tumor[2], tumor[3] ]
-        }
-
-        if (params.tools && params.tools.split(',').contains('strelka')) {
-            BAM_SOMATIC_STRELKA(bam_snv_calling_pair, fasta, fasta_fai)
-
-            versions = versions.mix(BAM_SOMATIC_STRELKA.out.versions)
-
-            somatic_vcf_from_snv_calling = Channel.empty().mix(BAM_SOMATIC_STRELKA.out.vcf)
-            somatic_vcf_from_snv_calling_to_cross = somatic_vcf_from_snv_calling.map{ meta, vcf -> [ meta.patient, meta, vcf ] }
-
-            BAM_GERMLINE_STRELKA(bam_snv_calling_status.normal, fasta, fasta_fai)
-
-            versions = versions.mix(BAM_GERMLINE_STRELKA.out.versions)
-
-            germline_vcf_from_snv_calling = Channel.empty().mix(BAM_GERMLINE_STRELKA.out.vcf)
-            germline_vcf_from_snv_calling_to_cross = somatic_vcf_from_snv_calling.map{ meta, vcf -> [ meta.patient, meta, vcf ] }
-        }
-    }
-
     if (runFragCounter) {
 
         if (params.step == 'fragcounter') {
@@ -1291,6 +1245,79 @@ workflow NFJABBA {
 
         }
 
+    }
+    if (runSnvCalling) {
+        if (params.step == 'snv_calling') {
+            input_snv_calling_convert = input_sample.branch{
+                bam:  it[0].data_type == "bam"
+                cram: it[0].data_type == "cram"
+            }
+            // BAM files first must be converted to CRAM files since from this step on we base everything on CRAM format
+            CRAM_TO_BAM(input_snv_calling_convert.cram, fasta, fasta_fai)
+            versions = versions.mix(CRAM_TO_BAM.out.versions)
+
+            bam_snv_calling = Channel.empty().mix(CRAM_TO_BAM.out.alignment_index, input_snv_calling_convert.bam)
+                                .map{ meta, bam, bai -> [ meta + [data_type: "bam"], bam, bai ] }           //making sure that the input data_type is correct
+
+        }
+
+        // getting the tumor and normal cram files separated
+        bam_snv_calling_status = bam_snv_calling.branch{
+            normal: it[0].status == 0
+            tumor:  it[0].status == 1
+        }
+
+
+        // All normal samples
+        bam_snv_calling_normal_to_cross = bam_snv_calling_status.normal.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
+
+        // All tumor samples
+        bam_snv_calling_tumor_to_cross = bam_snv_calling_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
+
+        // Crossing the normal and tumor samples to create tumor and normal pairs
+        bam_snv_calling_pair = bam_snv_calling_normal_to_cross.cross(bam_snv_calling_tumor_to_cross)
+            .map { normal, tumor ->
+                def meta = [:]
+
+                meta.id         = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
+                meta.normal_id  = normal[1].sample
+                meta.patient    = normal[0]
+                meta.sex        = normal[1].sex
+                meta.tumor_id   = tumor[1].sample
+
+                [ meta, tumor[2], tumor[3], normal[2], normal[3] ]
+        }
+
+        if (tools_used.contains('strelka')) {
+            BAM_SOMATIC_STRELKA(bam_snv_calling_pair, fasta, fasta_fai)
+
+            versions = versions.mix(BAM_SOMATIC_STRELKA.out.versions)
+
+            somatic_vcf_from_snv_calling_strelka = Channel.empty().mix(BAM_SOMATIC_STRELKA.out.vcf)
+
+            BAM_GERMLINE_STRELKA(bam_snv_calling_status.normal, fasta, fasta_fai)
+
+            versions = versions.mix(BAM_GERMLINE_STRELKA.out.versions)
+
+            germline_vcf_from_snv_calling_strelka = Channel.empty().mix(BAM_GERMLINE_STRELKA.out.vcf)
+        }
+
+        if (tools_used.contains('sage')) {
+            BAM_SAGE(
+                bam_snv_calling_pair,
+                fasta,
+                fasta_fai,
+                ref_genome_version_sage,
+                ensembl_data_dir_sage,
+                somatic_hotspots_sage,
+                panel_bed_sage,
+                high_confidence_bed_sage
+            )
+
+            versions = versions.mix(BAM_SAGE.out.versions)
+
+            somatic_vcf_from_snv_calling_sage = Channel.empty().mix(BAM_SAGE.out.sage_vcf)
+        }
     }
 
     if (runDryClean) {
