@@ -4,8 +4,8 @@ process SAGE {
     label 'process_medium'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/sage:latest':
-        'mskilab/sage:latest' }"
+        'https://depot.galaxyproject.org/singularity/hmftools-sage:3.4--hdfd78af_1' :
+        'quay.io/biocontainers/hmftools-sage:3.4--hdfd78af_1' }"
 
     input:
     tuple val(meta), path(tumor_bam_wgs, stageAs: "tumor.bam"), path(tumor_bai, stageAs: "tumor.bam.bai"), path(normal_bam_wgs, stageAs: "normal.bam"), path(normal_bai, stageAs: "normal.bam.bai")
@@ -23,36 +23,36 @@ process SAGE {
 
     when:
     task.ext.when == null || task.ext.when
-
     script:
     def args        = task.ext.args ?: ''
     def prefix      = task.ext.prefix ?: "${meta.id}"
     def output      = "${meta.id}_sage.vcf"
     def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
+    def reference_bam_arg = normal_bam_wgs ? "-reference_bam ${normal_bam_wgs}" : ''
     """
 
-    export SAGE_JAR_PATH=\$(echo "${baseDir}/bin/sage_v3.2.2.jar")
+    mkdir -p somatic/
 
-    java -jar -Xmx32G ${SAGE_JAR_PATH},
-         -tumor tumor \\
-         -tumor_bam ${tumor_bam_wgs} \\
-         -reference normal  \\
-         -reference_bam ${normal_bam_wgs} \\
-         -out ${output} \\
-         -ref_genome ${ref} \\
-         -ref_genome_version ${ref_genome_version} \\
-         -ensembl_data_dir ${ensembl_data_dir} \\
-         -hotspots ${somatic_hotspots} \\
-         -panel_bed ${panel_bed} \\
-         -high_confidence_bed ${high_confidence_bed} \\
-         -validation_stringency LENIENT \\
-         -threads $num.cores
-        )
+    sage \\
+        -Xmx${Math.round(task.memory.bytes * 0.95)} \\
+        ${args} \\
+        ${reference_bam_arg} \\
+        -tumor_bam ${tumor_bam_wgs} \\
+        -ref_genome ${ref} \\
+        -ref_genome_version ${ref_genome_version} \\
+        -hotspots ${somatic_hotspots} \\
+        -panel_bed ${panel_bed} \\
+        -high_confidence_bed ${high_confidence_bed} \\
+        -ensembl_data_dir ${ensembl_data_dir} \\
+        -write_bqr_data \\
+        -write_bqr_plot \\
+        -threads ${task.cpus} \\
+        -output_vcf ${output}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        HetPileups: ${VERSION}
+        sage: \$(sage -version | sed 's/^.* //')
     END_VERSIONS
     """
 
