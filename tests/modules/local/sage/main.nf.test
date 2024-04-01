@@ -1,7 +1,7 @@
 nextflow_process {
 
     name "Test Process SAGE"
-    script "modules/local/svaba/main.nf"
+    script "modules/local/sage/main.nf"
     process "SAGE"
 
 

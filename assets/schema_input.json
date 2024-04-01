@@ -262,6 +262,29 @@
                 "format": "file-path",
                 "exists": true
             },
+            "sage_vcf": {
+                "errorMessage": "VCF output file sage cannot contain spaces and must have extension '.vcf' or '.vcf.gz'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.vcf(\\.gz)?$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
             "seg": {
                 "errorMessage": "SEG file cannot contain spaces and must have extension '.rds'",
                 "anyOf": [

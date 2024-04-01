@@ -54,14 +54,47 @@ def checkPathParamList = [
 ]
 
 def toolParamMap = [
-    "snpeff"     : [params.snpeff_cache],
-    "vep"        : [params.vep_cache],
-    "svaba"      : [params.indel_mask, params.germ_sv_db, params.simple_seq_db],
-    "gridss"     : [params.blacklist_gridss, params.pon_gridss],
-    "hetpileups" : [params.hapmap_sites],
-    "sage"       : [params.somatic_hotspots, params.panel_bed, params.high_confidence_bed],
-    "fusions"    : [params.gencode_fusions],
-    "allelic_cn" : [params.mask_non_integer_balance, params.mask_lp_phased_balance]
+    "snpeff"     : [
+        params.snpeff_cache
+    ],
+    "vep"        : [
+        params.vep_cache
+    ],
+    "svaba"      : [
+        params.indel_mask,
+        params.germ_sv_db,
+        params.simple_seq_db
+    ],
+    "gridss"     : [
+        params.blacklist_gridss,
+        params.pon_gridss
+    ],
+    "hetpileups" : [
+        params.hapmap_sites
+    ],
+    "sage"       : [
+        params.ensembl_data_dir,
+        params.somatic_hotspots,
+        params.panel_bed,
+        params.high_confidence_bed
+    ],
+    "pave"       : [
+        params.sage_pon,
+        params.sage_blocklist_regions,
+        params.sage_blocklist_sites,
+        params.clinvar_annotations,
+        params.segment_mappability,
+        params.driver_gene_panel,
+        params.ensembl_data_resources,
+        params.gnomad_resource
+    ],
+    "fusions"    : [
+        params.gencode_fusions
+    ],
+    "allelic_cn" : [
+        params.mask_non_integer_balance,
+        params.mask_lp_phased_balance
+    ]
 ]
 
 // Check if running tools and add their params to the checkPathParamList
@@ -97,9 +130,9 @@ def handleError(step, dataType) {
 }
 
 input_sample = ch_from_samplesheet
-        .map{ meta, fastq_1, fastq_2, table, cram, crai, bam, bai, cov, hets, ploidy, vcf, vcf2, seg, nseg, ggraph, variantcaller ->
+        .map{ meta, fastq_1, fastq_2, table, cram, crai, bam, bai, cov, hets, ploidy, vcf, vcf2, sage_vcf, seg, nseg, ggraph, variantcaller ->
             // generate patient_sample key to group lanes together
-            [ meta.patient + meta.sample, [meta, fastq_1, fastq_2, table, cram, crai, bam, bai, cov, hets, ploidy, vcf, vcf2, seg, nseg, ggraph, variantcaller] ]
+            [ meta.patient + meta.sample, [meta, fastq_1, fastq_2, table, cram, crai, bam, bai, cov, hets, ploidy, vcf, vcf2, sage_vcf, seg, nseg, ggraph, variantcaller] ]
         }
         .tap{ ch_with_patient_sample } // save the channel
         .groupTuple() //group by patient_sample to get all lanes
@@ -110,7 +143,7 @@ input_sample = ch_from_samplesheet
         .combine(ch_with_patient_sample, by: 0) // for each entry add numLanes
         .map { patient_sample, num_lanes, ch_items ->
 
-            (meta, fastq_1, fastq_2, table, cram, crai, bam, bai, cov, hets, ploidy, vcf, vcf2, seg, nseg, ggraph, variantcaller) = ch_items
+            (meta, fastq_1, fastq_2, table, cram, crai, bam, bai, cov, hets, ploidy, vcf, vcf2, sage_vcf, seg, nseg, ggraph, variantcaller) = ch_items
             if (meta.lane && fastq_2) {
                 meta           = meta + [id: "${meta.sample}-${meta.lane}".toString()]
                 def CN         = params.seq_center ? "CN:${params.seq_center}\\t" : ''
@@ -217,6 +250,14 @@ input_sample = ch_from_samplesheet
                 else {
                     handleError(params.step, 'ggraph .rds')
                 }
+            } else if (sage_vcf) {
+                meta = meta + [id: meta.sample, data_type: 'sage_vcf']
+
+                if (params.step == 'variant_annotation' || params.step == 'signatures') return [ meta - meta.subMap('lane'), sage_vcf ]
+                else {
+                    handleError(params.step, 'sage .vcf')
+                }
+            }
         } else {
                 error("Missing or unknown field in csv file header. Please check your samplesheet")
             }
@@ -285,6 +326,17 @@ hapmap_sites       = params.hapmap_sites       ? Channel.fromPath(params.hapmap_
 somatic_hotspots_sage        = params.somatic_hotspots       ? Channel.fromPath(params.somatic_hotspots).collect()       : Channel.empty()
 panel_bed_sage               = params.panel_bed              ? Channel.fromPath(params.panel_bed).collect()              : Channel.empty()
 high_confidence_bed_sage     = params.high_confidence_bed    ? Channel.fromPath(params.high_confidence_bed).collect()    : Channel.empty()
+ensembl_data_dir_sage         = params.ensembl_data_dir       ? Channel.fromPath(params.ensembl_data_dir).collect()    : Channel.empty()
+
+// Pave
+sage_pon_pave                   = params.sage_pon ? Channel.fromPath(params.sage_pon).collect() : Channel.empty()
+sage_blocklist_regions_pave     = params.sage_blocklist_regions ? Channel.fromPath(params.sage_blocklist_regions).collect() : Channel.empty()
+sage_blocklist_sites_pave       = params.sage_blocklist_sites ? Channel.fromPath(params.sage_blocklist_sites).collect() : Channel.empty()
+clinvar_annotations_pave        = params.clinvar_annotations ? Channel.fromPath(params.clinvar_annotations).collect() : Channel.empty()
+segment_mappability_pave        = params.segment_mappability ? Channel.fromPath(params.segment_mappability).collect() : Channel.empty()
+driver_gene_panel_pave          = params.driver_gene_panel ? Channel.fromPath(params.driver_gene_panel).collect() : Channel.empty()
+ensembl_data_resources_pave     = params.ensembl_data_resources ? Channel.fromPath(params.ensembl_data_resources).collect() : Channel.empty()
+gnomad_resource_pave            = params.gnomad_resource ? Channel.fromPath(params.gnomad_resource).collect() : Channel.empty()
 
 
 // Dryclean
@@ -319,7 +371,9 @@ max_depth           = params.max_depth         ?: Channel.empty()
 
 // Sage
 ref_genome_version_sage       = params.ref_genome_version   ?: Channel.empty()
-ensembl_data_dir_sage         = params.ensembl_data_dir       ?: Channel.empty()
+
+// Pave
+ref_genome_version_pave       = params.ref_genome_version   ?: Channel.empty()
 
 // FragCounter
 windowsize_frag    = params.windowsize_frag    ?: Channel.empty()                                                         // For fragCounter
@@ -523,6 +577,9 @@ include { BAM_HETPILEUPS                              } from '../subworkflows/lo
 // SAGE
 include { BAM_SAGE                              } from '../subworkflows/local/bam_sage/main'
 
+// PAVE
+include { VCF_PAVE                              } from '../subworkflows/local/vcf_pave/main'
+
 // fragCounter
 include { BAM_FRAGCOUNTER as TUMOR_FRAGCOUNTER         } from '../subworkflows/local/bam_fragCounter/main'
 include { BAM_FRAGCOUNTER as NORMAL_FRAGCOUNTER        } from '../subworkflows/local/bam_fragCounter/main'
@@ -688,6 +745,7 @@ workflow NFJABBA {
     boolean runFragCounter = false
     boolean runHetPileups = false
     boolean runSnvCalling = false
+    boolean runVariantAnnotation = false
     boolean runDryClean = false
     boolean runAscat = false
     boolean runJabba = false
@@ -714,6 +772,8 @@ workflow NFJABBA {
             runHetPileups = true
         case 'snv_calling':
             runSnvCalling = true
+        case 'variant_annotation':
+            runVariantAnnotation = true
         case 'dryclean':
             runDryClean = true
         case 'ascat':
@@ -1246,6 +1306,7 @@ workflow NFJABBA {
         }
 
     }
+
     if (runSnvCalling) {
         if (params.step == 'snv_calling') {
             input_snv_calling_convert = input_sample.branch{
@@ -1316,8 +1377,38 @@ workflow NFJABBA {
 
             versions = versions.mix(BAM_SAGE.out.versions)
 
-            somatic_vcf_from_snv_calling_sage = Channel.empty().mix(BAM_SAGE.out.sage_vcf)
+            vcf_from_snv_calling_sage = Channel.empty().mix(BAM_SAGE.out.sage_vcf)
         }
+    }
+
+    if (runVariantAnnotation) {
+        if (params.step == 'snv_annotation') {
+            input_vcf = input_sample.map{ meta, sage_vcf -> [ meta, sage_vcf ] }
+        } else {
+            input_vcf = vcf_from_snv_calling_sage
+        }
+
+        if (tools_used.contains('pave')) {
+            VCF_PAVE(
+                input_vcf,
+                fasta,
+                fasta_fai,
+                ref_genome_version_pave,
+                sage_pon_pave,
+                sage_blocklist_regions_pave,
+                sage_blocklist_sites_pave,
+                clinvar_annotations_pave,
+                segment_mappability_pave,
+                driver_gene_panel_pave,
+                ensembl_data_resources_pave,
+                gnomad_resource_pave
+            )
+
+            annotations_from_pave = Channel.empty().mix(VCF_PAVE.out.pave_vcf)
+            pave_filtered_sage_vcf = Channel.empty().mix(VCF_PAVE.out.pave_filtered_vcf)
+
+        }
+
     }
 
     if (runDryClean) {

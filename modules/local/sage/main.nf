@@ -12,13 +12,13 @@ process SAGE {
     path(ref)
     path(ref_fai)
     val(ref_genome_version)
-    val(ensembl_data_dir) // set as val but is actually a path to a directory
+    path(ensembl_data_dir)
     path(somatic_hotspots)
     path(panel_bed)
     path(high_confidence_bed)
 
-    output:
-    tuple val(meta), path("*sage.vcf")                     , emit: sage_vcf, optional: true
+    output
+    tuple val(meta), path('*.sage.vcf.gz'), path('*.sage.vcf.gz.tbi'), emit: vcf
     path "versions.yml"                                     , emit: versions
 
     when:
@@ -26,7 +26,7 @@ process SAGE {
     script:
     def args        = task.ext.args ?: ''
     def prefix      = task.ext.prefix ?: "${meta.id}"
-    def output      = "${meta.id}_sage.vcf"
+    def output      = "sage.vcf.gz"
     def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
     def reference_bam_arg = normal_bam_wgs ? "-reference_bam ${normal_bam_wgs}" : ''
@@ -38,6 +38,7 @@ process SAGE {
         -Xmx${Math.round(task.memory.bytes * 0.95)} \\
         ${args} \\
         ${reference_bam_arg} \\
+        -tumor ${meta.id} \\
         -tumor_bam ${tumor_bam_wgs} \\
         -ref_genome ${ref} \\
         -ref_genome_version ${ref_genome_version} \\
