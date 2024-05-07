@@ -40,7 +40,7 @@ process JUNCTION_FILTER {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        non_integer_balance: ${VERSION}
+        Junction_Filter: ${VERSION}
     END_VERSIONS
     """
 
@@ -51,7 +51,7 @@ process JUNCTION_FILTER {
     touch somatic.filtered.gnoMAD.sv.rds somatic.filtered.sv.rds
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        JaBbA: ${VERSION}
+        Junction_Filter: ${VERSION}
     END_VERSIONS
     """
 }

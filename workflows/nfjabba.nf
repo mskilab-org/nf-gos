@@ -316,6 +316,11 @@ simple_seq_db      = params.simple_seq_db      ? Channel.fromPath(params.simple_
 blacklist_gridss   = params.blacklist_gridss   ? Channel.fromPath(params.blacklist_gridss).collect()  : Channel.empty()   // This is the mask for gridss SV calls
 pon_gridss         = params.pon_gridss         ? Channel.fromPath(params.pon_gridss).collect()        : Channel.empty()   //This is the pon directory for GRIDSS SOMATIC. (MUST CONTAIN .bed and .bedpe files)
 
+//SV Junction Filtering
+junction_pon_svaba  = params.junction_pon_svaba   ? Channel.fromPath(params.junction_pon_svaba).collect()   : Channel.empty()
+junction_pon_gridss = params.junction_pon_gridss  ? Channel.fromPath(params.junction_pon_gridss).collect()  : Channel.empty()
+gnomAD_sv_db        = params.gnomAD_sv_db         ? Channel.fromPath(params.gnomAD_sv_db).collect()         : Channel.empty()
+
 // FragCounter
 gcmapdir_frag      = params.gcmapdir_frag      ? Channel.fromPath(params.gcmapdir_frag).collect()     : Channel.empty()   // This is the GC/Mappability directory for fragCounter. (Must contain gc* & map* .rds files)
 
@@ -363,7 +368,10 @@ snpeff_db          = params.snpeff_db          ?: Channel.empty()
 vep_cache_version  = params.vep_cache_version  ?: Channel.empty()
 vep_genome         = params.vep_genome         ?: Channel.empty()
 vep_species        = params.vep_species        ?: Channel.empty()
-error_rate         = params.error_rate         ?: Channel.empty()                                                         // For SVABA
+error_rate         = params.error_rate         ?: Channel.empty()                         // For SVABA
+
+//SV Junction Filter
+pad_junc_filter    = params.pad_junc_filter    ?: Channel.empty()                        //For SV Filtering (tumor only)
 
 // Hetpileups
 filter_hets         = params.filter_hets       ?: Channel.empty()
@@ -567,6 +575,9 @@ include { BAM_SVCALLING_SVABA                         } from '../subworkflows/lo
 include { BAM_SVCALLING_GRIDSS                        } from '../subworkflows/local/bam_svcalling_gridss/main'
 include { BAM_SVCALLING_GRIDSS_SOMATIC                } from '../subworkflows/local/bam_svcalling_gridss/main'
 
+// SV Junction Filtering
+include { SV_JUNCTION_FILTER as JUNCTION_FILTER       } from '../subworkflows/local/junction_filter/main'
+
 //STRELKA2
 include { BAM_SOMATIC_STRELKA                        } from '../subworkflows/local/bam_somatic_strelka/main'
 include { BAM_GERMLINE_STRELKA                       } from '../subworkflows/local/bam_germline_strelka/main'
@@ -618,7 +629,6 @@ include { COV_GGRAPH_NON_INTEGER_BALANCE as NON_INTEGER_BALANCE_WITH_SVABA      
 include { COV_GGRAPH_LP_PHASED_BALANCE as LP_PHASED_BALANCE                            } from '../subworkflows/local/allelic_cn/main'
 include { COV_GGRAPH_LP_PHASED_BALANCE as LP_PHASED_BALANCE_WITH_GRIDSS                } from '../subworkflows/local/allelic_cn/main'
 include { COV_GGRAPH_LP_PHASED_BALANCE as LP_PHASED_BALANCE_WITH_SVABA                 } from '../subworkflows/local/allelic_cn/main'
-
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
