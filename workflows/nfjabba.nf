@@ -94,7 +94,7 @@ def toolParamMap = [
     "allelic_cn" : [
         params.mask_non_integer_balance,
         params.mask_lp_phased_balance
-    ]
+    ],
 ]
 
 // Check if running tools and add their params to the checkPathParamList
@@ -130,9 +130,9 @@ def handleError(step, dataType) {
 }
 
 input_sample = ch_from_samplesheet
-        .map{ meta, fastq_1, fastq_2, table, cram, crai, bam, bai, cov, hets, ploidy, vcf, vcf2, sage_vcf, seg, nseg, ggraph, variantcaller ->
+        .map{ meta, fastq_1, fastq_2, table, cram, crai, bam, bai, cov, hets, ploidy, vcf, vcf2, snv_vcf_somatic, snv_vcf_germline, seg, nseg, ggraph, variantcaller ->
             // generate patient_sample key to group lanes together
-            [ meta.patient + meta.sample, [meta, fastq_1, fastq_2, table, cram, crai, bam, bai, cov, hets, ploidy, vcf, vcf2, sage_vcf, seg, nseg, ggraph, variantcaller] ]
+            [ meta.patient + meta.sample, [meta, fastq_1, fastq_2, table, cram, crai, bam, bai, cov, hets, ploidy, vcf, vcf2, snv_vcf_somatic, snv_vcf_germline, seg, nseg, ggraph, variantcaller] ]
         }
         .tap{ ch_with_patient_sample } // save the channel
         .groupTuple() //group by patient_sample to get all lanes
@@ -143,7 +143,7 @@ input_sample = ch_from_samplesheet
         .combine(ch_with_patient_sample, by: 0) // for each entry add numLanes
         .map { patient_sample, num_lanes, ch_items ->
 
-            (meta, fastq_1, fastq_2, table, cram, crai, bam, bai, cov, hets, ploidy, vcf, vcf2, sage_vcf, seg, nseg, ggraph, variantcaller) = ch_items
+            (meta, fastq_1, fastq_2, table, cram, crai, bam, bai, cov, hets, ploidy, vcf, vcf2, snv_vcf_somatic, snv_vcf_germline, seg, nseg, ggraph, variantcaller) = ch_items
             if (meta.lane && fastq_2) {
                 meta           = meta + [id: "${meta.sample}-${meta.lane}".toString()]
                 def CN         = params.seq_center ? "CN:${params.seq_center}\\t" : ''
@@ -250,14 +250,22 @@ input_sample = ch_from_samplesheet
                 else {
                     handleError(params.step, 'ggraph .rds')
                 }
-            } else if (sage_vcf) {
-                meta = meta + [id: meta.sample, data_type: 'sage_vcf']
+                // variant_calling or signatures
+            } else if (snv_vcf_somatic && snv_vcf_germline) {
+                meta = meta + [id: meta.sample, data_type: ['snv_vcf_somatic', 'snv_vcf_germline']]
 
-                if (params.step == 'variant_annotation' || params.step == 'signatures') return [ meta - meta.subMap('lane'), sage_vcf ]
+                if (params.step == 'variant_annotation' || params.step == 'signatures') return [ meta - meta.subMap('lane'), snv_vcf_somatic, snv_vcf_germline ]
                 else {
-                    handleError(params.step, 'sage .vcf')
+                    handleError(params.step, 'sage somatic and germline .vcf')
                 }
-            }
+                // HRDetect
+            } else if (hets && vcf && vcf2 && snv_vcf_somatic && ggraph) {
+                meta = meta + [id: meta.sample, data_type: ['snv_vcf_somatic', 'vcf', 'hets', 'ggraph']]
+
+                if (params.step == 'hrdetect') return [ meta - meta.subMap('lane'), snv_vcf_somatic, vcf, hets, ggraph ]
+                else {
+                    handleError(params.step, 'hrdetect somatic .vcf, vcf, hets .txt and ggraph .rds')
+                }
         } else {
                 error("Missing or unknown field in csv file header. Please check your samplesheet")
             }
@@ -338,7 +346,6 @@ driver_gene_panel_pave          = params.driver_gene_panel ? Channel.fromPath(pa
 ensembl_data_resources_pave     = params.ensembl_data_resources ? Channel.fromPath(params.ensembl_data_resources).collect() : Channel.empty()
 gnomad_resource_pave            = params.gnomad_resource ? Channel.fromPath(params.gnomad_resource).collect() : Channel.empty()
 
-
 // Dryclean
 pon_dryclean      = params.pon_dryclean      ? Channel.fromPath(params.pon_dryclean).collect()     : Channel.empty()   // This is the path to the PON for Dryclean.
 blacklist_path_dryclean      = params.blacklist_path_dryclean      ? Channel.fromPath(params.blacklist_path_dryclean).collect()     : Channel.empty()   // This is the path to the blacklist for Dryclean (optional).
@@ -353,6 +360,9 @@ gencode_fusions             = params.gencode_fusions        ? Channel.fromPath(p
 // Allelic CN
 mask_non_integer_balance    = params.mask_non_integer_balance   ? Channel.fromPath(params.mask_non_integer_balance).collect() : Channel.empty()
 mask_lp_phased_balance    = params.mask_lp_phased_balance   ? Channel.fromPath(params.mask_lp_phased_balance).collect() : Channel.empty()
+
+// HRDetect
+hrdetect_mask               = params.hrdetect_mask          ? Channel.fromPath(params.hrdetect_mask).collect() : Channel.empty()
 
 // Initialize value channels based on params, defined in the params.genomes[params.genome] scope
 ascat_genome       = params.ascat_genome       ?: Channel.empty()
@@ -374,6 +384,10 @@ ref_genome_version_sage       = params.ref_genome_version   ?: Channel.empty()
 
 // Pave
 ref_genome_version_pave       = params.ref_genome_version   ?: Channel.empty()
+
+// SigprofilerAssignment
+sigprofilerassignment_genome         = params.sigprofilerassignment_genome   ?: Channel.empty()
+sigprofilerassignment_cosmic_version = params.sigprofilerassignment_cosmic_version ?: Channel.empty()
 
 // FragCounter
 windowsize_frag    = params.windowsize_frag    ?: Channel.empty()                                                         // For fragCounter
@@ -468,6 +482,9 @@ trelim_lp_phased_balance = params.trelim_lp_phased_balance ?: Channel.empty()
 reward_lp_phased_balance = params.reward_lp_phased_balance ?: Channel.empty()
 nodefileind_lp_phased_balance = params.nodefileind_lp_phased_balance ?: Channel.empty()
 tilim_lp_phased_balance = params.tilim_lp_phased_balance ?: Channel.empty()
+
+// HRDetect
+ref_genome_version_hrdetect = params.ref_genome_version ?: Channel.empty()
 
 // Initialize files channels based on params, not defined within the params.genomes[params.genome] scope
 if (params.snpeff_cache && params.tools && params.tools.contains("snpeff")) {
@@ -577,8 +594,16 @@ include { BAM_HETPILEUPS                              } from '../subworkflows/lo
 // SAGE
 include { BAM_SAGE                              } from '../subworkflows/local/bam_sage/main'
 
+// SNPEFF
+include { VCF_SNPEFF as VCF_SNPEFF_SOMATIC                              } from '../subworkflows/local/vcf_snpeff/main'
+include { VCF_SNPEFF as VCF_SNPEFF_GERMLINE                             } from '../subworkflows/local/vcf_snpeff/main'
+
 // PAVE
-include { VCF_PAVE                              } from '../subworkflows/local/vcf_pave/main'
+include { VCF_PAVE_SOMATIC                              } from '../subworkflows/local/vcf_pave/main'
+include { VCF_PAVE_GERMLINE                              } from '../subworkflows/local/vcf_pave/main'
+
+// SigProfilerAssignment
+include { VCF_SIGPROFILERASSIGNMENT                              } from '../subworkflows/local/vcf_sigprofilerassignment/main'
 
 // fragCounter
 include { BAM_FRAGCOUNTER as TUMOR_FRAGCOUNTER         } from '../subworkflows/local/bam_fragCounter/main'
@@ -618,6 +643,9 @@ include { COV_GGRAPH_NON_INTEGER_BALANCE as NON_INTEGER_BALANCE_WITH_SVABA      
 include { COV_GGRAPH_LP_PHASED_BALANCE as LP_PHASED_BALANCE                            } from '../subworkflows/local/allelic_cn/main'
 include { COV_GGRAPH_LP_PHASED_BALANCE as LP_PHASED_BALANCE_WITH_GRIDSS                } from '../subworkflows/local/allelic_cn/main'
 include { COV_GGRAPH_LP_PHASED_BALANCE as LP_PHASED_BALANCE_WITH_SVABA                 } from '../subworkflows/local/allelic_cn/main'
+
+// HRDetect
+include { JUNC_SNV_GGRAPH_HRDETECT } from '../subworkflows/local/hrdetect/main'
 
 
 /*
@@ -746,12 +774,14 @@ workflow NFJABBA {
     boolean runHetPileups = false
     boolean runSnvCalling = false
     boolean runVariantAnnotation = false
+    boolean runSignatures = false
     boolean runDryClean = false
     boolean runAscat = false
     boolean runJabba = false
     boolean runEvents = false
     boolean runFusions = false
     boolean runAlleicCN = false
+    boolean runHRDetect = false
 
     // Set flags based on params.step using a cascading approach
     // Fall through to the next case if the previous case is true
@@ -774,6 +804,8 @@ workflow NFJABBA {
             runSnvCalling = true
         case 'variant_annotation':
             runVariantAnnotation = true
+        case 'signatures':
+            runSignatures = true
         case 'dryclean':
             runDryClean = true
         case 'ascat':
@@ -786,6 +818,8 @@ workflow NFJABBA {
             runFusions = true
         case 'allelic_cn':
             runAlleicCN = true
+        case 'hrdetect':
+            runHRDetect = true
             break
         default:
             error "Invalid step: ${params.step}"
@@ -1377,19 +1411,49 @@ workflow NFJABBA {
 
             versions = versions.mix(BAM_SAGE.out.versions)
 
-            vcf_from_snv_calling_sage = Channel.empty().mix(BAM_SAGE.out.sage_vcf)
+            somatic_vcf_from_snv_calling_sage = Channel.empty().mix(BAM_SAGE.out.sage_somatic_vcf)
+            germline_vcf_from_snv_calling_sage = Channel.empty().mix(BAM_SAGE.out.sage_germline_vcf)
         }
     }
 
     if (runVariantAnnotation) {
         if (params.step == 'snv_annotation') {
-            input_vcf = input_sample.map{ meta, sage_vcf -> [ meta, sage_vcf ] }
+            input_vcf_somatic = input_sample.map{ meta, snv_vcf_somatic, snv_vcf_germline -> [ meta, snv_vcf_somatic ] }
+            input_vcf_germline = input_sample.map{ meta, snv_vcf_somatic, snv_vcf_germline -> [ meta, snv_vcf_germline ] }
         } else {
-            input_vcf = vcf_from_snv_calling_sage
+            input_vcf_somatic = somatic_vcf_from_snv_calling_sage
+            input_vcf_germline = germline_vcf_from_snv_calling_sage
+        }
+
+        if (tools_used.contains('snpeff')) {
+            VCF_SNPEFF_SOMATIC(
+                input_vcf_somatic,
+                snpeff_db,
+                snpeff_cache
+            )
+
+            somatic_annotations_from_snpeff = Channel.empty().mix(VCF_SNPEFF_SOMATIC.out.snpeff_vcf)
+            somatic_bcf_annotations_from_snpeff = Channel.empty().mix(VCF_SNPEFF_SOMATIC.out.snpeff_bcf)
+            somatic_report_from_snpeff = Channel.empty().mix(VCF_SNPEFF_SOMATIC.out.snpeff_report)
+            somatic_summary_html_from_snpeff = Channel.empty().mix(VCF_SNPEFF_SOMATIC.out.snpeff_summary_html)
+            somatic_genes_from_snpeff = Channel.empty().mix(VCF_SNPEFF_SOMATIC.out.snpeff_genes_txt)
+
+            VCF_SNPEFF_GERMLINE(
+                input_vcf_germline,
+                snpeff_db,
+                snpeff_cache
+            )
+
+            germline_annotations_from_snpeff = Channel.empty().mix(VCF_SNPEFF_GERMLINE.out.snpeff_vcf)
+            germline_bcf_annotations_from_snpeff = Channel.empty().mix(VCF_SNPEFF_GERMLINE.out.snpeff_bcf)
+            germline_report_from_snpeff = Channel.empty().mix(VCF_SNPEFF_GERMLINE.out.snpeff_report)
+            germline_summary_html_from_snpeff = Channel.empty().mix(VCF_SNPEFF_GERMLINE.out.snpeff_summary_html)
+            germline_genes_from_snpeff = Channel.empty().mix(VCF_SNPEFF_GERMLINE.out.snpeff_genes_txt)
+
         }
 
         if (tools_used.contains('pave')) {
-            VCF_PAVE(
+            VCF_PAVE_SOMATIC(
                 input_vcf,
                 fasta,
                 fasta_fai,
@@ -1404,11 +1468,47 @@ workflow NFJABBA {
                 gnomad_resource_pave
             )
 
-            annotations_from_pave = Channel.empty().mix(VCF_PAVE.out.pave_vcf)
-            pave_filtered_sage_vcf = Channel.empty().mix(VCF_PAVE.out.pave_filtered_vcf)
+            somatic_annotations_from_pave = Channel.empty().mix(VCF_PAVE.out.pave_vcf)
+            somatic_pave_filtered_sage_vcf = Channel.empty().mix(VCF_PAVE.out.pave_filtered_vcf)
+
+            VCF_PAVE_GERMLINE(
+                input_vcf,
+                fasta,
+                fasta_fai,
+                ref_genome_version_pave,
+                sage_pon_pave,
+                sage_blocklist_regions_pave,
+                sage_blocklist_sites_pave,
+                clinvar_annotations_pave,
+                segment_mappability_pave,
+                driver_gene_panel_pave,
+                ensembl_data_resources_pave,
+                gnomad_resource_pave
+            )
+
+            germline_annotations_from_pave = Channel.empty().mix(VCF_PAVE_GERMLINE.out.pave_vcf)
+            germline_pave_filtered_sage_vcf = Channel.empty().mix(VCF_PAVE_GERMLINE.out.pave_filtered_vcf)
 
         }
 
+    }
+
+    if (runSignatures) {
+        if (params.step == 'signatures') {
+            input_vcf_somatic = input_sample.map{ meta, snv_vcf_somatic, snv_vcf_germline -> [ meta, snv_vcf_somatic ] }
+        } else {
+            input_vcf_somatic = somatic_vcf_from_snv_calling_sage
+        }
+
+        if (tools_used.contains('sigprofilerassignment')) {
+            VCF_SIGPROFILERASSIGNMENT(
+                input_vcf_somatic,
+                sigprofilerassignment_genome,
+                sigprofilerassignment_cosmic_version
+            )
+
+            signatures_from_calling_sigprofilerassignment = Channel.empty().mix(VCF_SIGPROFILERASSIGNMENT.out.signatures)
+        }
     }
 
     if (runDryClean) {
@@ -1982,6 +2082,36 @@ workflow NFJABBA {
                     lp_phased_balance_unphased_allelic_gg = Channel.empty().mix(LP_PHASED_BALANCE_WITH_SVABA.out.lp_phased_balance_unphased_allelic_gg)
                 }
             }
+        }
+    }
+
+    if (runHRDetect) {
+        if (tools_used.contains('hrdetect')) {
+            if (params.step == 'hrdetect') {
+                hrdetect_inputs = input_sample.map{ meta, hets, vcf, vcf2, snv_vcf_somatic, ggraph -> [ meta, vcf, hets, snv_vcf_somatic, ggraph ] }
+            } else {
+                het_pileups_for_joining = sites_from_het_pileups_wgs.map { meta, hets -> [meta.patient, meta, hets] }
+                vcf_from_sv_calling_for_joining = vcf_from_sv_calling.map{ meta, juction -> [ meta.patient, junction ] }
+                vcf_somatic_from_snv_calling_for_joining = somatic_vcf_from_snv_calling_sage.map{ meta, vcf -> [ meta.patient, vcf ] }
+                ggraph_for_joining = jabba_rds.map{ meta, ggraph -> [ meta.patient, ggraph ] }
+
+                hrdetect_inputs = hets_pileups_for_joining
+                    .join(vcf_from_sv_calling_for_joining)
+                    .join(vcf_somatic_from_snv_calling_for_joining)
+                    .join(ggraph_for_joining)
+                    .map{ patient, meta, hets, junction, snv_vcf_somatic, ggraph -> [ meta, hets, junction, snv_vcf_somatic, ggraph ] }
+            }
+
+            JUNC_SNV_GGRAPH_HRDETECT(
+                hrdetect_inputs,
+                hrdetect_mask,
+                fasta,
+                ref_genome_version_hrdetect
+            )
+
+            versions = versions.mix(JUNC_SNV_GGRAPH_HRDETECT.out.versions)
+            hrdetect_rds = Channel.empty().mix(JUNC_SNV_GGRAPH_HRDETECT.out.hrdetect_rds)
+            hrdetect_txt = Channel.empty().mix(JUNC_SNV_GGRAPH_HRDETECT.out.hrdetect_txt)
         }
     }
 }

@@ -1,4 +1,4 @@
-process SAGE {
+process SAGE_GERMLINE {
 
     tag "$meta.id"
     label 'process_medium'
@@ -18,21 +18,14 @@ process SAGE {
     path(high_confidence_bed)
 
     output
-    tuple val(meta), path('*.sage.vcf.gz'), path('*.sage.vcf.gz.tbi'), emit: vcf
+    tuple val(meta), path('*.sage.germline.vcf.gz'), path('*.sage.germline.vcf.gz.tbi'), emit: vcf
     path "versions.yml"                                     , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
     script:
     def args        = task.ext.args ?: ''
-    def prefix      = task.ext.prefix ?: "${meta.id}"
-    def output      = "sage.vcf.gz"
-    def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
-
-    def reference_bam_arg = normal_bam_wgs ? "-reference_bam ${normal_bam_wgs}" : ''
     """
-
-    mkdir -p somatic/
 
     sage \\
         -Xmx${Math.round(task.memory.bytes * 0.95)} \\
@@ -46,10 +39,17 @@ process SAGE {
         -panel_bed ${panel_bed} \\
         -high_confidence_bed ${high_confidence_bed} \\
         -ensembl_data_dir ${ensembl_data_dir} \\
-        -write_bqr_data \\
-        -write_bqr_plot \\
+        -hotspot_min_tumor_qual 50 \\
+        -panel_min_tumor_qual 75 \\
+        -hotspot_max_germline_vaf 100 \\
+        -hotspot_max_germline_rel_raw_base_qual 100 \\
+        -panel_max_germline_vaf 100 \\
+        -panel_max_germline_rel_raw_base_qual 100 \\
+        -ref_sample_count 0 \\
+        -panel_only \\
+        -disable_bqr true \\
         -threads ${task.cpus} \\
-        -output_vcf ${output}
+        -output_vcf ${meta.tumor_id}.sage.germline.vcf.gz
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -58,14 +58,9 @@ process SAGE {
     """
 
     stub:
-    prefix = task.ext.prefix ?: "${meta.id}"
-    def VERSION = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
     """
-    touch sites.txt
-
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        hetpileups: ${VERSION}
-    END_VERSIONS
+    touch ${meta.tumor_id}.sage.germline.vcf.gz
+    touch ${meta.tumor_id}.sage.germline.vcf.gz.tbi
+    echo -e '${task.process}:\\n  stub: noversions\\n' > versions.yml
     """
 }
