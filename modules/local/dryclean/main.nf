@@ -3,8 +3,8 @@ process DRYCLEAN {
     label 'process_medium'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/dryclean:0.0.3':
-        'mskilab/dryclean:0.0.3' }"
+        'docker://mskilab/dryclean:0.0.4':
+        'mskilab/dryclean:0.0.4' }"
 
 
     input:
@@ -32,7 +32,7 @@ process DRYCLEAN {
     script:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
-    def VERSION = '0.0.3'
+    def VERSION = '0.0.4'
     """
     #!/bin/bash
     set -o allexport
@@ -69,7 +69,7 @@ process DRYCLEAN {
     CMD="Rscript \$drycln \\
         --input             ${input} \\
         --pon               ${pon} \\
-        --center            ${centered} \\
+        --center            ${center} \\
         --cbs               ${cbs} \\
         --cnsignif          ${cnsignif} \\
         --cores             ${task.cpus} \\
@@ -98,8 +98,6 @@ process DRYCLEAN {
     """
 
     stub:
-    def args = task.ext.args ?: ''
-    def prefix = task.ext.prefix ?: "${meta.id}"
     """
     touch drycleaned.cov.rds
     """

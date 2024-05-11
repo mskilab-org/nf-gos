@@ -19,7 +19,7 @@ nextflow_process {
                 input[0] = tuple(meta, "$projectDir/tests/test_data/samp1.rds")
                 // Defaults from nextflow.config
                 input[1] = params.genomes['GATK.GRCh37'].pon_dryclean
-                input[2] = params.centered_dryclean
+                input[2] = params.center_dryclean
                 input[3] = params.cbs_dryclean
                 input[4] = params.cnsignif_dryclean
                 input[5] = params.wholeGenome_dryclean
@@ -27,9 +27,8 @@ nextflow_process {
                 input[7] = params.blacklist_path_dryclean
                 input[8] = params.germline_filter_dryclean
                 input[9] = params.germline_file_dryclean
-                input[10] = params.human_dryclean
-                input[11] = params.field_dryclean
-                input[12] = params.genomes['GATK.GRCh37'].build_dryclean
+                input[10] = params.field_dryclean
+                input[11] = params.genomes['GATK.GRCh37'].build_dryclean
                 """
             }
         }

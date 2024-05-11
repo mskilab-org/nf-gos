@@ -50,7 +50,7 @@ def checkPathParamList = [
     params.pon_tbi,
     params.gcmapdir_frag,
     params.pon_dryclean,
-    params.blacklist_coverage_jabba
+    params.blacklist_coverage_jabba,
 ]
 
 def toolParamMap = [
@@ -397,13 +397,13 @@ paired_frag        = params.paired_frag        ?: Channel.empty()               
 exome_frag         = params.exome_frag         ?: Channel.empty()                                                         // For fragCounter
 
 // Dryclean
-center_dryclean             = params.center_dryclean          ?: Channel.empty()
+center_dryclean           = params.center_dryclean          ?: Channel.empty()
 cbs_dryclean                = params.cbs_dryclean               ?: Channel.empty()
 cnsignif_dryclean           = params.cnsignif_dryclean          ?: Channel.empty()
 wholeGenome_dryclean        = params.wholeGenome_dryclean       ?: Channel.empty()
 blacklist_dryclean          = params.blacklist_dryclean         ?: Channel.empty()
 germline_filter_dryclean    = params.germline_filter_dryclean   ?: Channel.empty()
-//human_dryclean              = params.human_dryclean             ?: Channel.empty()
+human_dryclean              = params.human_dryclean             ?: Channel.empty()
 field_dryclean              = params.field_dryclean             ?: Channel.empty()
 build_dryclean              = params.build_dryclean             ?: Channel.empty()
 
@@ -477,7 +477,7 @@ ism_lp_phased_balance = params.ism_lp_phased_balance ?: Channel.empty()
 epgap_lp_phased_balance = params.epgap_lp_phased_balance ?: Channel.empty()
 hets_thresh_lp_phased_balance = params.hets_thresh_lp_phased_balance ?: Channel.empty()
 min_bins_lp_phased_balance = params.min_bins_lp_phased_balance ?: Channel.empty()
-min_width_lp_phased_balance = params.min_width_lp_phased_balance ?: Channel.empty()
+min_width_lp_phased_balance = params.min_width_lp_phased_balance || params.min_width_lp_phased_balance == 0 ? params.min_width_lp_phased_balance : Channel.empty()
 trelim_lp_phased_balance = params.trelim_lp_phased_balance ?: Channel.empty()
 reward_lp_phased_balance = params.reward_lp_phased_balance ?: Channel.empty()
 nodefileind_lp_phased_balance = params.nodefileind_lp_phased_balance ?: Channel.empty()
@@ -622,27 +622,17 @@ include { COV_CBS as CBS                              } from '../subworkflows/lo
 
 // JaBbA
 include { COV_JUNC_JABBA as JABBA                     } from '../subworkflows/local/jabba/main'
-include { COV_JUNC_JABBA as JABBA_WITH_SVABA          } from '../subworkflows/local/jabba/main'
-include { COV_JUNC_JABBA as JABBA_WITH_GRIDSS         } from '../subworkflows/local/jabba/main'
 
 // Events
 include { GGRAPH_EVENTS as EVENTS                            } from '../subworkflows/local/events/main'
-include { GGRAPH_EVENTS as EVENTS_WITH_GRIDSS                } from '../subworkflows/local/events/main'
-include { GGRAPH_EVENTS as EVENTS_WITH_SVABA                 } from '../subworkflows/local/events/main'
 
 // Fusions
 include { GGRAPH_FUSIONS as FUSIONS                            } from '../subworkflows/local/fusions/main'
-include { GGRAPH_FUSIONS as FUSIONS_WITH_GRIDSS                } from '../subworkflows/local/fusions/main'
-include { GGRAPH_FUSIONS as FUSIONS_WITH_SVABA                 } from '../subworkflows/local/fusions/main'
 
 // Alleic CN
 include { COV_GGRAPH_NON_INTEGER_BALANCE as NON_INTEGER_BALANCE                            } from '../subworkflows/local/allelic_cn/main'
-include { COV_GGRAPH_NON_INTEGER_BALANCE as NON_INTEGER_BALANCE_WITH_GRIDSS                } from '../subworkflows/local/allelic_cn/main'
-include { COV_GGRAPH_NON_INTEGER_BALANCE as NON_INTEGER_BALANCE_WITH_SVABA                 } from '../subworkflows/local/allelic_cn/main'
 
 include { COV_GGRAPH_LP_PHASED_BALANCE as LP_PHASED_BALANCE                            } from '../subworkflows/local/allelic_cn/main'
-include { COV_GGRAPH_LP_PHASED_BALANCE as LP_PHASED_BALANCE_WITH_GRIDSS                } from '../subworkflows/local/allelic_cn/main'
-include { COV_GGRAPH_LP_PHASED_BALANCE as LP_PHASED_BALANCE_WITH_SVABA                 } from '../subworkflows/local/allelic_cn/main'
 
 // HRDetect
 include { JUNC_SNV_GGRAPH_HRDETECT } from '../subworkflows/local/hrdetect/main'
@@ -778,9 +768,9 @@ workflow NFJABBA {
     boolean runDryClean = false
     boolean runAscat = false
     boolean runJabba = false
+    boolean runAllelicCN = false
     boolean runEvents = false
     boolean runFusions = false
-    boolean runAlleicCN = false
     boolean runHRDetect = false
 
     // Set flags based on params.step using a cascading approach
@@ -812,12 +802,12 @@ workflow NFJABBA {
             runAscat = true
         case 'jabba':
             runJabba = true
+        case 'allelic_cn':
+            runAllelicCN = true
         case 'events':
             runEvents = true
         case 'fusions':
             runFusions = true
-        case 'allelic_cn':
-            runAlleicCN = true
         case 'hrdetect':
             runHRDetect = true
             break
@@ -1278,10 +1268,10 @@ workflow NFJABBA {
 
         if (tools_used.contains('fragcounter')) {
             NORMAL_FRAGCOUNTER(bam_fragcounter_status.normal, midpoint_frag, windowsize_frag, gcmapdir_frag, minmapq_frag, paired_frag, exome_frag)
-            normal_frag_cov = Channel.empty().mix(NORMAL_FRAGCOUNTER.out.rebinned_raw_cov)
+            normal_frag_cov = Channel.empty().mix(NORMAL_FRAGCOUNTER.out.fragcounter_cov)
 
             TUMOR_FRAGCOUNTER(bam_fragcounter_status.tumor, midpoint_frag, windowsize_frag, gcmapdir_frag, minmapq_frag, paired_frag, exome_frag)
-            tumor_frag_cov = Channel.empty().mix(TUMOR_FRAGCOUNTER.out.rebinned_raw_cov)
+            tumor_frag_cov = Channel.empty().mix(TUMOR_FRAGCOUNTER.out.fragcounter_cov)
 
             // Only need one versions because its just one program (fragcounter)
             versions = versions.mix(NORMAL_FRAGCOUNTER.out.versions)
@@ -1528,7 +1518,7 @@ workflow NFJABBA {
             TUMOR_DRYCLEAN(
                     tumor_frag_cov,
                     pon_dryclean,
-                    centered_dryclean,
+                    center_dryclean,
                     cbs_dryclean,
                     cnsignif_dryclean,
                     wholeGenome_dryclean,
@@ -1536,7 +1526,6 @@ workflow NFJABBA {
                     blacklist_path_dryclean,
                     germline_filter_dryclean,
                     germline_file_dryclean,
-                    human_dryclean,
                     field_dryclean,
                     build_dryclean
                     )
@@ -1546,7 +1535,7 @@ workflow NFJABBA {
             NORMAL_DRYCLEAN(
                     normal_frag_cov,
                     pon_dryclean,
-                    centered_dryclean,
+                    center_dryclean,
                     cbs_dryclean,
                     cnsignif_dryclean,
                     wholeGenome_dryclean,
@@ -1554,7 +1543,6 @@ workflow NFJABBA {
                     blacklist_path_dryclean,
                     germline_filter_dryclean,
                     germline_file_dryclean,
-                    human_dryclean,
                     field_dryclean,
                     build_dryclean
                     )
@@ -1611,7 +1599,7 @@ workflow NFJABBA {
                             meta.patient        = cov[0]
                             meta.sex            = cov[1].sex
 
-                            [ meta, cov[2], hets[2] ]
+                            [ meta, hets[2], cov[2] ]
                     }
             }
 
@@ -1675,8 +1663,74 @@ workflow NFJABBA {
                         ]
                     }
 
+            } else {
+
+                meta_for_joining = tumor_dryclean_cov.map{ meta, tumor_cov -> [meta.patient, meta] } // can use any of the inputs to get the meta data
+
+                tumor_dryclean_cov_for_joining = tumor_dryclean_cov.map { meta, tumor_cov -> [meta.patient, tumor_cov] }
+
+                het_pileups_for_joining = sites_from_het_pileups_wgs.map { meta, hets -> [meta.patient, hets] }
+
+                ploidy_for_joining = ploidy.map{ meta, ploidy -> [ meta.patient, ploidy ] }
+
+                cbs_seg_rds_for_joining = cbs_seg_rds.map{ meta, seg -> [ meta.patient, seg ] }
+                cbs_nseg_rds_for_joining = cbs_nseg_rds.map{ meta, nseg -> [ meta.patient, nseg ] }
+
+                // join all previous outputs to be used as input for jabba
+                // excluding svs since they can come from either svaba or gridss
+                jabba_inputs = meta_for_joining
+                    .join(tumor_dryclean_cov_for_joining)
+                    .join(het_pileups_for_joining)
+                    .join(ploidy_for_joining)
+                    .join(cbs_seg_rds_for_joining)
+                    .join(cbs_nseg_rds_for_joining)
+
+                if (tools_used.contains('gridss')) {
+
+                    vcf_from_sv_calling_gridss_for_joining = vcf_from_sv_calling_gridss.map{ meta, junction -> [ meta.patient, junction ] }
+                    unfiltered_som_sv_gridss_for_joining = unfiltered_som_sv_gridss.map{ meta, j_supp -> [ meta.patient, j_supp ] }
+
+                    jabba_inputs = jabba_inputs
+                        .join(vcf_from_sv_calling_gridss_for_joining)
+                        .join(unfiltered_som_sv_gridss_for_joining)
+                        .map{ patient, meta, cov, hets, ploidy, seg, nseg, junction, j_supp ->
+                            [
+                                meta,
+                                junction,
+                                cov,
+                                j_supp,
+                                hets,
+                                ploidy,
+                                seg,
+                                nseg
+                            ]
+                        }
+                }
+
+                else if (tools_used.contains('svaba')) {
+
+                    vcf_from_sv_calling_for_joining = vcf_from_sv_calling.map{ meta, juction -> [ meta.patient, junction ] }
+                    unfiltered_som_sv_for_joining = j_supp.map{ meta, j_supp -> [ meta.patient, j_supp ] }
+
+                    jabba_inputs = jabba_inputs
+                        .join(vcf_from_sv_calling_for_joining)
+                        .join(unfiltered_som_sv_for_joining)
+                        .map{ patient, meta, cov, hets, ploidy, seg, nseg, junction, j_supp ->
+                            [
+                                meta,
+                                junction,
+                                cov,
+                                j_supp,
+                                hets,
+                                ploidy,
+                                seg,
+                                nseg
+                            ]
+                        }
+                }
+
                 JABBA(
-                    jabba_inputs
+                    jabba_inputs,
                     blacklist_junctions_jabba,
                     geno_jabba,
                     indel_jabba,
@@ -1715,373 +1769,108 @@ workflow NFJABBA {
                 karyograph          = Channel.empty().mix(JABBA.out.karyograph)
                 versions            = versions.mix(JABBA.out.versions)
 
-            } else {
-
-                tumor_dryclean_cov_for_joining = tumor_dryclean_cov.map { meta, tumor_cov -> [meta.patient, meta, tumor_cov] }
-
-                het_pileups_for_joining = sites_from_het_pileups_wgs.map { meta, hets -> [meta.patient, hets] }
-
-                ploidy_for_joining = ploidy.map{ meta, ploidy -> [ meta.patient, ploidy ] }
-
-                cbs_seg_rds_for_joining = cbs_seg_rds.map{ meta, seg -> [ meta.patient, seg ] }
-                cbs_nseg_rds_for_joining = cbs_nseg_rds.map{ meta, nseg -> [ meta.patient, nseg ] }
-
-                // join all previous outputs to be used as input for jabba
-                // excluding svs since they can come from either svaba or gridss
-                jabba_inputs = tumor_dryclean_cov_for_joining
-                    .join(het_pileups_for_joining)
-                    .join(ploidy_for_joining)
-                    .join(cbs_seg_rds_for_joining)
-                    .join(cbs_nseg_rds_for_joining)
-
-                if (tools_used.contains('svaba')) {
-
-                    vcf_from_sv_calling_for_joining = vcf_from_sv_calling.map{ meta, juction -> [ meta.patient, junction ] }
-                    unfiltered_som_sv_for_joining = j_supp.map{ meta, j_supp -> [ meta.patient, j_supp ] }
-
-                    jabba_w_svaba_inputs = jabba_inputs
-                        .join(vcf_from_sv_calling_for_joining)
-                        .join(unfiltered_som_sv_for_joining)
-                        .map{ patient, meta, cov, hets, ploidy, seg, nseg, junction, j_supp ->
-                            [
-                                meta,
-                                junction,
-                                cov,
-                                j_supp,
-                                hets,
-                                ploidy,
-                                seg,
-                                nseg
-                            ]
-                        }
-
-                    JABBA_WITH_SVABA(
-                        jabba_w_svaba_inputs,
-                        blacklist_junctions_jabba,
-                        geno_jabba,
-                        indel_jabba,
-                        tfield_jabba,
-                        iter_jabba,
-                        rescue_window_jabba,
-                        rescue_all_jabba,
-                        nudgebalanced_jabba,
-                        edgenudge_jabba,
-                        strict_jabba,
-                        allin_jabba,
-                        field_jabba,
-                        maxna_jabba,
-                        blacklist_coverage_jabba,
-                        purity_jabba,
-                        pp_method_jabba,
-                        cnsignif_jabba,
-                        slack_jabba,
-                        linear_jabba,
-                        tilim_jabba,
-                        epgap_jabba,
-                        fix_thres_jabba,
-                        lp_jabba,
-                        ism_jabba,
-                        filter_loose_jabba,
-                        gurobi_jabba,
-                        verbose_jabba
-                    )
-
-                    jabba_rds_with_svaba           = Channel.empty().mix(JABBA_WITH_SVABA.out.jabba_rds)
-                    jabba_gg_with_svaba            = Channel.empty().mix(JABBA_WITH_SVABA.out.jabba_gg)
-                    jabba_vcf_with_svaba           = Channel.empty().mix(JABBA_WITH_SVABA.out.jabba_vcf)
-                    jabba_raw_rds_with_svaba       = Channel.empty().mix(JABBA_WITH_SVABA.out.jabba_raw_rds)
-                    opti_with_svaba                = Channel.empty().mix(JABBA_WITH_SVABA.out.opti)
-                    jabba_seg_with_svaba           = Channel.empty().mix(JABBA_WITH_SVABA.out.jabba_seg)
-                    karyograph_with_svaba          = Channel.empty().mix(JABBA_WITH_SVABA.out.karyograph)
-                    versions_with_svaba            = versions.mix(JABBA_WITH_SVABA.out.versions)
-
-                }
-
-                if (tools_used.contains('gridss')) {
-
-                    vcf_from_sv_calling_gridss_for_joining = vcf_from_sv_calling_gridss.map{ meta, junction -> [ meta.patient, junction ] }
-                    unfiltered_som_sv_gridss_for_joining = unfiltered_som_sv_gridss.map{ meta, j_supp -> [ meta.patient, j_supp ] }
-
-                    jabba_w_gridss_inputs = jabba_inputs
-                        .join(vcf_from_sv_calling_gridss_for_joining)
-                        .join(unfiltered_som_sv_gridss_for_joining)
-                        .map{ patient, meta, cov, hets, ploidy, seg, nseg, junction, j_supp ->
-                            [
-                                meta,
-                                junction,
-                                cov,
-                                j_supp,
-                                hets,
-                                ploidy,
-                                seg,
-                                nseg
-                            ]
-                        }
-
-                    JABBA_WITH_GRIDSS(
-                        jabba_w_gridss_inputs,
-                        blacklist_junctions_jabba,
-                        geno_jabba,
-                        indel_jabba,
-                        tfield_jabba,
-                        iter_jabba,
-                        rescue_window_jabba,
-                        rescue_all_jabba,
-                        nudgebalanced_jabba,
-                        edgenudge_jabba,
-                        strict_jabba,
-                        allin_jabba,
-                        field_jabba,
-                        maxna_jabba,
-                        blacklist_coverage_jabba,
-                        purity_jabba,
-                        pp_method_jabba,
-                        cnsignif_jabba,
-                        slack_jabba,
-                        linear_jabba,
-                        tilim_jabba,
-                        epgap_jabba,
-                        fix_thres_jabba,
-                        lp_jabba,
-                        ism_jabba,
-                        filter_loose_jabba,
-                        gurobi_jabba,
-                        verbose_jabba
-                    )
-
-                    jabba_rds_with_gridss           = Channel.empty().mix(JABBA_WITH_GRIDSS.out.jabba_rds)
-                    jabba_gg_with_gridss            = Channel.empty().mix(JABBA_WITH_GRIDSS.out.jabba_gg)
-                    jabba_seg_with_gridss           = Channel.empty().mix(JABBA_WITH_GRIDSS.out.jabba_seg)
-                    karyograph_with_gridss          = Channel.empty().mix(JABBA_WITH_GRIDSS.out.karyograph)
-                    versions_with_gridss            = versions.mix(JABBA_WITH_GRIDSS.out.versions)
-
-                }
             }
+        }
+    }
+
+    if (runAllelicCN) {
+        if (tools_used.contains('allelic_cn')) {
+            if (params.step == 'allelic_cn') {
+                non_integer_balance_inputs = input_sample.map{ meta, cov, hets, ggraph -> [ meta, ggraph, cov, hets ] }
+                het_pileups_for_joining = input_sample.map{ meta, cov, hets, ggraph -> [ meta.patient, hets ] }
+            } else {
+                jabba_rds_for_joining = jabba_rds.map{ meta, rds -> [ meta.patient, rds ] }
+                non_integer_balance_inputs = meta_for_joining
+                    .join(jabba_rds_for_joining)
+                    .join(tumor_dryclean_cov_for_joining)
+                    .join(het_pileups_for_joining)
+                    .map{ patient, meta, rds, cov, hets -> [ meta, rds, cov, hets ] }
+            }
+
+            NON_INTEGER_BALANCE(
+                non_integer_balance_inputs,
+                field_non_integer_balance,
+                hets_thresh_non_integer_balance,
+                mask_non_integer_balance,
+                overwrite_non_integer_balance,
+                lambda_non_integer_balance,
+                allin_non_integer_balance,
+                fix_thresh_non_integer_balance,
+                nodebounds_non_integer_balance,
+                ism_non_integer_balance,
+                build_non_integer_balance,
+                epgap_non_integer_balance,
+                tilim_non_integer_balance,
+                gurobi_non_integer_balance,
+                fasta,
+                fasta_fai,
+                bwa,
+                pad_non_integer_balance
+            )
+            versions = Channel.empty().mix(NON_INTEGER_BALANCE.out.versions)
+
+            non_integer_balance_balanced_gg = Channel.empty().mix(NON_INTEGER_BALANCE.out.non_integer_balance_balanced_gg)
+            non_integer_balance_hets_gg = Channel.empty().mix(NON_INTEGER_BALANCE.out.non_integer_balance_hets_gg)
+
+            non_integer_balance_balanced_gg_for_joining = non_integer_balance_balanced_gg.map{ meta, balanced -> [ meta.patient, balanced ] }
+
+            lp_phased_balance_inputs = meta_for_joining
+                .join(non_integer_balance_balanced_gg_for_joining)
+                .join(het_pileups_for_joining)
+                .map{ patient, meta, balanced_gg, hets -> [ meta, balanced_gg, hets ] }
+
+            LP_PHASED_BALANCE(
+                lp_phased_balance_inputs,
+                lambda_lp_phased_balance,
+                cnloh_lp_phased_balance,
+                major_lp_phased_balance,
+                allin_lp_phased_balance,
+                marginal_lp_phased_balance,
+                from_maf_lp_phased_balance,
+                mask_lp_phased_balance,
+                ism_lp_phased_balance,
+                epgap_lp_phased_balance,
+                hets_thresh_lp_phased_balance,
+                min_bins_lp_phased_balance,
+                min_width_lp_phased_balance,
+                trelim_lp_phased_balance,
+                reward_lp_phased_balance,
+                nodefileind_lp_phased_balance,
+                tilim_lp_phased_balance
+                )
+
+            lp_phased_balance_balanced_gg = Channel.empty().mix(LP_PHASED_BALANCE.out.lp_phased_balance_balanced_gg)
+            lp_phased_balance_binstats_gg = Channel.empty().mix(LP_PHASED_BALANCE.out.lp_phased_balance_binstats_gg)
+            lp_phased_balance_unphased_allelic_gg = Channel.empty().mix(LP_PHASED_BALANCE.out.lp_phased_balance_unphased_allelic_gg)
         }
     }
 
     if (runEvents) {
         if (tools_used.contains('events')) {
             if (params.step == 'events') {
-                EVENTS(input_sample, fasta)
+                events_input = input_sample
                 versions = Channel.empty().mix(EVENTS.out.versions)
-
-                events_output = Channel.empty().mix(EVENTS.out.events_output)
             } else {
-                if (tools_used.contains('gridss')) {
-                    EVENTS_WITH_GRIDSS(jabba_rds_with_gridss, fasta)
-                    events_w_gridss_versions = Channel.empty().mix(EVENTS_WITH_GRIDSS.out.versions)
-
-                    events_w_gridss_output = Channel.empty().mix(EVENTS_WITH_GRIDSS.out.events_output)
-                }
-                if (tools_used.contains('svaba')) {
-                    EVENTS_WITH_SVABA(jabba_rds_with_svaba, fasta)
-                    events_w_svaba_versions = Channel.empty().mix(EVENTS_WITH_SVABA.out.versions)
-
-                    events_w_svaba_output = Channel.empty().mix(EVENTS_WITH_SVABA.out.events_output)
-                }
+                events_input = lp_phased_balance_balanced_gg
             }
+
+            EVENTS(events_input, fasta)
+            events_versions = Channel.empty().mix(EVENTS.out.versions)
+            events_output = Channel.empty().mix(EVENTS.out.events_output)
         }
     }
 
     if (runFusions) {
         if (tools_used.contains('fusions')) {
             if (params.step == 'fusions') {
-                FUSIONS(input_sample, gencode_fusions)
-                fusions_output = Channel.empty().mix(FUSIONS.out.fusions_output)
-                versions = Channel.empty().mix(FUSIONS.out.versions)
-
+                fusions_input = input_sample
             } else {
-                if (tools_used.contains('gridss')) {
-                    FUSIONS_WITH_GRIDSS(jabba_rds_with_gridss, gencode_fusions)
-                    fusions_w_gridss_output = Channel.empty().mix(FUSIONS_WITH_GRIDSS.out.fusions_output)
-                    fusions_w_gridss_versions = Channel.empty().mix(FUSIONS_WITH_GRIDSS.out.versions)
-
-                }
-                if (tools_used.contains('svaba')) {
-                    FUSIONS_WITH_SVABA(jabba_rds_with_svaba, gencode_fusions)
-                    fusions_w_svaba_output = Channel.empty().mix(FUSIONS_WITH_SVABA.out.fusions_output)
-                    fusions_w_svaba_versions = Channel.empty().mix(FUSIONS_WITH_SVABA.out.versions)
-
-                }
+                fusions_input = lp_phased_balance_balanced_gg
             }
-        }
-    }
 
-    if (runAlleicCN) {
-        if (tools_used.contains('allelic_cn')) {
-            if (params.step == 'allelic_cn') {
-                non_integer_balance_inputs = input_sample.map{ meta, cov, hets, ggraph -> [ meta, ggraph, cov, hets ] }
-
-                NON_INTEGER_BALANCE(
-                    non_integer_balance_inputs,
-					field_non_integer_balance,
-					hets_thresh_non_integer_balance,
-                    mask_non_integer_balance,
-					overwrite_non_integer_balance,
-					lambda_non_integer_balance,
-					allin_non_integer_balance,
-					fix_thresh_non_integer_balance,
-					nodebounds_non_integer_balance,
-					ism_non_integer_balance,
-					build_non_integer_balance,
-					epgap_non_integer_balance,
-					tilim_non_integer_balance,
-					gurobi_non_integer_balance,
-                    fasta,
-					pad_non_integer_balance
-                )
-                versions = Channel.empty().mix(NON_INTEGER_BALANCE.out.versions)
-
-                non_integer_balance_balanced_gg = Channel.empty().mix(NON_INTEGER_BALANCE.out.non_integer_balance_balanced_gg)
-                non_integer_balance_hets_gg = Channel.empty().mix(NON_INTEGER_BALANCE.out.non_integer_balance_hets_gg)
-
-                non_integer_balance_balanced_gg_for_joining = non_integer_balance_balanced_gg.map{ meta, balanced -> [ meta.patient, meta, balanced ] }
-                hets_for_joining = input_sample.map{ meta, cov, hets, ggraph -> [ meta.patient, hets ] }
-                lp_phased_balance_inputs = non_integer_balance_hets_gg_for_joining.join(hets_for_joining)
-                    .map{ patient, meta, balanced, hets -> [ meta, balanced, hets ]
-                }
-
-                LP_PHASED_BALANCE(
-                    lp_phased_balance_inputs,
-                    lambda_lp_phased_balance,
-                    cnloh_lp_phased_balance,
-                    major_lp_phased_balance,
-                    allin_lp_phased_balance,
-                    marginal_lp_phased_balance,
-                    from_maf_lp_phased_balance,
-                    mask_lp_phased_balance,
-                    ism_lp_phased_balance,
-                    epgap_lp_phased_balance,
-                    hets_thresh_lp_phased_balance,
-                    min_bins_lp_phased_balance,
-                    min_width_lp_phased_balance,
-                    trelim_lp_phased_balance,
-                    reward_lp_phased_balance,
-                    nodefileind_lp_phased_balance,
-                    tilim_lp_phased_balance
-                )
-
-                lp_phased_balance_balanced_gg = Channel.empty().mix(LP_PHASED_BALANCE.out.lp_phased_balance_balanced_gg)
-                lp_phased_balance_binstats_gg = Channel.empty().mix(LP_PHASED_BALANCE.out.lp_phased_balance_binstats_gg)
-                lp_phased_balance_unphased_allelic_gg = Channel.empty().mix(LP_PHASED_BALANCE.out.lp_phased_balance_unphased_allelic_gg)
-            } else {
-                if (tools_used.contains('gridss')) {
-                    jabba_rds_with_gridss_for_joining = jabba_rds_with_gridss.map{ meta, rds -> [ meta.patient, meta, rds ] }
-                    non_integer_balance_w_gridss_inputs = jabba_rds_with_gridss_for_joining
-                        .join(tumor_dryclean_cov_for_joining)
-                        .join(het_pileups_for_joining)
-                        .map{ patient, meta, rds, cov, hets -> [ meta, rds, cov, hets ] }
-
-                    NON_INTEGER_BALANCE_WITH_GRIDSS(
-                        non_integer_balance_w_gridss_inputs,
-                        field_non_integer_balance,
-                        hets_thresh_non_integer_balance,
-                        mask_non_integer_balance,
-                        overwrite_non_integer_balance,
-                        lambda_non_integer_balance,
-                        allin_non_integer_balance,
-                        fix_thresh_non_integer_balance,
-                        nodebounds_non_integer_balance,
-                        ism_non_integer_balance,
-                        build_non_integer_balance,
-                        epgap_non_integer_balance,
-                        tilim_non_integer_balance,
-                        gurobi_non_integer_balance,
-                        fasta,
-                        pad_non_integer_balance
-                    )
-                    versions_w_gridss = Channel.empty().mix(NON_INTEGER_BALANCE_WITH_GRIDSS.out.versions)
-
-                    non_integer_balance_w_gridss_balanced_gg = Channel.empty().mix(NON_INTEGER_BALANCE_WITH_GRIDSS.out.non_integer_balance_balanced_gg)
-                    non_integer_balance_w_gridss_hets_gg = Channel.empty().mix(NON_INTEGER_BALANCE_WITH_GRIDSS.out.non_integer_balance_hets_gg)
-
-                    non_integer_balance_w_gridss_balanced_gg_for_joining = non_integer_balance_w_gridss_balanced_gg.map{ meta, balanced -> [ meta.patient, meta, balanced ] }
-                    lp_phased_balance_w_gridss_inputs = non_integer_balance_w_gridss_balanced_gg_for_joining.join(het_pileups_for_joining)
-                        .map{ patient, meta, balanced, hets -> [ meta, balanced, hets ] }
-
-                    LP_PHASED_BALANCE_WITH_GRIDSS(
-                        lp_phased_balance_w_gridss_inputs,
-                        lambda_lp_phased_balance,
-                        cnloh_lp_phased_balance,
-                        major_lp_phased_balance,
-                        allin_lp_phased_balance,
-                        marginal_lp_phased_balance,
-                        from_maf_lp_phased_balance,
-                        mask_lp_phased_balance,
-                        ism_lp_phased_balance,
-                        epgap_lp_phased_balance,
-                        hets_thresh_lp_phased_balance,
-                        min_bins_lp_phased_balance,
-                        min_width_lp_phased_balance,
-                        trelim_lp_phased_balance,
-                        reward_lp_phased_balance,
-                        nodefileind_lp_phased_balance,
-                        tilim_lp_phased_balance
-                    )
-
-                    lp_phased_balance_w_gridss_balanced_gg = Channel.empty().mix(LP_PHASED_BALANCE_WITH_GRIDSS.out.lp_phased_balance_balanced_gg)
-                    lp_phased_balance_w_gridss_binstats_gg = Channel.empty().mix(LP_PHASED_BALANCE_WITH_GRIDSS.out.lp_phased_balance_binstats_gg)
-                    lp_phased_balance_w_gridss_unphased_allelic_gg = Channel.empty().mix(LP_PHASED_BALANCE_WITH_GRIDSS.out.lp_phased_balance_unphased_allelic_gg)
-                }
-                if (tools_used.contains('svaba')) {
-                    jabba_rds_with_svaba_for_joining = jabba_rds_with_svaba.map{ meta, rds -> [ meta.patient, meta, rds ] }
-                    non_integer_balance_w_svaba_inputs = jabba_rds_with_svaba_for_joining
-                        .join(tumor_dryclean_cov_for_joining)
-                        .join(het_pileups_for_joining)
-                        .map{ patient, meta, rds, cov, hets -> [ meta, rds, cov, hets ] }
-                    NON_INTEGER_BALANCE_WITH_SVABA(
-                        non_integer_balance_w_svaba_inputs,
-                        field_non_integer_balance,
-                        hets_thresh_non_integer_balance,
-                        mask_non_integer_balance,
-                        overwrite_non_integer_balance,
-                        lambda_non_integer_balance,
-                        allin_non_integer_balance,
-                        fix_thresh_non_integer_balance,
-                        nodebounds_non_integer_balance,
-                        ism_non_integer_balance,
-                        build_non_integer_balance,
-                        epgap_non_integer_balance,
-                        tilim_non_integer_balance,
-                        gurobi_non_integer_balance,
-                        fasta,
-                        pad_non_integer_balance
-                    )
-                    versions_w_svaba = Channel.empty().mix(NON_INTEGER_BALANCE_WITH_SVABA.out.versions)
-
-                    non_integer_balance_w_svaba_balanced_gg = Channel.empty().mix(NON_INTEGER_BALANCE_WITH_SVABA.out.non_integer_balance_balanced_gg)
-                    non_integer_balance_w_svaba_hets_gg = Channel.empty().mix(NON_INTEGER_BALANCE_WITH_SVABA.out.non_integer_balance_hets_gg)
-
-                    non_integer_balance_w_svaba_balanced_gg_for_joining = non_integer_balance_w_svaba_balanced_gg.map{ meta, balanced -> [ meta.patient, meta, balanced ] }
-                    lp_phased_balance_w_svaba_inputs = non_integer_balance_w_svaba_balanced_gg_for_joining.join(het_pileups_for_joining)
-                        .map{ patient, meta, balanced, hets -> [ meta, balanced, hets ] }
-
-                    LP_PHASED_BALANCE_WITH_SVABA(
-                        lp_phased_balance_w_svaba_inputs,
-                        lambda_lp_phased_balance,
-                        cnloh_lp_phased_balance,
-                        major_lp_phased_balance,
-                        allin_lp_phased_balance,
-                        marginal_lp_phased_balance,
-                        from_maf_lp_phased_balance,
-                        mask_lp_phased_balance,
-                        ism_lp_phased_balance,
-                        epgap_lp_phased_balance,
-                        hets_thresh_lp_phased_balance,
-                        min_bins_lp_phased_balance,
-                        min_width_lp_phased_balance,
-                        trelim_lp_phased_balance,
-                        reward_lp_phased_balance,
-                        nodefileind_lp_phased_balance,
-                        tilim_lp_phased_balance
-                    )
-
-                    lp_phased_balance_balanced_gg = Channel.empty().mix(LP_PHASED_BALANCE_WITH_SVABA.out.lp_phased_balance_balanced_gg)
-                    lp_phased_balance_binstats_gg = Channel.empty().mix(LP_PHASED_BALANCE_WITH_SVABA.out.lp_phased_balance_binstats_gg)
-                    lp_phased_balance_unphased_allelic_gg = Channel.empty().mix(LP_PHASED_BALANCE_WITH_SVABA.out.lp_phased_balance_unphased_allelic_gg)
-                }
-            }
+            FUSIONS(fusions_input, gencode_fusions)
+            fusions_output = Channel.empty().mix(FUSIONS.out.fusions_output)
+            versions = Channel.empty().mix(FUSIONS.out.versions)
         }
     }
 
