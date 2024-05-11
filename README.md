@@ -1,18 +1,4 @@
-# NF-JaBbA (Nextflow - Junction Balance Analysis Pipeline)
-```
-▐▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▌
-▐                                                                                                  ▌
-▐                  ██████                   █████           ███████████  █████       █████████     ▌
-▐                 ███░░███                 ░░███           ░░███░░░░░███░░███       ███░░░░░███    ▌
-▐    ████████    ░███ ░░░                   ░███   ██████   ░███    ░███ ░███████  ░███    ░███    ▌
-▐   ░░███░░███  ███████    ██████████       ░███  ░░░░░███  ░██████████  ░███░░███ ░███████████    ▌
-▐    ░███ ░███ ░░░███░    ░░░░░░░░░░        ░███   ███████  ░███░░░░░███ ░███ ░███ ░███░░░░░███    ▌
-▐    ░███ ░███   ░███                 ███   ░███  ███░░███  ░███    ░███ ░███ ░███ ░███    ░███    ▌
-▐    ████ █████  █████               ░░████████  ░░████████ ███████████  ████████  █████   █████   ▌
-▐   ░░░░ ░░░░░  ░░░░░                 ░░░░░░░░    ░░░░░░░░ ░░░░░░░░░░░  ░░░░░░░░  ░░░░░   ░░░░░    ▌
-▐                                                                                                  ▌
-▐▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▌
-```
+# NF-CaseReports (Nextflow - Case Reports Pipeline)
 
 [![Cite with Zenodo](http://img.shields.io/badge/DOI-10.5281/zenodo.XXXXXXX-1073c8?labelColor=000000)](https://doi.org/10.5281/zenodo.XXXXXXX)
 
@@ -21,16 +7,33 @@
 [![run with singularity](https://img.shields.io/badge/run%20with-singularity-1d355c.svg?labelColor=000000)](https://sylabs.io/docs/)
 [![Launch on Nextflow Tower](https://img.shields.io/badge/Launch%20%F0%9F%9A%80-Nextflow%20Tower-%234256e7)](https://tower.nf/launch?pipeline=https://github.com/mskilab-org/nf-jabba)
 
+## Citations
+
+An extensive list of references for the tools used by the pipeline can be found in the [`CITATIONS.md`](CITATIONS.md) file.
+
+This pipeline uses code and infrastructure developed and maintained by the [nf-core](https://nf-co.re) community, reused here under the [MIT license](https://github.com/nf-core/tools/blob/master/LICENSE).
+
+> **Most large structural variants in cancer genomes can be detected without long reads.**
+> Choo, ZN., Behr, J.M., Deshpande, A. et al.
+>
+> _Nat Genet_ 2023 Nov 09. doi: [https://doi.org/10.1038/s41588-023-01540-6](https://doi.org/10.1038/s41588-023-01540-6)
+
+> **The nf-core framework for community-curated bioinformatics pipelines.**
+>
+> Philip Ewels, Alexander Peltzer, Sven Fillinger, Harshil Patel, Johannes Alneberg, Andreas Wilm, Maxime Ulysse Garcia, Paolo Di Tommaso & Sven Nahnsen.
+>
+> _Nat Biotechnol._ 2020 Feb 13. doi: [10.1038/s41587-020-0439-x](https://dx.doi.org/10.1038/s41587-020-0439-x).
+
 ## Introduction
 
-**mskilab-org/nf-JaBbA** is a new state-of-the-art bioinformatics pipeline from [`mskilab-org`](https://www.mskilab.org/) for running [`JaBbA`](https://github.com/mskilab-org/JaBbA/tree/master), our algorithm for doing MIP based joint inference of copy number and rearrangement state in cancer whole genome sequence data. This pipeline runs all the pre-requisite modules and generates the necessary inputs for running JaBbA. It is designed to take tumor-normal pairs of human samples as input. 
+**mskilab-org/nf-JaBbA** is a new state-of-the-art bioinformatics pipeline from [`mskilab-org`](https://www.mskilab.org/) for running [`JaBbA`](https://github.com/mskilab-org/JaBbA/tree/master), our algorithm for doing MIP based joint inference of copy number and rearrangement state in cancer whole genome sequence data. This pipeline runs all the pre-requisite modules and generates the necessary inputs for running JaBbA. It is designed to take tumor-normal pairs of human samples as input.
 
 We took inspiration from [`nf-core/Sarek`](https://github.com/nf-core/sarek), a workflow for detecting variants in whole genome or targeted sequencing data. **`nf-jabba`** is built using [`Nextflow`](https://www.nextflow.io/) and the `Nextflow DSL2`. All the modules use [`Docker`](https://www.docker.com/) and [`Singularity`](https://sylabs.io/docs/) containers, for easy execution and reproducibility. Some of the modules/processes are derived from open source [`nf-core/modules`](https://github.com/nf-core/modules).
 
-This pipeline has been designed to start from **FASTQ** files or directly from **BAM** files. Paths to these files should be supplied in a **CSV** file (*please refer to the section below for the input format of the .csv file*). 
+This pipeline has been designed to start from **FASTQ** files or directly from **BAM** files. Paths to these files should be supplied in a **CSV** file (*please refer to the section below for the input format of the .csv file*).
 
 ## Workflow Summary:
-1. Alignment to Reference Genome (currently supports `BWA-MEM` & `BWA-MEM2`; a modified version of the `Alignment` step from `nf-core/Sarek` is used here). 
+1. Alignment to Reference Genome (currently supports `BWA-MEM` & `BWA-MEM2`; a modified version of the `Alignment` step from `nf-core/Sarek` is used here).
 )
 2. Quality Control (using [`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/))
 3. Trimming (must turn on using `--trim_fastq`) (using `fastp`)
@@ -92,7 +95,7 @@ A typical sample sheet should populate with the column names as shown below:
 |-----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
 |   patient       | Patient or Sample ID. This should differentiate each patient/sample. *Note*: Each patient can have multiple sample names.                                 |
 |   sample        | Sample ID for each Patient. Should differentiate between tumor and normal. Sample IDs should be unique to Patient IDs                                     |
-|   lane          | If starting with FASTQ files, and if there are multiple lanes for each sample for each patient, mention lane name. **Required for `--step alignment`.         | 
+|   lane          | If starting with FASTQ files, and if there are multiple lanes for each sample for each patient, mention lane name. **Required for `--step alignment`.         |
 |   sex           | If known, please provide the sex for the patient. For instance if **Male** type XY, else if **Female** type XX, otherwise put NA.     |
 |   status        | This should indicate if your sample is **tumor** or **normal**. For **normal**, write 0, and for **tumor**, write 1.                                          |
 |   fastq_1       | Full Path to FASTQ file read 1. The extension should be `.fastq.gz` or `.fq.gz`. **Required** for `--step alignment`.                                     |
@@ -116,7 +119,7 @@ If a process of the pipeline fails or is interrupted at some point, Nextflow can
 #### `-profile`
 Use this parameter for choosing a configuration profile. Profiles contain configuration presets for different computing environments.
 
-Several generic profiles have been provided by default which instruct the pipeline to use software packaged using different methods. You can use this option to run the pipeline via containers (singularity/Docker) (**highly recommended**) 
+Several generic profiles have been provided by default which instruct the pipeline to use software packaged using different methods. You can use this option to run the pipeline via containers (singularity/Docker) (**highly recommended**)
 
 #### `-c`
 You can mention custom configuration scripts to run the pipeline with using the `-c` flag and providing a path to the `.config` file. This is advised when you want to submit processes into an executor like `slurm` or `LSF`.
@@ -128,16 +131,16 @@ The Nextflow `-bg` flag launches the Nextflow pipeline as a background process. 
 Every module in the pipeline has been containerized. Some modules are partially modified versions of [nf-core/modules](https://nf-co.re/modules), these modules use nf-core containers. Modules that use our lab packages and scripts were containerized into Docker images. These images can be found on our [DockerHub](https://hub.docker.com/repositories/mskilab).
 
 > **Warning:**
-> JaBbA depends on CPLEX MIP Optimizer to work. Because CPLEX is a proprietary software, it isn't included in the image and needs to be installed by the user. 
+> JaBbA depends on CPLEX MIP Optimizer to work. Because CPLEX is a proprietary software, it isn't included in the image and needs to be installed by the user.
 > To add CPLEX:
 >  1. Download CPLEX (Linux x86-64). (You may need to use the HTTP method.)
 >  2. Pull image and run the container using:
 > ```
 > docker pull mskilab/jabba:latest
 > docker run -it --rm --platform linux/amd64 mskilab/jabba:latest
-> ``` 
+> ```
 >  3. Copy CPLEX binary into the container: docker cp /PATH/TO/DOWNLOADED_CPLEX.bin CONTAINER_ID:/opt/cplex_studio
->  4. Install CPLEX: /opt/cplex_studio/DOWNLOADED_CPLEX.bin (If you get a Permission denied error, run 
+>  4. Install CPLEX: /opt/cplex_studio/DOWNLOADED_CPLEX.bin (If you get a Permission denied error, run
 >  chmod 777 /PATH/TO/DOWNLOADED_CPLEX.bin before copying it into the container.)
 >  5. When prompted for an installation path, type /opt/cplex. This is what the CPLEX_DIR environmental variable is set to.
 >  6. Save changes to a new image for future use:
@@ -162,14 +165,5 @@ We thank the following people for their extensive guidance in the development of
 
 If you would like to contribute to this pipeline, please see the [contributing guidelines](.github/CONTRIBUTING.md).
 
-## Citations
 
-An extensive list of references for the tools used by the pipeline can be found in the [`CITATIONS.md`](CITATIONS.md) file.
 
-This pipeline uses code and infrastructure developed and maintained by the [nf-core](https://nf-co.re) community, reused here under the [MIT license](https://github.com/nf-core/tools/blob/master/LICENSE).
-
-> **The nf-core framework for community-curated bioinformatics pipelines.**
->
-> Philip Ewels, Alexander Peltzer, Sven Fillinger, Harshil Patel, Johannes Alneberg, Andreas Wilm, Maxime Ulysse Garcia, Paolo Di Tommaso & Sven Nahnsen.
->
-> _Nat Biotechnol._ 2020 Feb 13. doi: [10.1038/s41587-020-0439-x](https://dx.doi.org/10.1038/s41587-020-0439-x).
