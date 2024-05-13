@@ -17,7 +17,7 @@ process SAGE_SOMATIC {
     path(panel_bed)
     path(high_confidence_bed)
 
-    output
+    output:
     tuple val(meta), path('*.sage.somatic.vcf.gz'), path('*.sage.somatic.vcf.gz.tbi'), emit: vcf
     path "versions.yml"                                     , emit: versions
 

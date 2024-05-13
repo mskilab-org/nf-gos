@@ -2,8 +2,8 @@
 // BAM SAGE
 //
 
-include { SAGE_SOMATIC } from '../../../modules/local/somatic/sage/main.nf'
-include { SAGE_GERMLINE } from '../../../modules/local/somatic/germline/main.nf'
+include { SAGE_SOMATIC } from '../../../modules/local/sage/somatic/main.nf'
+include { SAGE_GERMLINE } from '../../../modules/local/sage/germline/main.nf'
 
 workflow BAM_SAGE {
     // defining inputs

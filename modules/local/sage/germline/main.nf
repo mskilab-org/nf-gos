@@ -17,7 +17,7 @@ process SAGE_GERMLINE {
     path(panel_bed)
     path(high_confidence_bed)
 
-    output
+    output:
     tuple val(meta), path('*.sage.germline.vcf.gz'), path('*.sage.germline.vcf.gz.tbi'), emit: vcf
     path "versions.yml"                                     , emit: versions
 
