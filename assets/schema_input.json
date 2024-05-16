@@ -285,12 +285,58 @@
                 "format": "file-path",
                 "exists": true
             },
+            "snv_tbi_somatic": {
+                "errorMessage": "Sage somatic VCF tbi file cannot contain spaces and must have extension '.tbi' or '.gz.tbi'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.tbi(\\.gz.tbi)?$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
             "snv_vcf_germline": {
                 "errorMessage": "Sage germline VCF output file cannot contain spaces and must have extension '.vcf' or '.vcf.gz'",
                 "anyOf": [
                     {
                         "type": "string",
                         "pattern": "^\\S+\\.vcf(\\.gz)?$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+            "snv_tbi_germline": {
+                "errorMessage": "Sage germline VCF tbi file cannot contain spaces and must have extension '.tbi' or '.gz.tbi'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.tbi(\\.gz.tbi)?$"
                     },
                     {
                         "type": "string",

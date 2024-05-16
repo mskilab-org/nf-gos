@@ -8,7 +8,6 @@ workflow JUNC_SNV_GGRAPH_HRDETECT {
 
     take:
     inputs  // [ meta, junction, hets, snv_somatic, jabba_rds]
-    mask
     ref_fasta
     genome_version
 
@@ -19,7 +18,6 @@ workflow JUNC_SNV_GGRAPH_HRDETECT {
 
     HRDETECT(
         inputs,
-        mask,
         ref_fasta,
         genome_version
     )

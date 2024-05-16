@@ -4,8 +4,8 @@ process SIGPROFILERASSIGNMENT {
     label 'process_medium'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/sigprofilerassignment:0.1':
-        'mskilab/sigprofilerassignment:0.1' }"
+        'docker://mskilab/sigprofilerassignment:0.0.3':
+        'mskilab/sigprofilerassignment:0.0.3' }"
 
     input:
     tuple val(meta), path(vcf), path(tbi)
@@ -25,11 +25,13 @@ process SIGPROFILERASSIGNMENT {
     def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
     """
-    python sigprofilerassignment.py \\
+    export SIGPROFILER_PATH=\$(echo "${baseDir}/bin/sigprofilerassignment.py")
+
+    python \$SIGPROFILER_PATH \\
     --input-vcf ${vcf} \\
     --genome ${genome} \\
     --cosmic-version ${cosmic_version} \\
-    ${use_gpu}
+    --output-directory ./ \\
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

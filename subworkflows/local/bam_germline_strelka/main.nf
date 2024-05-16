@@ -15,12 +15,10 @@ workflow BAM_GERMLINE_STRELKA {
     main:
     versions = Channel.empty()
 
-    STRELKA_GERMLINE(bam_intervals, fasta, fasta_fai)
+    STRELKA_GERMLINE(bam, fasta, fasta_fai)
 
     vcf = STRELKA_GERMLINE.out.vcf
 
-    versions = versions.mix(MERGE_STRELKA.out.versions)
-    versions = versions.mix(MERGE_STRELKA_GENOME.out.versions)
     versions = versions.mix(STRELKA_GERMLINE.out.versions)
 
     emit:

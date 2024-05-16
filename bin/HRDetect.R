@@ -480,9 +480,9 @@ if (!exists('cnv') || is.null(cnv)) {
     stop("no allelic CN available...")
 }
 
-if (is.character(cnv) && cnv == "/dev/null")
+if (is.character(cnv) && cnv == "/dev/null") {
     cnv.tmp = NULL
-else {
+} else {
     cnv.tmp = "./cna.txt"
     fwrite(cnv, cnv.tmp, sep = "\t")
     names(cnv.tmp) = "sample_1"

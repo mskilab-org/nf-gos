@@ -4,12 +4,11 @@ process HRDETECT {
     label 'process_medium'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/hrdetect:latest':
-        'mskilab/hrdetect:latest' }"
+        'docker://mskilab/hrdetect:0.0.3':
+        'mskilab/hrdetect:0.0.3' }"
 
     input:
     tuple val(meta), path(junctions), path(hets), path(snv_somatic), path(jabba_rds)
-    val(mask) // declared as val to allow for NULL value, but this is actually a path
     path(ref_fasta)
     val(genome_version)
 
@@ -24,7 +23,6 @@ process HRDETECT {
     script:
     def args        = task.ext.args ?: ''
     def prefix      = task.ext.prefix ?: "${meta.id}"
-    def hrdetect_mask = mask ?: "--mask '/dev/null'"
     def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
     """
@@ -35,7 +33,6 @@ process HRDETECT {
 	--hets $hets \\
 	--snv $snv_somatic \\
 	--jabba $jabba_rds \\
-    ${hrdetect_mask} \\
     --ref $ref_fasta \\
     --genome $genome_version
 

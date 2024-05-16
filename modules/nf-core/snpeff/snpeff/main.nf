@@ -8,8 +8,8 @@ process SNPEFF_SNPEFF {
 
     input:
     tuple val(meta), path(vcf), path(tbi)
-    val   db                       // e.g hg19 or GRch37.87
-    path(cache)
+    val(db)                       // e.g hg19 or GRch37.87
+    tuple val(meta2), path(cache)
 
     output:
     tuple val(meta), path("*.ann.vcf"),   emit: vcf
@@ -33,7 +33,6 @@ process SNPEFF_SNPEFF {
     def cache_command = cache ? "-dataDir \${PWD}/${cache}" : ""
     """
     snpEff \\
-	-v \\
         -Xmx${avail_mem}M \\
         $db \\
         $args \\
@@ -66,8 +65,8 @@ process SNPEFF_VCF_TO_BCF {
     label 'process_low'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/utils:0.1':
-        'mskilab/utils:0.1' }"
+        'docker://mskilab/utils:0.0.2':
+        'mskilab/utils:0.0.2' }"
 
     input:
     tuple val(meta), path(vcf)
@@ -84,7 +83,7 @@ process SNPEFF_VCF_TO_BCF {
     """
     bcftools view ${vcf} -O b -o ${prefix}.ann.unsorted.bcf &&
     bcftools sort ${prefix}.ann.unsorted.bcf -O b -o ${prefix}.ann.bcf &&
-    bcftools index ${prefix}.ann.bcf; } ||
+    bcftools index ${prefix}.ann.bcf;
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -102,5 +101,4 @@ process SNPEFF_VCF_TO_BCF {
         bcftools: 0.0.1
     END_VERSIONS
     """
-
 }

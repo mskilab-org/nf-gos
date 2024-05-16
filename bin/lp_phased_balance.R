@@ -691,7 +691,7 @@
     ## we want to only segment nodes with at least 10 SNPs
     ## and with CN > 0
     ## get stretches of constant total CN
-    if (is.null(gg$meta$ploidy)) {
+    if (is.null(gg$meta$ploidy) || is.na(gg$meta$ploidy)) {
         max.cn = 3
     } else {
         max.cn = ceiling(gg$meta$ploidy + 1)
@@ -705,51 +705,45 @@
                                     dt2gr(hets.dt[, .(seqnames, start, end, strand = "*")]),
                                     return.type = "data.table")
 
-    # handle case where nodes.ov.hets is empty
-    if (nrow(nodes.ov.hets) == 0) {
-        message("No nodes overlap with hets")
-        segs = NULL
-    } else {
-        nodes.ov.hets[, count := .N, by = query.id]
+    nodes.ov.hets[, count := .N, by = query.id]
 
-        ## we should only segment relatively wide nodes with low copy number
-        nodes.ov.hets = nodes.ov.hets[count >= 100,]
+    ## we should only segment relatively wide nodes with low copy number
+    nodes.ov.hets = nodes.ov.hets[count >= 100,]
 
-        nodes.to.segment = nodes.ov.hets[, unique(query.id)]
+    nodes.to.segment = nodes.ov.hets[, unique(query.id)]
 
-        new.sl = seqlengths(gg)
+    new.sl = seqlengths(gg)
 
-        segs = lapply(nodes.to.segment,
-                      function(qid) {
-                          message("Starting segmentation for : ", qid)
-                          hets.subset.dt = hets.dt[nodes.ov.hets[query.id == qid, subject.id],]
-                          cna = CNA(hets.subset.dt[, BAF],
-                                    hets.subset.dt[, as.character(seqnames)],
-                                    hets.subset.dt[, start],
-                                    data.type = "logratio")
-                          seg = segment(smooth.CNA(cna),
-                                        alpha = 1e-5,
-                                        verbose = TRUE)
-                          utils::capture.output({seg_dt = print(seg); setDT(seg_dt)},
-                                                type = "output",
-                                                file = "/dev/null")
-                          out = seg2gr(seg_dt[!(is.na(seg.mean) | is.na(loc.start) | is.na(loc.end))], new.sl)
-                          out = gr.fix(out, new.sl, drop = T)
-                          ## get the number of hets per segment
-                          values(out)[, "nhets"] = out %N% hets.gr
-                          ## make sure the segment is on the order of high kbp
-                          out = out %Q% (nhets > 50)
-                          message("Number of segments: ", length(out))
-                          names(out) = NULL
-                          if (length(out) > 1) {
-                              return(gr.start(out[2:length(out)]))
-                          }
-                          return(GRanges())
-                          message("Finished!")
-                      })
+    segs = lapply(nodes.to.segment,
+                  function(qid) {
+                      message("Starting segmentation for : ", qid)
+                      hets.subset.dt = hets.dt[nodes.ov.hets[query.id == qid, subject.id],]
+                      cna = CNA(hets.subset.dt[, BAF],
+                                hets.subset.dt[, as.character(seqnames)],
+                                hets.subset.dt[, start],
+                                data.type = "logratio")
+                      seg = segment(smooth.CNA(cna),
+                                    alpha = 1e-5,
+                                    verbose = TRUE)
+                      utils::capture.output({seg_dt = print(seg); setDT(seg_dt)},
+                                            type = "output",
+                                            file = "/dev/null")
+                      out = seg2gr(seg_dt[!(is.na(seg.mean) | is.na(loc.start) | is.na(loc.end))], new.sl)
+                      out = gr.fix(out, new.sl, drop = T)
+                      ## get the number of hets per segment
+                      values(out)[, "nhets"] = out %N% hets.gr
+                      ## make sure the segment is on the order of high kbp
+                      out = out %Q% (nhets > 50)
+                      message("Number of segments: ", length(out))
+                      names(out) = NULL
+                      if (length(out) > 1) {
+                          return(gr.start(out[2:length(out)]))
+                      }
+                      return(GRanges())
+                      message("Finished!")
+                  })
 
-        segs = do.call(grbind, segs)
-    }
+    segs = do.call(grbind, segs)
 
     if (is.null(segs)) {
         message("No extra breakends")
@@ -796,7 +790,6 @@
         ##binstats.gg$edges$mark(reward = new.gg$edges$dt[match(binstats.gg$edges$dt$og.edge.id, edge.id), reward])
         binstats.gg$edges$mark(cnloh = new.gg$edges$dt[match(binstats.gg$edges$dt$og.edge.id, edge.id), cnloh])
         ## binstats.gg$edges$mark(cnloh = gg$edges$dt[match(binstats.gg$edges$dt$og.edge.id, edge.id), cnloh])
-        print('tracer2')
     } else {
         tmp = as.data.table(readRDS(opt$hets))
         tmp = rbind(tmp[, .(seqnames, start, end, strand = "*",
