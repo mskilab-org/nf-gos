@@ -279,7 +279,7 @@
 
         ## save purity and ploidy
         message("Transfering purity and ploidy metadata")
-        balanced.gg$set(purity = jab$meta$purity, ploidy = jab$meta$ploidy)
+        balanced.gg$set(purity = jab$purity, ploidy = jab$ploidy)
 
         balanced.gg = gGnome:::loosefix(balanced.gg)
         ## save results

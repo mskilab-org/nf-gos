@@ -86,9 +86,10 @@ system(paste('mkdir -p',  opt$outdir))
 
 #' xtYao #' Thursday, May 06, 2021 01:44:08 PM
 ## the reference genome should be consistent with the input VCF
-## v = VariantAnnotation::scanVcfHeader(opt$snv)
-## sl = seqlengths(v)
-sl = hg_seqlengths()
+v = VariantAnnotation::scanVcfHeader(opt$snv)
+sl = seqlengths(v)
+# Sys.setenv(DEFAULT_GENOME = opt$ref)
+# sl = hg_seqlengths()
 
 ## wg = si2gr(sl) ## modified line
 
@@ -98,7 +99,7 @@ wg = keepStandardChromosomes(wg, pruning.mode = "coarse")
 wg = sort(sortSeqlevels(wg), ignore.strand = T)
 
 gr.mask = withv(opt$mask,  {
-    if (!file.not.exists(x)) {
+    if (!is.null(x) && file.exists(x)) {
         message("mask provided")
         if (grepl("bed(.gz)?$", x))
             import(x)
@@ -179,11 +180,11 @@ if (file.exists(snv) && file.info(snv)$size) {
     message("Processing SNV VCF")
     if (grepl("gz$", snv))
     {
-        cmd = sprintf("{ vcftools --gzvcf %s --remove-indels --remove-filtered-all --recode --stdout | awk '{ if (match($0,/(##contig=<ID=)(.*)/,m)) { sub(/chr/,\"\", m[2]); print m[1]m[2] } else if ($0 !~ /^#/) { gsub(/^chr/,\"\"); print } else { print $0 } }' | bedtools intersect -a stdin -b %s -header | vcf-sort -c | bcftools view -S ^./excls.txt | bcftools view -v snps | bcftools norm -Oz -m-any; } > %s", snv, normalizePath(regions.bed), snv.tmp)
+        cmd = sprintf("{ vcftools --gzvcf %s --remove-indels --remove-filtered-all --recode --stdout | awk '{ if ($0 ~ /##contig=<ID=chr/) { gsub(/##contig=<ID=chr/, \"##contig=<ID=\"); print } else if ($0 !~ /^#/){ gsub(/^chr/, \"\"); print } else { print } }' | bedtools intersect -a stdin -b %s -header | vcf-sort -c | bcftools view -S ^./excls.txt | bcftools view -v snps | bcftools norm -Oz -m-any; } > %s", snv, normalizePath(regions.bed), snv.tmp)
     }
     else
     {
-        cmd = sprintf("{ vcftools --vcf %s --remove-indels --remove-filtered-all --recode --stdout | awk '{ if (match($0,/(##contig=<ID=)(.*)/,m)) { sub(/chr/,\"\", m[2]); print m[1]m[2] } else if ($0 !~ /^#/) { gsub(/^chr/,\"\"); print } else { print $0 } }' | bedtools intersect -a stdin -b %s -header | vcf-sort -c | bcftools view -v snps | bcftools norm -Oz -m-any; } > %s", snv, normalizePath(regions.bed), snv.tmp)
+        cmd = sprintf("{ vcftools --vcf %s --remove-indels --remove-filtered-all --recode --stdout | awk '{ if ($0 ~ /##contig=<ID=chr/) { gsub(/##contig=<ID=chr/, \"##contig=<ID=\"); print } else if ($0 !~ /^#/) { gsub(/^chr/, \"\"); print } else { print } }' | bedtools intersect -a stdin -b %s -header | vcf-sort -c | bcftools view -v snps | bcftools norm -Oz -m-any; } > %s", snv, normalizePath(regions.bed), snv.tmp)
     }
     print(cmd)
 
@@ -207,7 +208,7 @@ if (file.exists(snv) && file.info(snv)$size) {
     snv.tmp = NULL
 }
 
-if (!file.exists(indel) || identical(indel, "/dev/null")) {
+if (is.null(indel) || !file.exists(indel) || identical(indel, "/dev/null")) {
     message("no proper indel file provided... assuming indels are in snv vcf file")
     indel = snv
 }
@@ -224,7 +225,7 @@ if (!file.exists(indel) || identical(indel, "/dev/null")) {
 
 ## if (file.exists(indel) && identical(indel, "/dev/null")) {
 ## check that file is non-empty
-if (file.exists(indel) && file.info(indel)$size) {
+if (!is.null(indel) && file.exists(indel) && file.info(indel)$size) {
     indel.tmp = "./indel.vcf.bgz"
     system2("rm", c(paste0(indel.tmp, "*")), stderr = "/dev/null")
 
@@ -241,11 +242,12 @@ if (file.exists(indel) && file.info(indel)$size) {
     message("Processing indel input")
     if (grepl("gz$", indel))
     {
-        cmd = sprintf("{ vcftools --gzvcf %s --keep-only-indels --remove-filtered-all --recode --stdout | awk '{ if (match($0,/(##contig=<ID=)(.*)/,m)) { sub(/chr/,\"\", m[2]); print m[1]m[2] } else if ($0 !~ /^#/) { gsub(/^chr/,\"\"); print } else { print $0 } }' | bedtools intersect -a stdin -b %s -header | vcf-sort -c | bcftools view -S ^./excls.txt | bcftools view -v indels | bcftools norm -Ov -m-any | bcftools norm -f %s --check-ref s | bgzip -c; } > %s", indel, regions.bed, opt$ref, indel.tmp)
+
+        cmd = sprintf("{ vcftools --gzvcf %s --keep-only-indels --remove-filtered-all --recode --stdout | awk '{ if ($0 ~ /##contig=<ID=chr/) { gsub(/##contig=<ID=chr/, \"##contig=<ID=\"); print } else if ($0 !~ /^#/) { gsub(/^chr/, \"\"); print } else { print } }' | bedtools intersect -a stdin -b ./good_rfile.bed -header | vcf-sort -c | bcftools view -S ^./excls.txt | bcftools view -v indels | bcftools norm -Ov -m-any | bcftools norm -f human_g1k_v37_decoy.fasta --check-ref s | bgzip -c; } > ./indel.vcf.bgz", indel)
     }
     else
     {
-        cmd = sprintf("{ vcftools --vcf %s --keep-only-indels --remove-filtered-all --recode --stdout | awk '{ if (match($0,/(##contig=<ID=)(.*)/,m)) { sub(/chr/,\"\", m[2]); print m[1]m[2] } else if ($0 !~ /^#/) { gsub(/^chr/,\"\"); print } else { print $0 } }' | bedtools intersect -a stdin -b %s -header | vcf-sort -c | bcftools view -v indels | bcftools norm -Ov -m-any | bcftools norm -f %s --check-ref s | bgzip -c; } > %s", indel, regions.bed, opt$ref, indel.tmp)
+        cmd = sprintf("{ vcftools --vcf %s --keep-only-indels --remove-filtered-all --recode --stdout | awk '{ if ($0 ~ /##contig=<ID=chr/) { gsub(/##contig=<ID=chr/, \"##contig=<ID=\"); print } else if ($0 !~ /^#/) { gsub(/^chr/, \"\"); print } else { print } }' | bedtools intersect -a stdin -b %s -header | vcf-sort -c | bcftools view -v indels | bcftools norm -Ov -m-any | bcftools norm -f %s --check-ref s | bgzip -c; } > %s", indel, regions.bed, opt$ref, indel.tmp)
     }
     print(cmd)
 

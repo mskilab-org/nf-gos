@@ -7,7 +7,7 @@ include { HRDETECT } from '../../../modules/local/hrdetect/main.nf'
 workflow JUNC_SNV_GGRAPH_HRDETECT {
 
     take:
-    inputs  // [ meta, junction, hets, snv_somatic, jabba_rds]
+    inputs  // [ meta, junction, hets, snv_somatic, snv_somatic_tbi, jabba_rds]
     ref_fasta
     genome_version
 

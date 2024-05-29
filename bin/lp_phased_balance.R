@@ -691,7 +691,7 @@
     ## we want to only segment nodes with at least 10 SNPs
     ## and with CN > 0
     ## get stretches of constant total CN
-    if (is.null(gg$meta$ploidy) || is.na(gg$meta$ploidy)) {
+    if (is.null(gg$meta$ploidy)) {
         max.cn = 3
     } else {
         max.cn = ceiling(gg$meta$ploidy + 1)
@@ -777,7 +777,6 @@
     }
 
     if(!opt$from_maf) {
-        gg$meta$ploidy = ifelse(is.null(gg$meta$ploidy), NA, gg$meta$ploidy)
         jab = zitools:::gg2jab(gg, purity = gg$meta$purity, ploidy = gg$meta$ploidy)
         jab = jabba.alleles2(jab, hets.gr, verbose = TRUE, uncoupled = TRUE, marginal = opt$marginal)
 

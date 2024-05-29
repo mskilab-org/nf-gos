@@ -483,7 +483,7 @@ nodefileind_lp_phased_balance = params.nodefileind_lp_phased_balance ?: Channel.
 tilim_lp_phased_balance = params.tilim_lp_phased_balance ?: Channel.empty()
 
 // HRDetect
-ref_genome_version_hrdetect = params.ref_genome_version ?: Channel.empty()
+ref_genome_version_hrdetect = params.ref_hrdetect ?: Channel.empty()
 
 // Initialize files channels based on params, not defined within the params.genomes[params.genome] scope
 if (params.snpeff_cache && params.tools && params.tools.contains("snpeff")) {
@@ -1854,19 +1854,19 @@ workflow NFJABBA {
     if (runHRDetect) {
         if (tools_used.contains('hrdetect')) {
             if (params.step == 'hrdetect') {
-                hrdetect_inputs = input_sample.map{ meta, hets, vcf, vcf2, snv_vcf_somatic, ggraph -> [ meta, vcf, hets, snv_vcf_somatic, ggraph ] }
+                hrdetect_inputs = input_sample.map{ meta, hets, vcf, vcf2, snv_vcf_somatic, snv_vcf_somatic_tbi, ggraph -> [ meta, vcf, hets, snv_vcf_somatic, snv_vcf_somatic_bit, ggraph ] }
             } else {
-                het_pileups_for_joining = sites_from_het_pileups_wgs.map { meta, hets -> [meta.patient, hets] }
                 vcf_from_sv_calling_for_joining = vcf_from_sv_calling.map{ meta, junction -> [ meta.patient, junction ] }
-                vcf_somatic_from_snv_calling_for_joining = somatic_vcf_from_snv_calling_sage.map{ meta, vcf, tbi -> [ meta.patient, vcf ] }
+                het_pileups_for_joining = sites_from_het_pileups_wgs.map { meta, hets -> [meta.patient, hets] }
+                vcf_somatic_from_snv_calling_for_joining = somatic_vcf_from_snv_calling_sage.map{ meta, vcf, tbi -> [ meta.patient, vcf, tbi ] }
                 ggraph_for_joining = jabba_rds.map{ meta, ggraph -> [ meta.patient, ggraph ] }
 
                 hrdetect_inputs = meta_for_joining
-                    .join(het_pileups_for_joining)
                     .join(vcf_from_sv_calling_for_joining)
+                    .join(het_pileups_for_joining)
                     .join(vcf_somatic_from_snv_calling_for_joining)
                     .join(ggraph_for_joining)
-                    .map{ patient, meta, hets, junction, snv_vcf_somatic, ggraph -> [ meta, hets, junction, snv_vcf_somatic, ggraph ] }
+                    .map{ patient, meta, junction, hets, snv_vcf_somatic, snv_vcf_somatic_tbi, ggraph -> [ meta, junction, hets, snv_vcf_somatic, snv_vcf_somatic_tbi, ggraph ] }
             }
 
             JUNC_SNV_GGRAPH_HRDETECT(
