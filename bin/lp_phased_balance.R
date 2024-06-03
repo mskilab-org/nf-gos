@@ -61,6 +61,8 @@
 
         ## prepare nodes for melted graph
         phased.gg.nodes = c(og.nodes.gr, og.nodes.gr)
+        print("trace0")
+        print(names(gg$sedgesdt))
         values(phased.gg.nodes)[, "cn"] = c(values(og.nodes.gr)[, "cn.high"], values(og.nodes.gr)[, "cn.low"])
         values(phased.gg.nodes)[, "allele"] = c(rep("major", length(og.nodes.gr)), rep("minor", length(og.nodes.gr)))
         values(phased.gg.nodes)[, "variance"] = c(values(og.nodes.gr)[, "var.high"], values(og.nodes.gr)[, "var.low"])
@@ -110,12 +112,15 @@
         alt.edge.lwd = 1.0
         phased.gg$edges$mark(col = ifelse(phased.gg$edges$dt$type == "REF", ref.edge.col, alt.edge.col),
             lwd = ifelse(phased.gg$edges$dt$type == "REF", ref.edge.lwd, alt.edge.lwd))
+        phased.gg$edges$mark(weight = 1)
 
         major.node.col = alpha("red", 0.5)
         minor.node.col = alpha("blue", 0.5)
         phased.gg$nodes$mark(col = ifelse(phased.gg$nodes$dt$allele == "major", major.node.col, minor.node.col),
             ywid = 0.8)
 
+        print("trace4")
+        print(names(phased.gg$sedgesdt))
         return(phased.gg)
     }
 
@@ -1136,6 +1141,9 @@
     ########
 
         ## create state space, keeping track of graph ids
+        gg$sedgesdt[, .(gid = sedge.id, cn,
+                        weight, type = 'eresidual',
+                        vtype = 'C')] ## edge residual
         vars = rbind(
             gg$dt[, .(cn, snode.id, lb, ub, weight, gid = index, type = 'node', vtype = 'I')],
             gg$sedgesdt[, .(from, to, lb, ub, sedge.id,  cn, reward,
@@ -1158,7 +1166,6 @@
                             weight, type = 'eresidual',
                             vtype = 'C')], ## edge residual
             fill = TRUE)
-
 
         ## add "slush" variables - there will be one per chromosome
         if (nonintegral) {

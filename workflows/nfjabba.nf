@@ -1828,7 +1828,7 @@ workflow NFJABBA {
                 events_input = input_sample
                 versions = Channel.empty().mix(EVENTS.out.versions)
             } else {
-                events_input = lp_phased_balance_balanced_gg
+                events_input = non_integer_balance_balanced_gg
             }
 
             EVENTS(events_input, fasta)
@@ -1842,7 +1842,7 @@ workflow NFJABBA {
             if (params.step == 'fusions') {
                 fusions_input = input_sample
             } else {
-                fusions_input = lp_phased_balance_balanced_gg
+                fusions_input = non_integer_balance_balanced_gg
             }
 
             FUSIONS(fusions_input, gencode_fusions)
