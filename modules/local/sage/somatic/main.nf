@@ -1,4 +1,4 @@
-process SAGE {
+process SAGE_SOMATIC {
 
     tag "$meta.id"
     label 'process_medium'
@@ -11,6 +11,7 @@ process SAGE {
     tuple val(meta), path(tumor_bam_wgs, stageAs: "${meta.id}.tumor.bam"), path(tumor_bai, stageAs: "${meta.id}.tumor.bam.bai"), path(normal_bam_wgs, stageAs: "${meta.id}.normal.bam"), path(normal_bai, stageAs: "${meta.id}.normal.bam.bai")
     path(ref)
     path(ref_fai)
+    path(ref_genome_dict)
     val(ref_genome_version)
     path(ensembl_data_dir)
     path(somatic_hotspots)
@@ -18,25 +19,26 @@ process SAGE {
     path(high_confidence_bed)
 
     output:
-    tuple val(meta), path('*.sage.filtered.vcf.gz'), path('*.sage.filtered.vcf.gz.tbi'), emit: vcf
+    tuple val(meta), path('*.sage.somatic.vcf.gz'), path('*.sage.somatic.vcf.gz.tbi'), emit: vcf
     path "versions.yml"                                     , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
+
     script:
     def args        = task.ext.args ?: ''
     def prefix      = task.ext.prefix ?: "${meta.id}"
     def output      = "${meta.id}.sage.vcf.gz"
     def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
+    def reference_arg = meta.containsKey('normal_id') ? "-reference ${meta.normal_id}" : ''
     def reference_bam_arg = normal_bam_wgs ? "-reference_bam ${normal_bam_wgs}" : ''
+
     """
-
-    mkdir -p somatic/
-
     sage \\
         -Xmx${Math.round(task.memory.bytes * 0.95)} \\
         ${args} \\
+        ${reference_arg} \\
         ${reference_bam_arg} \\
         -tumor ${meta.id} \\
         -tumor_bam ${tumor_bam_wgs} \\
@@ -46,12 +48,9 @@ process SAGE {
         -panel_bed ${panel_bed} \\
         -high_confidence_bed ${high_confidence_bed} \\
         -ensembl_data_dir ${ensembl_data_dir} \\
-        -write_bqr_data \\
-        -write_bqr_plot \\
+        -disable_bqr \\
         -threads ${task.cpus} \\
-        -output_vcf ${output}
-
-    bcftools view -i 'FILTER="PASS"' -O z -o ${meta.id}.sage.filtered.vcf.gz ${output} && tabix -p vcf ${meta.id}.sage.filtered.vcf.gz
+        -output_vcf ${meta.tumor_id}.sage.somatic.vcf.gz
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -60,8 +59,6 @@ process SAGE {
     """
 
     stub:
-    prefix = task.ext.prefix ?: "${meta.id}"
-    def VERSION = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
     """
     touch ${meta.id}.sage.vcf.gz
 
@@ -72,9 +69,41 @@ process SAGE {
     """
 }
 
+process SAGE_PASS_FILTER {
+    tag "$meta.id"
+    label 'process_low'
+
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'docker://mskilab/utils:0.0.2':
+        'mskilab/utils:0.0.2' }"
+
+    input:
+    tuple val(meta), path(sage_vcf), path(sage_vcf_tbi)
+
+    output:
+    tuple val(meta), path('*.sage.pass_filtered.vcf.gz'), path('*.sage.pass_filtered.vcf.gz.tbi'), emit: vcf
+
+    script:
+
+    """
+    bcftools view -i 'FILTER="PASS"' -O z -o ${meta.id}.sage.pass_filtered.vcf.gz ${output} && tabix -p vcf ${meta.id}.sage.pass_filtered.vcf.gz
+    """
+
+    stub:
+    """
+    touch ${meta.id}.sage.pass_filtered.vcf.gz
+    touch ${meta.id}.sage.pass_filtered.vcf.gz.tbi
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        bcftools: \$(bcftools -v | head -n 1 | sed 's/^bcftools //')
+    END_VERSIONS
+    """
+}
+
 process SAGE_FILTER {
     tag "$meta.id"
-    label 'process_medium'
+    label 'process_low'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/hmftools-sage:3.4--hdfd78af_1' :
@@ -150,7 +179,7 @@ process SAGE_FILTER {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        sage: \$(sage -version | sed 's/^.* //')
+        bcftools: \$(bcftools -v | head -n 1 | sed 's/^bcftools //')
     END_VERSIONS
 
     """

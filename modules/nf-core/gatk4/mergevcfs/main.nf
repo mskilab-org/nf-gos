@@ -9,7 +9,6 @@ process GATK4_MERGEVCFS {
 
     input:
     tuple val(meta), path(vcf)
-    tuple val(meta2), path(dict)
 
     output:
     tuple val(meta), path('*.vcf.gz'), emit: vcf
@@ -23,7 +22,7 @@ process GATK4_MERGEVCFS {
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     def input_list = vcf.collect{ "--INPUT $it"}.join(' ')
-    def reference_command = dict ? "--SEQUENCE_DICTIONARY $dict" : ""
+    // def reference_command = dict ? "--SEQUENCE_DICTIONARY $dict" : ""
 
     def avail_mem = 3072
     if (!task.memory) {
@@ -36,7 +35,6 @@ process GATK4_MERGEVCFS {
         MergeVcfs \\
         $input_list \\
         --OUTPUT ${prefix}.vcf.gz \\
-        $reference_command \\
         --TMP_DIR . \\
         $args
 

@@ -1,21 +1,19 @@
-process SIGPROFILER {
+process SIGPROFILERASSIGNMENT {
 
     tag "$meta.id"
     label 'process_medium'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/sigprofiler:0.1':
-        'mskilab/sigprofiler:0.1' }"
+        'docker://mskilab/sigprofilerassignment:0.0.3':
+        'mskilab/sigprofilerassignment:0.0.3' }"
 
     input:
-    tuple val(meta), path(vcf)
-    val(max_signatures)
+    tuple val(meta), path(vcf), path(tbi)
+    val(genome)
     val(cosmic_version)
-    val(use_gpu)
-
 
     output:
-    tuple val(meta), path("*.txt")                   , emit: sigprofiler_raw_cov, optional: true
+    tuple val(meta), path("Assignment_Solution/**/*.txt")    , emit: sigs, optional: true
     path "versions.yml"                                     , emit: versions
 
     when:
@@ -24,24 +22,20 @@ process SIGPROFILER {
     script:
     def args        = task.ext.args ?: ''
     def prefix      = task.ext.prefix ?: "${meta.id}"
-    def vcf_dir     = "sigprofiler_input_vcfs/${meta.id}/"
-    def output_dir  = "sigprofiler_output/${meta.id}/"
-    def gpu_flag  = use_gpu ? "--gpu" : ""
     def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
     """
-    mkdir -p ${vcf_dir} && mv ${vcf} ${vcf_dir}
+    export SIGPROFILER_PATH=\$(echo "${baseDir}/bin/sigprofilerassignment.py")
 
-    python sigprofiler.py \\
-    --data-directory ${vcf_dir} \\
-    --output-directory ${output_dir} \\
-    --maximum-signatures ${max_signatures} \\
+    python \$SIGPROFILER_PATH \\
+    --input-vcf ${vcf} \\
+    --genome ${genome} \\
     --cosmic-version ${cosmic_version} \\
-    ${use_gpu}
+    --output-directory ./ \\
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        sigprofiler: ${VERSION}
+        sigprofilerassignment: ${VERSION}
     END_VERSIONS
 
     """
@@ -50,7 +44,7 @@ process SIGPROFILER {
     prefix = task.ext.prefix ?: "${meta.id}"
     def VERSION = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
     """
-    touch signatuers.txt
+    touch signatures.txt
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

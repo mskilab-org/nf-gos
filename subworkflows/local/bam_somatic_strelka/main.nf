@@ -22,21 +22,14 @@ workflow BAM_SOMATIC_STRELKA {
     vcf_snvs = STRELKA_SOMATIC.out.vcf_snvs
 
     // create a single channel consist of [meta, indels, snvs] from vcf_indels (which is [meta, vcf]) and vcf_snvs (which is also [meta, vcf])
-    vcfs_to_merge = vcf_indels
-        .join(vcf_snvs) { indels, snvs ->
-            indels[0].id == snvs[0].id
-        }
-        .map { indels, snvs ->
-            [indels[0], indels[1], snvs[1]]
-        }
+    vcfs_to_merge = vcf_indels.join(vcf_snvs)
 
     GATK4_MERGEVCFS(vcfs_to_merge)
 
     vcf = GATK4_MERGEVCFS.out.vcf
         .map{ meta, vcf -> [ meta + [ variantcaller:'strelka' ], vcf ] }
 
-    versions = versions.mix(MERGE_STRELKA_SNVS.out.versions)
-    versions = versions.mix(MERGE_STRELKA_INDELS.out.versions)
+    versions = versions.mix(GATK4_MERGEVCFS.out.versions)
     versions = versions.mix(STRELKA_SOMATIC.out.versions)
 
     emit:

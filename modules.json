@@ -160,6 +160,11 @@
                         "git_sha": "4d584d5cf6ed5f7363a51cdb4b3eb25398e9e537",
                         "installed_by": ["modules"]
                     },
+                    "snpeff/snpeff": {
+                        "branch": "master",
+                        "git_sha": "2f3db6f45147ebbb56b371536e31bdf622b5bfee",
+                        "installed_by": ["modules"]
+                    },
                     "strelka/germline": {
                         "branch": "master",
                         "git_sha": "3f5420aa22e00bd030a2556dfdffc9e164ec0ec5",

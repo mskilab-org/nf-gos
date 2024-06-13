@@ -82,8 +82,8 @@ process PAVE_FILTER_VCF {
     label 'process_low'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/utils:0.1':
-        'mskilab/utils:0.1' }"
+        'docker://mskilab/utils:0.0.2':
+        'mskilab/utils:0.0.2' }"
 
     input:
     tuple val(meta), path(sage_pave_vcf), path(sage_pave_tbi)
