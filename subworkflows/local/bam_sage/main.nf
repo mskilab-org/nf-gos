@@ -4,7 +4,7 @@
 
 include { SAGE_SOMATIC } from '../../../modules/local/sage/somatic/main.nf'
 include { SAGE_PASS_FILTER } from '../../../modules/local/sage/somatic/main.nf'
-include { SAGE_FILTER } from '../../../modules/local/sage/somatic/main.nf'
+include { SAGE_TUMOR_ONLY_FILTER } from '../../../modules/local/sage/somatic/main.nf'
 include { SAGE_GERMLINE } from '../../../modules/local/sage/germline/main.nf'
 
 workflow BAM_SAGE {
@@ -63,36 +63,45 @@ workflow BAM_SAGE {
     emit:
     sage_somatic_vcf
     sage_germline_vcf
+    sage_pass_filtered_somatic_vcf
 
     versions
 }
 
 
-workflow BAM_SAGE_FILTER {
+workflow BAM_SAGE_TUMOR_ONLY_FILTER {
     // defining inputs
     take:
     inputs
     dbsnp
+    dbsnp_tbi
     gnomAD_snv_db
+    gnomeAD_snv_db_tbi
     sage_germ_pon
+    sage_germ_pon_tbi
     mills_gold_indel
+    mills_gold_indel_tbi
 
     //Creating empty channels for output
     main:
     versions            = Channel.empty()
     sage_filtered_vcf   = Channel.empty()
 
-    SAGE_FILTER(
+    SAGE_TUMOR_ONLY_FILTER(
         inputs,
         dbsnp,
+        dbsnp_tbi,
         gnomAD_snv_db,
+        gnomeAD_snv_db_tbi,
         sage_germ_pon,
-        mills_gold_indel
+        sage_germ_pon_tbi,
+        mills_gold_indel,
+        mills_gold_indel_tbi
     )
 
     // initializing outputs from fragcounter
-    versions             = SAGE_FILTER.out.versions
-    sage_filtered_vcf    = SAGE_FILTER.out.sage_filtered_vcf
+    versions             = SAGE_TUMOR_ONLY_FILTER.out.versions
+    sage_filtered_vcf    = SAGE_TUMOR_ONLY_FILTER.out.sage_filtered_vcf
 
     emit:
     sage_filtered_vcf

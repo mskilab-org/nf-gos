@@ -8,7 +8,7 @@ process SAGE_SOMATIC {
         'quay.io/biocontainers/hmftools-sage:3.4--hdfd78af_1' }"
 
     input:
-    tuple val(meta), path(tumor_bam_wgs, stageAs: "${meta.id}.tumor.bam"), path(tumor_bai, stageAs: "${meta.id}.tumor.bam.bai"), path(normal_bam_wgs, stageAs: "${meta.id}.normal.bam"), path(normal_bai, stageAs: "${meta.id}.normal.bam.bai")
+    tuple val(meta), path(normal_bam_wgs, stageAs: "normal.bam"), path(normal_bai, stageAs: "normal.bam.bai"), path(tumor_bam_wgs, stageAs: "tumor.bam"), path(tumor_bai, stageAs: "tumor.bam.bai")
     path(ref)
     path(ref_fai)
     path(ref_genome_dict)
@@ -50,7 +50,7 @@ process SAGE_SOMATIC {
         -ensembl_data_dir ${ensembl_data_dir} \\
         -disable_bqr \\
         -threads ${task.cpus} \\
-        -output_vcf ${meta.tumor_id}.sage.somatic.vcf.gz
+        -output_vcf ${meta.id}.sage.somatic.vcf.gz
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -86,7 +86,7 @@ process SAGE_PASS_FILTER {
     script:
 
     """
-    bcftools view -i 'FILTER="PASS"' -O z -o ${meta.id}.sage.pass_filtered.vcf.gz ${output} && tabix -p vcf ${meta.id}.sage.pass_filtered.vcf.gz
+    bcftools view -i 'FILTER="PASS"' -O z -o ${meta.id}.sage.pass_filtered.vcf.gz ${sage_vcf} && tabix -p vcf ${meta.id}.sage.pass_filtered.vcf.gz
     """
 
     stub:
@@ -101,75 +101,79 @@ process SAGE_PASS_FILTER {
     """
 }
 
-process SAGE_FILTER {
+process SAGE_TUMOR_ONLY_FILTER {
     tag "$meta.id"
     label 'process_low'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/hmftools-sage:3.4--hdfd78af_1' :
-        'quay.io/biocontainers/hmftools-sage:3.4--hdfd78af_1' }"
+        'docker://mskilab/utils:0.0.2':
+        'mskilab/utils:0.0.2' }"
 
     input:
     tuple val(meta), path(sage_vcf), path(sage_vcf_tbi)
     path(dbsnp)
+    path(dbsnp_tbi)
     path(gnomAD_snv_db)
+    path(gnomAD_snv_db_tbi)
     path(sage_germ_pon)
+    path(sage_germ_pon_tbi)
     path(mills_gold_indel)
+    path(mills_gold_indel_tbi)
 
     output:
-    tuple val(meta), path("*.sage.filtered.tumoronly.vcf.gz"), path("*.sage.filtered.tumoronly.vcf.gz.tbi"),                  emit: sage_filtered_vcf
-    path "versions.yml"                                                                                                     emit: versions,                 optional:true
+    tuple val(meta), path("*.sage.pass_filtered.tumoronly.vcf.gz"), path("*.sage.pass_filtered.tumoronly.vcf.gz.tbi"),    emit: sage_filtered_vcf
+    path "versions.yml",                                                                                        emit: versions, optional:true
 
     when:
     task.ext.when == null || task.ext.when
     script:
     def args        = task.ext.args ?: ''
     def prefix      = task.ext.prefix ?: "${meta.id}"
-    def output      = "${meta.id}.sage.filtered.tumoronly.vcf.gz"
+    def output      = "${meta.id}.sage.pass_filtered.tumoronly.vcf.gz"
     def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
     """
     mkdir -p filter_tumoronly/
 
-    if [[ -e ${meta.id}.sage.filtered.vcf.gz ]]; then
+    if [[ -e ${meta.id}.sage.pass_filtered.vcf.gz ]]; then
         echo "Filtering the tumor-only vcf by dbSNP..."
-        bcftools isec -C -O z -o ${meta.id}.sage.filtered.nodbsnp.vcf.gz -p ./ ${meta.id}.sage.filtered.vcf.gz ${dbsnp} && \\
-        mv 0000.vcf.gz filter_tumoronly/${meta.id}.sage.filtered.nodbsnp.vcf.gz && \\
-        mv 0000.vcf.gz.tbi filter_tumoronly/${meta.id}.sage.filtered.nodbsnp.vcf.gz.tbi
+        bcftools isec -C -O z -o ${meta.id}.sage.pass_filtered.nodbsnp.vcf.gz -p ./ ${meta.id}.sage.pass_filtered.vcf.gz ${dbsnp} && \\
+        mv 0000.vcf.gz filter_tumoronly/${meta.id}.sage.pass_filtered.nodbsnp.vcf.gz && \\
+        mv 0000.vcf.gz.tbi filter_tumoronly/${meta.id}.sage.pass_filtered.nodbsnp.vcf.gz.tbi
     else
         echo "Cannot perform SNV filtering by dbSNP. Exiting..."
         exit 1;
     fi
 
-    if [[ -e filter_tumoronly/${meta.id}.sage.filtered.nodbsnp.vcf.gz ]]; then
+    if [[ -e filter_tumoronly/${meta.id}.sage.pass_filtered.nodbsnp.vcf.gz ]]; then
         echo "Now filtering by gnomAD SNV DB ..."
-        bcftools isec -C -O z -o ${meta.id}.sage.filtered.nodbsnp.nognoMAD.vcf.gz -p ./ filter_tumoronly/${meta.id}.sage.filtered.nodbsnp.vcf.gz ${gnomAD_snv_db} && \\
-        mv 0000.vcf.gz filter_tumoronly/${meta.id}.sage.filtered.nodbsnp.nognoMAD.vcf.gz && \\
-        mv 0000.vcf.gz.tbi filter_tumoronly/${meta.id}.sage.filtered.nodbsnp.nognoMAD.vcf.gz.tbi
+        bcftools isec -C -O z -o ${meta.id}.sage.pass_filtered.nodbsnp.nognomAD.vcf.gz -p ./ filter_tumoronly/${meta.id}.sage.pass_filtered.nodbsnp.vcf.gz ${gnomAD_snv_db} && \\
+        mv 0000.vcf.gz filter_tumoronly/${meta.id}.sage.pass_filtered.nodbsnp.nognomAD.vcf.gz && \\
+        mv 0000.vcf.gz.tbi filter_tumoronly/${meta.id}.sage.pass_filtered.nodbsnp.nognomAD.vcf.gz.tbi
     else
         echo "Cannot perform SNV filtering by gnomAD SNV database. Exiting..."
         exit 1;
     fi
 
-    if [[ -e filter_tumoronly/${meta.id}.sage.filtered.nodbsnp.nognoMAD.vcf.gz ]]; then
+    if [[ -e filter_tumoronly/${meta.id}.sage.pass_filtered.nodbsnp.nognomAD.vcf.gz ]]; then
         echo "Now filtering by SAGE Germline PON ..."
-        bcftools isec -C -O z -o ${meta.id}.sage.filtered.nodbsnp.nognoMAD.noPON.vcf.gz -p ./ filter_tumoronly/${meta.id}.sage.filtered.nodbsnp.nognoMAD.vcf.gz \\
-        ${sage_germ_pon} && mv 0000.vcf.gz filter_tumoronly/${meta.id}.sage.filtered.nodbsnp.nognoMAD.noPON.vcf.gz && \\
-        mv 0000.vcf.gz.tbi filter_tumoronly/${meta.id}.sage.filtered.nodbsnp.nognoMAD.noPON.vcf.gz.tbi
+        bcftools isec -C -O z -o ${meta.id}.sage.pass_filtered.nodbsnp.nognomAD.noPON.vcf.gz -p ./ filter_tumoronly/${meta.id}.sage.pass_filtered.nodbsnp.nognomAD.vcf.gz \\
+        ${sage_germ_pon} && mv 0000.vcf.gz filter_tumoronly/${meta.id}.sage.pass_filtered.nodbsnp.nognomAD.noPON.vcf.gz && \\
+        mv 0000.vcf.gz.tbi filter_tumoronly/${meta.id}.sage.pass_filtered.nodbsnp.nognomAD.noPON.vcf.gz.tbi
     else
         echo "Cannot perform SNV filtering by SAGE Germline PON. Exiting..."
         exit 1;
     fi
 
-    if [[ -e filter_tumoronly/${meta.id}.sage.filtered.nodbsnp.nognoMAD.noPON.vcf.gz ]]; then
+    if [[ -e filter_tumoronly/${meta.id}.sage.pass_filtered.nodbsnp.nognomAD.noPON.vcf.gz ]]; then
         echo "Now filtering by Mills and Gold Standard Indels ..."
-        bcftools isec -C -O z -o ${meta.id}.sage.filtered.nodbsnp.nognoMAD.noPON.noMGIndel.vcf.gz -p ./ \\
-        filter_tumoronly/${meta.id}.sage.filtered.nodbsnp.nognoMAD.noPON.vcf.gz ${mills_gold_indel} && \\
-        mv 0000.vcf.gz filter_tumoronly/${meta.id}.sage.filtered.nodbsnp.nognoMAD.noPON.noMGIndel.vcf.gz && \\
-        mv 0000.vcf.gz.tbi filter_tumoronly/${meta.id}.sage.filtered.nodbsnp.nognoMAD.noPON.noMGIndel.vcf.gz.tbi
+        bcftools isec -C -O z -o ${meta.id}.sage.pass_filtered.nodbsnp.nognomAD.noPON.noMGIndel.vcf.gz -p ./ \\
+        filter_tumoronly/${meta.id}.sage.pass_filtered.nodbsnp.nognomAD.noPON.vcf.gz ${mills_gold_indel} && \\
+        mv 0000.vcf.gz filter_tumoronly/${meta.id}.sage.pass_filtered.nodbsnp.nognomAD.noPON.noMGIndel.vcf.gz && \\
+        mv 0000.vcf.gz.tbi filter_tumoronly/${meta.id}.sage.pass_filtered.nodbsnp.nognomAD.noPON.noMGIndel.vcf.gz.tbi
 
-        cp filter_tumoronly/${meta.id}.sage.filtered.nodbsnp.nognoMAD.noPON.noMGIndel.vcf.gz.tbi ./${meta.id}.sage.filtered.tumoronly.vcf.gz && \\
-        cp filter_tumoronly/${meta.id}.sage.filtered.nodbsnp.nognoMAD.noPON.noMGIndel.vcf.gz.tbi ./${meta.id}.sage.filtered.tumoronly.vcf.gz.tbi
+        cp filter_tumoronly/${meta.id}.sage.pass_filtered.nodbsnp.nognomAD.noPON.noMGIndel.vcf.gz.tbi ./${meta.id}.sage.pass_filtered.tumoronly.vcf.gz && \\
+        cp filter_tumoronly/${meta.id}.sage.pass_filtered.nodbsnp.nognomAD.noPON.noMGIndel.vcf.gz.tbi ./${meta.id}.sage.pass_filtered.tumoronly.vcf.gz.tbi
 
         rm -rf filter_tumoronly/
     else

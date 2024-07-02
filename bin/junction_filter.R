@@ -21,14 +21,15 @@ withAutoprint(
     writeLines(paste(paste('--', names(opt), ' ', sapply(opt, function(x) paste(x, collapse = ',')), sep = '', collapse = ' '), sep = ''), paste(opt$outfile_path, '/cmd.args', sep = '/'))
     saveRDS(opt, paste(opt$outfile_path, 'cmd.opts', sep = '/'))
 
-    setDTthreads(1)
+    library(data.table)
     library(skitools)
     library(gUtils)
     library(gTrack)
     library(gGnome)
 
+    setDTthreads(1)
     out.file.somatic.sv            = paste(opt$outfile_path, 'somatic.filtered.sv.rds', sep = '/')
-    out.file.somatic.sv.gnoMAD     = paste(opt$outfile_path, 'somatic.filtered.gnoMAD.sv.rds', sep = '/')
+    out.file.somatic.sv.gnomAD     = paste(opt$outfile_path, 'somatic.filtered.gnomAD.sv.rds', sep = '/')
 
     if(file.exists(opt$pon)) {
             ## PON filtering
@@ -39,24 +40,26 @@ withAutoprint(
             message("read in the filtered SV file from:", this_path)
             within_pon                     = suppressWarnings(suppressMessages(ra.overlaps(this_filt, pon_object, pad = opt$padding)))
             filter_these                   = unique(within_pon[,"ra1.ix"])
+            filter_these = filter_these[!is.na(filter_these)]  # Remove NAs
             return_this_filtered_somatic   = this_filt[-filter_these]
-            message("Finished filtering of the provided SV vcf with Junction PON, now will filter by gnoMAD...")
+            message("Finished filtering of the provided SV vcf with Junction PON, now will filter by gnomAD...")
             rm(pon_object, filter_these, this_filt)
-            ## gnoMAD filtering
-            gnoMAD_object                  = readRDS(opt$gnoMAD)
-            message("Loaded the gnoMAD object, filtering the provided VCF...")
-            within_gnoMAD                  = suppressWarnings(suppressMessages(ra.overlaps(return_this_filtered_somatic, gnoMAD_object, pad = opt$padding)))
-            filter_these_gnoMAD            = unique(within_gnoMAD[,"ra1.ix"])
-            return_this_filt               = return_this_filtered_somatic[-filter_these_gnoMAD]
+            ## gnomAD filtering
+            gnomAD_object                  = readRDS(opt$gnomAD)
+            message("Loaded the gnomAD object, filtering the provided VCF...")
+            within_gnomAD                  = suppressWarnings(suppressMessages(ra.overlaps(return_this_filtered_somatic, gnomAD_object, pad = opt$padding)))
+            filter_these_gnomAD            = unique(within_gnomAD[,"ra1.ix"])
+            filter_these_gnomAD = filter_these_gnomAD[!is.na(filter_these_gnomAD)]  # Remove NAs
+            return_this_filt               = return_this_filtered_somatic[-filter_these_gnomAD]
             ## Saving output
             message("Saving the results in .rds format. You can plug the rds file in JaBbA as input. :)")
             saveRDS(return_this_filtered_somatic, out.file.somatic.sv)
-            saveRDS(return_this_filt, out.file.somatic.sv.gnoMAD)
+            saveRDS(return_this_filt, out.file.somatic.sv.gnomAD)
     } else {
             stop(print_help(parseobj))
     }
 
-    cat('Done filtering SV calls from PON and gnoMAD!\n')
+    cat('Done filtering SV calls from PON and gnomAD!\n')
 
     quit("no", 0)
 }, echo = FALSE)

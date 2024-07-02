@@ -41,8 +41,8 @@ def main(args):
         genome_build=genome,
         signature_database=None,
         exclude_signature_subgroups=None,
-        export_probabilities=False,
-        export_probabilities_per_mutation=False,
+        export_probabilities=True,
+        export_probabilities_per_mutation=True,
         make_plots=False,
         sample_reconstruction_plots=False,
         verbose=True

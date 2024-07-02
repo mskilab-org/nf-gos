@@ -1,4 +1,3 @@
-
 process GRIDSS_GRIDSS {
     tag "$meta.id"
     label 'process_medium'
@@ -18,11 +17,11 @@ process GRIDSS_GRIDSS {
 
 
     output:
-    tuple val(meta), path("*.vcf.gz")                                  , emit: vcf,                optional:true
-    tuple val(meta), path("*.vcf.gz.tbi")                              , emit: vcf_index,          optional:true
+    tuple val(meta), path("*gridss.vcf.gz")                                  , emit: vcf,                optional:true
+    tuple val(meta), path("*gridss.vcf.gz.tbi")                              , emit: vcf_index,          optional:true
     tuple val(meta), path("*.assembly.bam")                            , emit: assembly,           optional:true
-    tuple val(meta), path("*.filtered.vcf.gz")                         , emit: filtered_vcf,       optional:true
-    tuple val(meta), path("*.filtered.vcf.gz.tbi")                     , emit: filtered_vcf_index, optional:true
+    tuple val(meta), path("*gridss.filtered.vcf.gz")                         , emit: filtered_vcf,       optional:true
+    tuple val(meta), path("*gridss.filtered.vcf.gz.tbi")                     , emit: filtered_vcf_index, optional:true
     path "versions.yml"                                                , emit: versions
 
 
@@ -53,7 +52,6 @@ process GRIDSS_GRIDSS {
         ${normalbam} \\
         ${tumorbam}
 
-    //TO DO: Need to verify whether bcftools is inside the container!! Else need to modify it to have bcftools!! (we use filter by PASS downstream!!)
     bcftools view -f PASS ${prefix}.vcf.gz -Oz -o ${prefix}.filtered.vcf.gz
     tabix -p vcf ${prefix}.filtered.vcf.gz
 

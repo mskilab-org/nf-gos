@@ -710,6 +710,9 @@
                                     dt2gr(hets.dt[, .(seqnames, start, end, strand = "*")]),
                                     return.type = "data.table")
 
+    print("trace1")
+    print(nodes.ov.hets)
+    print(names(nodes.ov.hets))
     nodes.ov.hets[, count := .N, by = query.id]
 
     ## we should only segment relatively wide nodes with low copy number
