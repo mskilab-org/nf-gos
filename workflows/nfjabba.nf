@@ -130,9 +130,9 @@ def handleError(step, dataType) {
 }
 
 input_sample = ch_from_samplesheet
-        .map{ meta, fastq_1, fastq_2, table, cram, crai, bam, bai, ploidy, cov, hets, vcf, vcf2, snv_vcf_somatic, snv_tbi_somatic, snv_vcf_germline, snv_tbi_germline, seg, nseg, ggraph, variantcaller ->
+        .map{ meta, fastq_1, fastq_2, table, cram, crai, bam, bai, cov, hets, ploidy, vcf, vcf2, snv_vcf_somatic, snv_tbi_somatic, snv_vcf_germline, snv_tbi_germline, seg, nseg, ggraph, variantcaller ->
             // generate patient_sample key to group lanes together
-            [ meta.patient + meta.sample, [meta, fastq_1, fastq_2, table, cram, crai, bam, bai, ploidy, cov, hets, vcf, vcf2, snv_vcf_somatic, snv_tbi_somatic, snv_vcf_germline, snv_tbi_germline, seg, nseg, ggraph, variantcaller] ]
+            [ meta.patient + meta.sample, [meta, fastq_1, fastq_2, table, cram, crai, bam, bai, cov, hets, ploidy, vcf, vcf2, snv_vcf_somatic, snv_tbi_somatic, snv_vcf_germline, snv_tbi_germline, seg, nseg, ggraph, variantcaller] ]
         }
         .tap{ ch_with_patient_sample } // save the channel
         .groupTuple() //group by patient_sample to get all lanes
@@ -143,7 +143,7 @@ input_sample = ch_from_samplesheet
         .combine(ch_with_patient_sample, by: 0) // for each entry add numLanes
         .map { patient_sample, num_lanes, ch_items ->
 
-            (meta, fastq_1, fastq_2, table, cram, crai, bam, bai, ploidy, cov, hets, vcf, vcf2, snv_vcf_somatic, snv_tbi_somatic, snv_vcf_germline, snv_tbi_germline, seg, nseg, ggraph, variantcaller) = ch_items
+            (meta, fastq_1, fastq_2, table, cram, crai, bam, bai, cov, hets, ploidy, vcf, vcf2, snv_vcf_somatic, snv_tbi_somatic, snv_vcf_germline, snv_tbi_germline, seg, nseg, ggraph, variantcaller) = ch_items
             if (meta.lane && fastq_2) {
                 meta           = meta + [id: "${meta.sample}-${meta.lane}".toString()]
                 def CN         = params.seq_center ? "CN:${params.seq_center}\\t" : ''
@@ -1835,7 +1835,6 @@ workflow NFJABBA {
                                 []
                             ]
                         }
-                    jabba_inputs.dump(tag: 'trace2')
                 } else {
                     // join all previous outputs to be used as input for jabba
                     // excluding svs since they can come from either svaba or gridss

@@ -162,30 +162,6 @@
                 "format": "file-path",
                 "exists": true
             },
-            "ploidy": {
-                "errorMessage": "purityploidy file must have extension '.rds' or be a number",
-                "anyOf": [
-                    {
-                        "type": "string",
-                        "pattern": "^\\S+\\.rds$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^NA$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^/dev/null$"
-                    },
-                    {
-                        "type": "string",
-                        "maxLength": 0
-                    },
-                    {
-                        "type": "number"
-                    }
-                ],
-            },
             "cov": {
                 "errorMessage": "COV file cannot contain spaces and must have extension '.rds' or '.txt'",
                 "anyOf": [
@@ -223,6 +199,30 @@
                 ],
                 "format": "file-path",
                 "exists": true
+            },
+            "ploidy": {
+                "errorMessage": "purityploidy file must have extension '.rds' or be a number",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.rds$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    },
+                    {
+                        "type": "number"
+                    }
+                ],
             },
             "vcf": {
                 "errorMessage": "VCF file for reads 1 cannot contain spaces and must have extension '.vcf' or '.vcf.gz'",
