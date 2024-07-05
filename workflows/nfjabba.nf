@@ -1589,6 +1589,7 @@ workflow NFJABBA {
 
             sbs_signatures_from_calling_sigprofilerassignment = Channel.empty().mix(VCF_SIGPROFILERASSIGNMENT.out.sbs_signatures)
             indel_signatures_from_calling_sigprofilerassignment = Channel.empty().mix(VCF_SIGPROFILERASSIGNMENT.out.indel_signatures)
+            signatures_matrix_from_calling_sigprofilermatrixgenerator = Channel.empty().mix(VCF_SIGPROFILERASSIGNMENT.out.sig_matrix)
         }
     }
 

@@ -4,6 +4,7 @@ import gzip
 import shutil
 from SigProfilerAssignment import Analyzer as Analyze
 from SigProfilerMatrixGenerator import install as genInstall
+from SigProfilerMatrixGenerator.scripts import SigProfilerMatrixGeneratorFunc as matGen
 
 # Usage
 # python sigprofilerassgnment.py --data-directory /path/to/vcf/files --output-directory /path/to/output --maximum-signatures 25 --cosmic-version 3.2
@@ -26,8 +27,9 @@ def unzip_vcf(input_vcf, input_dir):
 
 def main(args):
     input_dir = args.input_directory
-    output_sbs = args.output_directory or './sbs_results'
-    output_indel = args.output_directory or './indel_results'
+    output_sbs = './sbs_results'
+    output_indel = './indel_results'
+    output_sigmat = './sigmat_results'
     genome = args.genome or 'GRCh37'
     cosmic_version = args.cosmic_version or 3.4
 
@@ -67,6 +69,13 @@ def main(args):
         verbose=True
     )
 
+    print('running matrix generator...')
+    matrices = matGen.SigProfilerMatrixGeneratorFunc(
+        output_sigmat,
+        genome,
+        input_dir,
+    )
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -75,8 +84,6 @@ if __name__ == '__main__':
                         help='Genome reference to download. Default is GRCh37.')
     parser.add_argument('--input-vcf', type=str, required=True,
                         help='Path to the input gzipped VCF file.')
-    parser.add_argument('--output-directory', type=str, required=True,
-                        help='Directory to save the output results.')
     parser.add_argument('--cosmic-version', type=float, default=3.4,
                         help='COSMIC database version to use. Default is 3.4.')
 

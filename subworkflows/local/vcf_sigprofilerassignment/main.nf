@@ -24,9 +24,12 @@ workflow VCF_SIGPROFILERASSIGNMENT {
 
     sbs_signatures   = SIGPROFILERASSIGNMENT.out.sbs_sigs
     indel_signatures   = SIGPROFILERASSIGNMENT.out.indel_sigs
+    signatures_matrix   = SIGPROFILERASSIGNMENT.out.sig_matrix
 
     emit:
-    signatures
+    sbs_signatures
+    indel_signatures
+    signatures_matrix
 
     versions
 }
