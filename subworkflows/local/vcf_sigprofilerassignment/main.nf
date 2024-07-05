@@ -22,7 +22,8 @@ workflow VCF_SIGPROFILERASSIGNMENT {
         cosmic_version
     )
 
-    signatures   = SIGPROFILERASSIGNMENT.out.sigs
+    sbs_signatures   = SIGPROFILERASSIGNMENT.out.sbs_sigs
+    indel_signatures   = SIGPROFILERASSIGNMENT.out.indel_sigs
 
     emit:
     signatures

@@ -13,7 +13,8 @@ process SIGPROFILERASSIGNMENT {
     val(cosmic_version)
 
     output:
-    tuple val(meta), path("Assignment_Solution/**/*.txt")    , emit: sigs, optional: true
+    tuple val(meta), path("sbs_results/Assignment_Solution/**/*.txt")    , emit: sbs_sigs, optional: true
+    tuple val(meta), path("indel_results/Assignment_Solution/**/*.txt")    , emit: indel_sigs, optional: true
     path "versions.yml"                                     , emit: versions
 
     when:

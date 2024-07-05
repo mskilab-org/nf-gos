@@ -1587,7 +1587,8 @@ workflow NFJABBA {
                 sigprofilerassignment_cosmic_version
             )
 
-            signatures_from_calling_sigprofilerassignment = Channel.empty().mix(VCF_SIGPROFILERASSIGNMENT.out.signatures)
+            sbs_signatures_from_calling_sigprofilerassignment = Channel.empty().mix(VCF_SIGPROFILERASSIGNMENT.out.sbs_signatures)
+            indel_signatures_from_calling_sigprofilerassignment = Channel.empty().mix(VCF_SIGPROFILERASSIGNMENT.out.indel_signatures)
         }
     }
 

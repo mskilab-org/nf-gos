@@ -26,13 +26,16 @@ def unzip_vcf(input_vcf, input_dir):
 
 def main(args):
     input_dir = args.input_directory
-    output = args.output_directory or './'
+    output_sbs = args.output_directory or './sbs_results'
+    output_indel = args.output_directory or './indel_results'
     genome = args.genome or 'GRCh37'
     cosmic_version = args.cosmic_version or 3.4
-    print('running...')
+
+    # run twice for SBS and indel
+    print('running sbs...')
     Analyze.cosmic_fit(
         samples=input_dir,
-        output=output,
+        output=output_sbs,
         input_type="vcf",
         context_type="96",
         collapse_to_SBS96=True,
@@ -41,6 +44,22 @@ def main(args):
         genome_build=genome,
         signature_database=None,
         exclude_signature_subgroups=None,
+        export_probabilities=True,
+        export_probabilities_per_mutation=True,
+        make_plots=False,
+        sample_reconstruction_plots=False,
+        verbose=True
+    )
+
+    print('running indel...')
+    Analyze.cosmic_fit(
+        samples=input_dir,
+        output=output_indel,
+        input_type="vcf",
+        context_type="ID",
+        cosmic_version=cosmic_version,
+        exome=False,
+        genome_build=genome,
         export_probabilities=True,
         export_probabilities_per_mutation=True,
         make_plots=False,
