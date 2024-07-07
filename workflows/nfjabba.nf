@@ -54,12 +54,6 @@ def checkPathParamList = [
 ]
 
 def toolParamMap = [
-    "snpeff"     : [
-        params.snpeff_cache
-    ],
-    "vep"        : [
-        params.vep_cache
-    ],
     "svaba"      : [
         params.indel_mask,
         params.germ_sv_db,
@@ -71,6 +65,19 @@ def toolParamMap = [
     ],
     "hetpileups" : [
         params.hapmap_sites
+    ],
+    "fusions"    : [
+        params.gencode_fusions
+    ],
+    "allelic_cn" : [
+        params.mask_non_integer_balance,
+        params.mask_lp_phased_balance
+    ],
+    "vep"        : [
+        params.vep_cache
+    ],
+    "snpeff"     : [
+        params.snpeff_cache
     ],
     "sage"       : [
         params.ensembl_data_dir,
@@ -87,13 +94,6 @@ def toolParamMap = [
         params.driver_gene_panel,
         params.ensembl_data_resources,
         params.gnomad_resource
-    ],
-    "fusions"    : [
-        params.gencode_fusions
-    ],
-    "allelic_cn" : [
-        params.mask_non_integer_balance,
-        params.mask_lp_phased_balance
     ],
 ]
 
@@ -340,6 +340,21 @@ gcmapdir_frag      = params.gcmapdir_frag      ? Channel.fromPath(params.gcmapdi
 // HetPileups
 hapmap_sites       = params.hapmap_sites       ? Channel.fromPath(params.hapmap_sites).collect()      : Channel.empty()
 
+// Dryclean
+pon_dryclean      = params.pon_dryclean      ? Channel.fromPath(params.pon_dryclean).collect()     : Channel.empty()   // This is the path to the PON for Dryclean.
+blacklist_path_dryclean      = params.blacklist_path_dryclean      ? Channel.fromPath(params.blacklist_path_dryclean).collect()     : Channel.empty()   // This is the path to the blacklist for Dryclean (optional).
+germline_file_dryclean      = params.germline_file_dryclean      ? Channel.fromPath(params.germline_file_dryclean).collect()     : Channel.empty()   // This is the path to the germline mask for dryclean (optional).
+
+// JaBbA
+blacklist_coverage_jabba		= params.blacklist_coverage_jabba		  ? Channel.fromPath(params.blacklist_coverage_jabba).collect() : Channel.empty()
+
+// Fusions
+gencode_fusions             = params.gencode_fusions        ? Channel.fromPath(params.gencode_fusions).collect() : Channel.empty()
+
+// Allelic CN
+mask_non_integer_balance    = params.mask_non_integer_balance   ? Channel.fromPath(params.mask_non_integer_balance).collect() : Channel.empty()
+mask_lp_phased_balance    = params.mask_lp_phased_balance   ? Channel.fromPath(params.mask_lp_phased_balance).collect() : Channel.empty()
+
 // Sage
 somatic_hotspots_sage        = params.somatic_hotspots       ? Channel.fromPath(params.somatic_hotspots).collect()       : Channel.empty()
 panel_bed_sage               = params.panel_bed              ? Channel.fromPath(params.panel_bed).collect()              : Channel.empty()
@@ -360,21 +375,6 @@ driver_gene_panel_pave          = params.driver_gene_panel ? Channel.fromPath(pa
 ensembl_data_resources_pave     = params.ensembl_data_resources ? Channel.fromPath(params.ensembl_data_resources).collect() : Channel.empty()
 gnomad_resource_pave            = params.gnomad_resource ? Channel.fromPath(params.gnomad_resource).collect() : Channel.empty()
 
-// Dryclean
-pon_dryclean      = params.pon_dryclean      ? Channel.fromPath(params.pon_dryclean).collect()     : Channel.empty()   // This is the path to the PON for Dryclean.
-blacklist_path_dryclean      = params.blacklist_path_dryclean      ? Channel.fromPath(params.blacklist_path_dryclean).collect()     : Channel.empty()   // This is the path to the blacklist for Dryclean (optional).
-germline_file_dryclean      = params.germline_file_dryclean      ? Channel.fromPath(params.germline_file_dryclean).collect()     : Channel.empty()   // This is the path to the germline mask for dryclean (optional).
-
-// JaBbA
-blacklist_coverage_jabba		= params.blacklist_coverage_jabba		  ? Channel.fromPath(params.blacklist_coverage_jabba).collect() : Channel.empty()
-
-// Fusions
-gencode_fusions             = params.gencode_fusions        ? Channel.fromPath(params.gencode_fusions).collect() : Channel.empty()
-
-// Allelic CN
-mask_non_integer_balance    = params.mask_non_integer_balance   ? Channel.fromPath(params.mask_non_integer_balance).collect() : Channel.empty()
-mask_lp_phased_balance    = params.mask_lp_phased_balance   ? Channel.fromPath(params.mask_lp_phased_balance).collect() : Channel.empty()
-
 // Initialize value channels based on params, defined in the params.genomes[params.genome] scope
 ascat_genome       = params.ascat_genome       ?: Channel.empty()
 dbsnp_vqsr         = params.dbsnp_vqsr         ? Channel.value(params.dbsnp_vqsr) : Channel.empty()
@@ -394,16 +394,6 @@ junction_padding    = params.pad_junc_filter    ?: Channel.empty()              
 // Hetpileups
 filter_hets         = params.filter_hets       ?: Channel.empty()
 max_depth           = params.max_depth         ?: Channel.empty()
-
-// Sage
-ref_genome_version_sage       = params.ref_genome_version   ?: Channel.empty()
-
-// Pave
-ref_genome_version_pave       = params.ref_genome_version   ?: Channel.empty()
-
-// SigprofilerAssignment
-sigprofilerassignment_genome         = params.sigprofilerassignment_genome   ?: Channel.empty()
-sigprofilerassignment_cosmic_version = params.sigprofilerassignment_cosmic_version ?: Channel.empty()
 
 // FragCounter
 windowsize_frag    = params.windowsize_frag    ?: Channel.empty()                                                         // For fragCounter
@@ -502,6 +492,16 @@ tilim_lp_phased_balance = params.tilim_lp_phased_balance ?: Channel.empty()
 // HRDetect
 ref_genome_version_hrdetect = params.ref_hrdetect ?: Channel.empty()
 
+// Sage
+ref_genome_version_sage       = params.ref_genome_version   ?: Channel.empty()
+
+// Pave
+ref_genome_version_pave       = params.ref_genome_version   ?: Channel.empty()
+
+// SigprofilerAssignment
+sigprofilerassignment_genome         = params.sigprofilerassignment_genome   ?: Channel.empty()
+sigprofilerassignment_cosmic_version = params.sigprofilerassignment_cosmic_version ?: Channel.empty()
+
 // Initialize files channels based on params, not defined within the params.genomes[params.genome] scope
 if (params.snpeff_cache && params.tools && params.tools.contains("snpeff")) {
     def snpeff_annotation_cache_key = params.use_annotation_cache_keys ? "${params.snpeff_genome}.${params.snpeff_db}/" : ""
@@ -525,7 +525,6 @@ if (params.vep_cache && params.tools && params.tools.contains("vep")) {
 } else vep_cache = []
 
 vep_extra_files = []
-
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -603,27 +602,8 @@ include { BAM_SVCALLING_GRIDSS_SOMATIC                } from '../subworkflows/lo
 // SV Junction Filtering
 include { SV_JUNCTION_FILTER as JUNCTION_FILTER       } from '../subworkflows/local/junction_filter/main'
 
-//STRELKA2
-include { BAM_SOMATIC_STRELKA                        } from '../subworkflows/local/bam_somatic_strelka/main'
-include { BAM_GERMLINE_STRELKA                       } from '../subworkflows/local/bam_germline_strelka/main'
-
 // HETPILEUPS
 include { BAM_HETPILEUPS                              } from '../subworkflows/local/bam_hetpileups/main'
-
-// SAGE
-include { BAM_SAGE                              } from '../subworkflows/local/bam_sage/main'
-include { BAM_SAGE_TUMOR_ONLY_FILTER            } from '../subworkflows/local/bam_sage/main'
-
-// SNPEFF
-include { VCF_SNPEFF as VCF_SNPEFF_SOMATIC                              } from '../subworkflows/local/vcf_snpeff/main'
-include { VCF_SNPEFF as VCF_SNPEFF_GERMLINE                             } from '../subworkflows/local/vcf_snpeff/main'
-
-// PAVE
-include { VCF_PAVE as VCF_PAVE_SOMATIC                              } from '../subworkflows/local/vcf_pave/main'
-include { VCF_PAVE as VCF_PAVE_GERMLINE                              } from '../subworkflows/local/vcf_pave/main'
-
-// SigProfilerAssignment
-include { VCF_SIGPROFILERASSIGNMENT                              } from '../subworkflows/local/vcf_sigprofilerassignment/main'
 
 // fragCounter
 include { BAM_FRAGCOUNTER as TUMOR_FRAGCOUNTER         } from '../subworkflows/local/bam_fragCounter/main'
@@ -656,6 +636,28 @@ include { COV_GGRAPH_LP_PHASED_BALANCE as LP_PHASED_BALANCE                     
 
 // HRDetect
 include { JUNC_SNV_GGRAPH_HRDETECT } from '../subworkflows/local/hrdetect/main'
+
+//STRELKA2
+include { BAM_SOMATIC_STRELKA                        } from '../subworkflows/local/bam_somatic_strelka/main'
+include { BAM_GERMLINE_STRELKA                       } from '../subworkflows/local/bam_germline_strelka/main'
+
+// SAGE
+include { BAM_SAGE                              } from '../subworkflows/local/bam_sage/main'
+include { BAM_SAGE_TUMOR_ONLY_FILTER            } from '../subworkflows/local/bam_sage/main'
+
+// SNPEFF
+include { VCF_SNPEFF as VCF_SNPEFF_SOMATIC                              } from '../subworkflows/local/vcf_snpeff/main'
+include { VCF_SNPEFF as VCF_SNPEFF_GERMLINE                             } from '../subworkflows/local/vcf_snpeff/main'
+
+// SNV MULTIPLICITY
+include { VCF_SNV_MULTIPLICITY           } from '../subworkflows/local/vcf_snv_multiplicity/main'
+
+// PAVE
+include { VCF_PAVE as VCF_PAVE_SOMATIC                              } from '../subworkflows/local/vcf_pave/main'
+include { VCF_PAVE as VCF_PAVE_GERMLINE                              } from '../subworkflows/local/vcf_pave/main'
+
+// SigProfilerAssignment
+include { VCF_SIGPROFILERASSIGNMENT                              } from '../subworkflows/local/vcf_sigprofilerassignment/main'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -792,7 +794,7 @@ workflow NFJABBA {
     boolean runFusions = false
     boolean runHRDetect = false
 
-    // Set flags based on params.step using a cascading approach
+    // Set flags based on params.step (the starting step) using a cascading approach
     // Fall through to the next case if the previous case is true
     switch (params.step) {
         case 'alignment':
@@ -809,12 +811,6 @@ workflow NFJABBA {
             runFragCounter = true
         case 'hetpileups':
             runHetPileups = true
-        case 'snv_calling':
-            runSnvCalling = true
-        case 'variant_annotation':
-            runVariantAnnotation = true
-        case 'signatures':
-            runSignatures = true
         case 'dryclean':
             runDryClean = true
         case 'ascat':
@@ -829,6 +825,12 @@ workflow NFJABBA {
             runFusions = true
         case 'hrdetect':
             runHRDetect = true
+        case 'snv_calling':
+            runSnvCalling = true
+        case 'variant_annotation':
+            runVariantAnnotation = true
+        case 'signatures':
+            runSignatures = true
             break
         default:
             error "Invalid step: ${params.step}"
@@ -1183,8 +1185,6 @@ workflow NFJABBA {
         //cram_fragcounter_calling  = cram_variant_calling
     }
 
-
-
     if (runSvCalling) {
         //when starting from sv_calling
         if (params.step == 'sv_calling') {
@@ -1197,8 +1197,12 @@ workflow NFJABBA {
             versions = versions.mix(CRAM_TO_BAM.out.versions)
 
             bam_sv_calling = Channel.empty().mix(CRAM_TO_BAM.out.alignment_index, input_sv_calling_convert.bam)
-                                .map{ meta, bam, bai, ploidy -> [ meta + [data_type: "bam"], bam, bai ] }           //making sure that the input data_type is correct
+                                .map{ meta, bam, bai -> [ meta + [data_type: "bam"], bam, bai ] }           //making sure that the input data_type is correct
 
+            if (params.tumor_only) {
+                bam_sv_calling = Channel.empty().mix(CRAM_TO_BAM.out.alignment_index, input_sv_calling_convert.bam)
+                                    .map{ meta, bam, bai, ploidy -> [ meta + [data_type: "bam"], bam, bai ] }           //making sure that the input data_type is correct
+            }
         }
 
         if (params.tumor_only) {
@@ -1378,219 +1382,6 @@ workflow NFJABBA {
         bam_snv_calling = bam_hetpileups_calling
     } else {
         bam_snv_calling = bam_sv_calling
-    }
-
-    if (runSnvCalling) {
-        if (params.step == 'snv_calling') {
-            input_snv_calling_convert = input_sample.branch{
-                bam:  it[0].data_type == "bam"
-                cram: it[0].data_type == "cram"
-            }
-            // BAM files first must be converted to CRAM files since from this step on we base everything on CRAM format
-            CRAM_TO_BAM(input_snv_calling_convert.cram, fasta, fasta_fai)
-            versions = versions.mix(CRAM_TO_BAM.out.versions)
-
-            bam_snv_calling = Channel.empty().mix(CRAM_TO_BAM.out.alignment_index, input_snv_calling_convert.bam)
-                                .map{ meta, bam, bai -> [ meta + [data_type: "bam"], bam, bai ] }           //making sure that the input data_type is correct
-
-        }
-
-        if (params.tumor_only) {
-            bam_snv_calling_status = bam_snv_calling.branch{
-                tumor:  it[0].status == 1
-            }
-
-            bam_snv_calling_pair = bam_snv_calling_status.tumor.map{ meta, bam, bai -> [ meta, [], [], bam, bai ] }
-        } else {
-            // getting the tumor and normal cram files separated
-            bam_snv_calling_status = bam_snv_calling.branch{
-                normal: it[0].status == 0
-                tumor:  it[0].status == 1
-            }
-
-
-            // All normal samples
-            bam_snv_calling_normal_to_cross = bam_snv_calling_status.normal.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
-
-            // All tumor samples
-            bam_snv_calling_tumor_to_cross = bam_snv_calling_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
-
-            // Crossing the normal and tumor samples to create tumor and normal pairs
-            bam_snv_calling_pair = bam_snv_calling_normal_to_cross.cross(bam_snv_calling_tumor_to_cross)
-                .map { normal, tumor ->
-                    def meta = [:]
-
-                    meta.id         = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
-                    meta.normal_id  = normal[1].sample
-                    meta.patient    = normal[0]
-                    meta.sex        = normal[1].sex
-                    meta.tumor_id   = tumor[1].sample
-
-                    [ meta, normal[2], normal[3], tumor[2], tumor[3] ]
-            }
-        }
-
-        if (tools_used.contains('strelka')) {
-            BAM_SOMATIC_STRELKA(bam_snv_calling_pair, fasta, fasta_fai)
-
-            versions = versions.mix(BAM_SOMATIC_STRELKA.out.versions)
-
-            somatic_vcf_from_snv_calling_strelka = Channel.empty().mix(BAM_SOMATIC_STRELKA.out.vcf)
-
-            BAM_GERMLINE_STRELKA(bam_snv_calling_status.normal, fasta, fasta_fai)
-
-            versions = versions.mix(BAM_GERMLINE_STRELKA.out.versions)
-
-            germline_vcf_from_snv_calling_strelka = Channel.empty().mix(BAM_GERMLINE_STRELKA.out.vcf)
-        }
-
-        if (tools_used.contains('sage')) {
-
-            dict_sage = dict.map{ id, dict -> dict }
-
-            BAM_SAGE(
-                bam_snv_calling_pair,
-                fasta,
-                fasta_fai,
-                dict_sage,
-                ref_genome_version_sage,
-                ensembl_data_dir_sage,
-                somatic_hotspots_sage,
-                panel_bed_sage,
-                high_confidence_bed_sage
-            )
-
-            versions = versions.mix(BAM_SAGE.out.versions)
-
-            somatic_vcf_from_snv_calling_sage = Channel.empty().mix(BAM_SAGE.out.sage_somatic_vcf)
-            pass_filtered_somatic_vcf_from_snv_calling_sage = Channel.empty().mix(BAM_SAGE.out.sage_pass_filtered_somatic_vcf)
-            germline_vcf_from_snv_calling_sage = Channel.empty().mix(BAM_SAGE.out.sage_germline_vcf)
-
-            if (params.tumor_only) {
-                BAM_SAGE_TUMOR_ONLY_FILTER(
-                    pass_filtered_somatic_vcf_from_snv_calling_sage,
-                    dbsnp,
-                    dbsnp_tbi,
-                    gnomAD_snv_db,
-                    gnomAD_snv_db_tbi,
-                    sage_germline_pon,
-                    sage_germline_pon_tbi,
-                    known_indels,
-                    known_indels_tbi
-                )
-
-                sage_filtered_vcf = Channel.empty().mix(BAM_SAGE_TUMOR_ONLY_FILTER.out.sage_filtered_vcf)
-            }
-        }
-    }
-
-    if (runVariantAnnotation) {
-        if (params.step == 'snv_annotation') {
-            input_vcf_somatic = input_sample.map{ meta, snv_vcf_somatic, snv_tbi_somatic, snv_vcf_germline, snv_tbi_germliine -> [ meta, snv_vcf_somatic, snv_tbi_somatic ] }
-            if (!params.tumor_only) {
-                input_vcf_germline = input_sample.map{ meta, snv_vcf_somatic, snv_tbi_somatic, snv_vcf_germline, snv_tbi_germliine -> [ meta, snv_vcf_germline, snv_tbi_germline ] }
-            }
-        } else {
-            if (tools_used.contains('sage')) {
-                input_vcf_somatic = pass_filtered_somatic_vcf_from_snv_calling_sage
-                if (!params.tumor_only) {
-                    input_vcf_germline = germline_vcf_from_snv_calling_sage
-                }
-            }
-        }
-
-        if (tools_used.contains('snpeff')) {
-            VCF_SNPEFF_SOMATIC(
-                input_vcf_somatic,
-                snpeff_db_full,
-                snpeff_cache
-            )
-
-            somatic_annotations_from_snpeff = Channel.empty().mix(VCF_SNPEFF_SOMATIC.out.snpeff_vcf)
-            somatic_bcf_annotations_from_snpeff = Channel.empty().mix(VCF_SNPEFF_SOMATIC.out.snpeff_bcf)
-            somatic_report_from_snpeff = Channel.empty().mix(VCF_SNPEFF_SOMATIC.out.snpeff_report)
-            somatic_summary_html_from_snpeff = Channel.empty().mix(VCF_SNPEFF_SOMATIC.out.snpeff_summary_html)
-            somatic_genes_from_snpeff = Channel.empty().mix(VCF_SNPEFF_SOMATIC.out.snpeff_genes_txt)
-
-            if (!params.tumor_only) {
-                VCF_SNPEFF_GERMLINE(
-                    input_vcf_germline,
-                    snpeff_db_full,
-                    snpeff_cache
-                )
-
-                germline_annotations_from_snpeff = Channel.empty().mix(VCF_SNPEFF_GERMLINE.out.snpeff_vcf)
-                germline_bcf_annotations_from_snpeff = Channel.empty().mix(VCF_SNPEFF_GERMLINE.out.snpeff_bcf)
-                germline_report_from_snpeff = Channel.empty().mix(VCF_SNPEFF_GERMLINE.out.snpeff_report)
-                germline_summary_html_from_snpeff = Channel.empty().mix(VCF_SNPEFF_GERMLINE.out.snpeff_summary_html)
-                germline_genes_from_snpeff = Channel.empty().mix(VCF_SNPEFF_GERMLINE.out.snpeff_genes_txt)
-            }
-
-        }
-
-        if (tools_used.contains('pave')) {
-            VCF_PAVE_SOMATIC(
-                input_vcf,
-                fasta,
-                fasta_fai,
-                ref_genome_version_pave,
-                sage_pon_pave,
-                sage_blocklist_regions_pave,
-                sage_blocklist_sites_pave,
-                clinvar_annotations_pave,
-                segment_mappability_pave,
-                driver_gene_panel_pave,
-                ensembl_data_resources_pave,
-                gnomad_resource_pave
-            )
-
-            somatic_annotations_from_pave = Channel.empty().mix(VCF_PAVE.out.pave_vcf)
-            somatic_pave_filtered_sage_vcf = Channel.empty().mix(VCF_PAVE.out.pave_filtered_vcf)
-
-            if (!params.tumor_only) {
-                VCF_PAVE_GERMLINE(
-                    input_vcf,
-                    fasta,
-                    fasta_fai,
-                    ref_genome_version_pave,
-                    sage_pon_pave,
-                    sage_blocklist_regions_pave,
-                    sage_blocklist_sites_pave,
-                    clinvar_annotations_pave,
-                    segment_mappability_pave,
-                    driver_gene_panel_pave,
-                    ensembl_data_resources_pave,
-                    gnomad_resource_pave
-                )
-
-                germline_annotations_from_pave = Channel.empty().mix(VCF_PAVE_GERMLINE.out.pave_vcf)
-                germline_pave_filtered_sage_vcf = Channel.empty().mix(VCF_PAVE_GERMLINE.out.pave_filtered_vcf)
-            }
-
-        }
-
-    }
-
-    if (runSignatures) {
-        if (params.step == 'signatures') {
-            input_vcf_somatic = input_sample.map{ meta, snv_vcf_somatic, snv_tbi_somatic, snv_vcf_germline, snv_tbi_germliine -> [ meta, snv_vcf_somatic, snv_tbi_somatic ] }
-        } else {
-            if (tools_used.contains('sage')) {
-                input_vcf_somatic = pass_filtered_somatic_vcf_from_snv_calling_sage
-            }
-        }
-
-        if (tools_used.contains('sigprofilerassignment')) {
-            VCF_SIGPROFILERASSIGNMENT(
-                input_vcf_somatic,
-                sigprofilerassignment_genome,
-                sigprofilerassignment_cosmic_version
-            )
-
-            sbs_signatures_from_calling_sigprofilerassignment = Channel.empty().mix(VCF_SIGPROFILERASSIGNMENT.out.sbs_signatures)
-            indel_signatures_from_calling_sigprofilerassignment = Channel.empty().mix(VCF_SIGPROFILERASSIGNMENT.out.indel_signatures)
-            signatures_matrix_from_calling_sigprofilermatrixgenerator = Channel.empty().mix(VCF_SIGPROFILERASSIGNMENT.out.sig_matrix)
-        }
     }
 
     if (runDryClean) {
@@ -2057,6 +1848,191 @@ workflow NFJABBA {
         }
     }
 
+    if (runSnvCalling) {
+        if (params.step == 'snv_calling') {
+            input_snv_calling_convert = input_sample.branch{
+                bam:  it[0].data_type == "bam"
+                cram: it[0].data_type == "cram"
+            }
+            // BAM files first must be converted to CRAM files since from this step on we base everything on CRAM format
+            CRAM_TO_BAM(input_snv_calling_convert.cram, fasta, fasta_fai)
+            versions = versions.mix(CRAM_TO_BAM.out.versions)
+
+            bam_snv_calling = Channel.empty().mix(CRAM_TO_BAM.out.alignment_index, input_snv_calling_convert.bam)
+                                .map{ meta, bam, bai -> [ meta + [data_type: "bam"], bam, bai ] }           //making sure that the input data_type is correct
+
+        }
+
+        if (params.tumor_only) {
+            bam_snv_calling_status = bam_snv_calling.branch{
+                tumor:  it[0].status == 1
+            }
+
+            bam_snv_calling_pair = bam_snv_calling_status.tumor.map{ meta, bam, bai -> [ meta, [], [], bam, bai ] }
+        } else {
+            // getting the tumor and normal cram files separated
+            bam_snv_calling_status = bam_snv_calling.branch{
+                normal: it[0].status == 0
+                tumor:  it[0].status == 1
+            }
+
+
+            // All normal samples
+            bam_snv_calling_normal_to_cross = bam_snv_calling_status.normal.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
+
+            // All tumor samples
+            bam_snv_calling_tumor_to_cross = bam_snv_calling_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
+
+            // Crossing the normal and tumor samples to create tumor and normal pairs
+            bam_snv_calling_pair = bam_snv_calling_normal_to_cross.cross(bam_snv_calling_tumor_to_cross)
+                .map { normal, tumor ->
+                    def meta = [:]
+
+                    meta.id         = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
+                    meta.normal_id  = normal[1].sample
+                    meta.patient    = normal[0]
+                    meta.sex        = normal[1].sex
+                    meta.tumor_id   = tumor[1].sample
+
+                    [ meta, normal[2], normal[3], tumor[2], tumor[3] ]
+            }
+        }
+
+        if (tools_used.contains('strelka')) {
+            BAM_SOMATIC_STRELKA(bam_snv_calling_pair, fasta, fasta_fai)
+
+            versions = versions.mix(BAM_SOMATIC_STRELKA.out.versions)
+
+            somatic_vcf_from_snv_calling_strelka = Channel.empty().mix(BAM_SOMATIC_STRELKA.out.vcf)
+
+            BAM_GERMLINE_STRELKA(bam_snv_calling_status.normal, fasta, fasta_fai)
+
+            versions = versions.mix(BAM_GERMLINE_STRELKA.out.versions)
+
+            germline_vcf_from_snv_calling_strelka = Channel.empty().mix(BAM_GERMLINE_STRELKA.out.vcf)
+        }
+
+        if (tools_used.contains('sage')) {
+
+            dict_sage = dict.map{ id, dict -> dict }
+
+            BAM_SAGE(
+                bam_snv_calling_pair,
+                fasta,
+                fasta_fai,
+                dict_sage,
+                ref_genome_version_sage,
+                ensembl_data_dir_sage,
+                somatic_hotspots_sage,
+                panel_bed_sage,
+                high_confidence_bed_sage
+            )
+
+            versions = versions.mix(BAM_SAGE.out.versions)
+
+            pass_filtered_somatic_vcf_from_snv_calling_sage = Channel.empty().mix(BAM_SAGE.out.sage_pass_filtered_somatic_vcf)
+            germline_vcf_from_snv_calling_sage = Channel.empty().mix(BAM_SAGE.out.sage_germline_vcf)
+
+            if (params.tumor_only) {
+                BAM_SAGE_TUMOR_ONLY_FILTER(
+                    pass_filtered_somatic_vcf_from_snv_calling_sage,
+                    dbsnp,
+                    dbsnp_tbi,
+                    gnomAD_snv_db,
+                    gnomAD_snv_db_tbi,
+                    sage_germline_pon,
+                    sage_germline_pon_tbi,
+                    known_indels,
+                    known_indels_tbi
+                )
+
+                sage_filtered_vcf = Channel.empty().mix(BAM_SAGE_TUMOR_ONLY_FILTER.out.sage_filtered_vcf)
+            }
+        }
+    }
+
+    if (runVariantAnnotation) {
+        if (params.step == 'snv_annotation') {
+            input_vcf_somatic = input_sample.map{ meta, snv_vcf_somatic, snv_tbi_somatic, snv_vcf_germline, snv_tbi_germliine -> [ meta, snv_vcf_somatic, snv_tbi_somatic ] }
+            if (!params.tumor_only) {
+                input_vcf_germline = input_sample.map{ meta, snv_vcf_somatic, snv_tbi_somatic, snv_vcf_germline, snv_tbi_germliine -> [ meta, snv_vcf_germline, snv_tbi_germline ] }
+            }
+        } else {
+            if (tools_used.contains('sage')) {
+                input_vcf_somatic = pass_filtered_somatic_vcf_from_snv_calling_sage
+                if (!params.tumor_only) {
+                    input_vcf_germline = germline_vcf_from_snv_calling_sage
+                }
+            }
+        }
+
+        if (tools_used.contains('snpeff')) {
+            VCF_SNPEFF_SOMATIC(
+                input_vcf_somatic,
+                snpeff_db_full,
+                snpeff_cache
+            )
+
+            somatic_annotations_from_snpeff = Channel.empty().mix(VCF_SNPEFF_SOMATIC.out.snpeff_vcf)
+            somatic_bcf_annotations_from_snpeff = Channel.empty().mix(VCF_SNPEFF_SOMATIC.out.snpeff_bcf)
+            somatic_genes_from_snpeff = Channel.empty().mix(VCF_SNPEFF_SOMATIC.out.snpeff_genes_txt)
+
+            if (!params.tumor_only) {
+                VCF_SNPEFF_GERMLINE(
+                    input_vcf_germline,
+                    snpeff_db_full,
+                    snpeff_cache
+                )
+
+                germline_annotations_from_snpeff = Channel.empty().mix(VCF_SNPEFF_GERMLINE.out.snpeff_vcf)
+                germline_bcf_annotations_from_snpeff = Channel.empty().mix(VCF_SNPEFF_GERMLINE.out.snpeff_bcf)
+                germline_genes_from_snpeff = Channel.empty().mix(VCF_SNPEFF_GERMLINE.out.snpeff_genes_txt)
+
+                vcf_somatic_for_joining = somatic_annotations_from_snpeff.map{ meta, vcf -> [ meta.patient, vcf ] }
+                vcf_germline_for_joining = germline_annotations_from_snpeff.map{ meta, vcf -> [ meta.patient, vcf ] }
+
+                input_snv_multiplicity = meta_for_joining
+                    .join(vcf_somatic_for_joining)
+                    .join(vcf_germline_for_joining)
+                    .join(jabba_rds_for_joining)
+                    .map{
+                        patient, meta, somatic_vcf, germline_vcf, ggraph ->
+                        [ meta, somatic_vcf, germline_vcf, ggraph ]
+                    }
+
+                VCF_SNV_MULTIPLICITY(
+                    input_snv_multiplicity,
+                    fasta,
+                    fasta_fai
+                )
+            }
+
+        }
+
+    }
+
+    if (runSignatures) {
+        if (params.step == 'signatures') {
+            input_vcf_somatic = input_sample.map{ meta, snv_vcf_somatic, snv_tbi_somatic, snv_vcf_germline, snv_tbi_germliine -> [ meta, snv_vcf_somatic, snv_tbi_somatic ] }
+        } else {
+            if (tools_used.contains('sage')) {
+                input_vcf_somatic = pass_filtered_somatic_vcf_from_snv_calling_sage
+            }
+        }
+
+        if (tools_used.contains('sigprofilerassignment')) {
+            VCF_SIGPROFILERASSIGNMENT(
+                input_vcf_somatic,
+                sigprofilerassignment_genome,
+                sigprofilerassignment_cosmic_version
+            )
+
+            sbs_signatures_from_calling_sigprofilerassignment = Channel.empty().mix(VCF_SIGPROFILERASSIGNMENT.out.sbs_signatures)
+            indel_signatures_from_calling_sigprofilerassignment = Channel.empty().mix(VCF_SIGPROFILERASSIGNMENT.out.indel_signatures)
+            signatures_matrix_from_calling_sigprofilermatrixgenerator = Channel.empty().mix(VCF_SIGPROFILERASSIGNMENT.out.signatures_matrix)
+        }
+    }
+
     if (runHRDetect && !params.tumor_only) {
         if (tools_used.contains('hrdetect')) {
             if (params.step == 'hrdetect') {
@@ -2088,6 +2064,7 @@ workflow NFJABBA {
             hrdetect_txt = Channel.empty().mix(JUNC_SNV_GGRAPH_HRDETECT.out.hrdetect_txt)
         }
     }
+
 }
 
 /*

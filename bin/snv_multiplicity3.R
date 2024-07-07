@@ -8,8 +8,11 @@
             make_option(c("-g", "--germline_snv"), type = "character", help = "Path to germline snv file"),
             make_option(c("-j", "--jabba"), type = "character", help = "Path to jabba file"),
             make_option(c("-f", "--fasta"), type = "character", help = "Path to ref fasta file"),
+            make_option(c("--downsample_jar"), type = "character", help = "Path to downsample jar"),
+            make_option(c("--snpsift_jar"), type = "character", help = "Path to snpsift jar"),
+            make_option(c("--vcfeff_perl"), type = "character", help = "Path to vcfeff perl"),
             make_option(c("-k", "--cores"), type = "integer", help = "Number of cores"),
-            make_option(c("-o", "--outdir"), type = "character", default = './', help = "output directory"),
+            make_option(c("-o", "--outdir"), type = "character", default = './', help = "output directory")
         )
 
         parseobj = OptionParser(option_list=option_list)
@@ -40,9 +43,79 @@
             library(rtracklayer)
             library(khtools)
             library(skidb)
-            devtools::load_all("~/git/zitools")
+            library(zitools)
         })
     })
+
+    #' @name gg2jab
+    #' @title gg2jab
+    #'
+    #' @description
+    #'
+    #' Hacky way to make a JaBbA-like output from a gGraph
+    #'
+    #' @param gg (gGraph)
+    #' @param purity (numeric) overwrite automated purity (default 1)
+    #' @param ploidy (numeric) overwrite automated purity ploidy calculation
+    #' @return list with names:
+    #' - segstats (GRanges, signed)
+    #' - adj (adjacency matrix)
+    #' - ab.edges (array)
+    #' - purity (numeric)
+    #' - ploidy (numeric)
+    #' - junctions (GRangesList)
+    gg2jab = function(gg, purity = NA, ploidy = NA) {
+
+        if (!inherits(gg, 'gGraph')) {
+            stop("Must supply gGraph")
+        }
+
+        ## create ab.edges object
+        ab.edges = array(NA, dim = c(length(gg$junctions[type == "ALT"]), 3, 2),
+                         dimnames = list(NULL, c('from', 'to', 'edge.ix'), c('+', '-')))
+        ab.edges[, 1, 1] = gg$sedgesdt[sedge.id > 0][match(gg$junctions[type == "ALT"]$dt$edge.id, edge.id), from]
+        ab.edges[, 2, 1] = gg$sedgesdt[sedge.id > 0][match(gg$junctions[type == "ALT"]$dt$edge.id, edge.id), to]
+        ab.edges[, 3, 1] = gg$junctions[type == "ALT"]$dt$edge.id
+        ab.edges[, 1, 2] = gg$sedgesdt[sedge.id < 0][match(gg$junctions[type == "ALT"]$dt$edge.id, edge.id), from]
+        ab.edges[, 2, 2] = gg$sedgesdt[sedge.id < 0][match(gg$junctions[type == "ALT"]$dt$edge.id, edge.id), to]
+        ab.edges[, 3, 2] = gg$junctions[type == "ALT"]$dt$edge.id
+
+        ## prepare djacency matrix - a sparse matrix where the nonzero entries
+        ## are the CNs if that field exists and 1 otherwise
+        adj.dims = dim(gg$adj)
+        if (!is.null(gg$sedgesdt$cn)) {
+            adj = Matrix::sparseMatrix(i = gg$sedgesdt[, from],
+                                       j = gg$sedgesdt[, to],
+                                       x = gg$sedgesdt[, cn],
+                                       dims = adj.dims)
+        } else {
+            adj = Matrix::sparseMatrix(i = gg$sedgesdt[, from],
+                                       j = gg$sedgesdt[, to],
+                                       x = 1,
+                                       dims = adj.dims)
+        }
+
+        ## initalize output which is a list
+        res = list(segstats = gg$gr,
+                   adj = adj,
+                   junctions = gg$junctions[type == "ALT"]$grl,
+                   ab.edges = ab.edges)
+
+        ## calculate purity/ploidy if not supplied
+        if (!is.na(ploidy)) {
+            res$ploidy = ploidy
+        } else {
+            res$ploidy = weighted.mean(gg$nodes$dt[, cn], gg$nodes$dt[, width], na.rm = TRUE)
+        }
+
+        if (!is.na(purity)) {
+            res$purity = purity
+        } else {
+            res$purity = 1
+        }
+
+        return(res)
+    }
 
     # debug.R contents
     est_snv_cn_stub =
@@ -66,10 +139,10 @@
             system2("bcftools", c("view -i 'FILTER==\"PASS\"'", vcf),
                     stdout = tmpvcf)
             system2("java",
-                    sprintf("-jar ~/software/jvarkit/dist/downsamplevcf.jar -N 10 -n %s %s",
-                            germ_subsample, tmpvcf),
+                    sprintf("-jar %s -N 10 -n %s %s",
+                            opt$downsample_jar, germ_subsample, tmpvcf),
                     stdout = tmpvcf2,
-                    env = "module unload java; module load java/1.8;")
+                    )
             gvcf = parsesnpeff(
                 tmpvcf, coding_alt_only = TRUE, keepfile = FALSE,
                 altpipe = TRUE)
@@ -280,9 +353,9 @@
             on.exit(unlink(tmp.path))
         try2({
             catcmd = if (grepl("(.gz)$", vcf)) "zcat" else "cat"
-            onepline = "/gpfs/commons/groups/imielinski_lab/git/mskilab/flows/modules/SnpEff/source/snpEff/scripts/vcfEffOnePerLine.pl"
+            onepline = opt$vcfeff_perl
             if (coding_alt_only) {
-                filt = "java -Xmx20m -Xms20m -XX:ParallelGCThreads=1 -jar /gpfs/commons/groups/imielinski_lab/git/mskilab/flows/modules/SnpEff/source/snpEff/SnpSift.jar filter \"( ANN =~ 'chromosome_number_variation|exon_loss_variant|rare_amino_acid|stop_lost|transcript_ablation|coding_sequence|regulatory_region_ablation|TFBS|exon_loss|truncation|start_lost|missense|splice|stop_gained|frame' )\""
+                filt = sprintf("java -Xmx20m -Xms20m -XX:ParallelGCThreads=1 -jar %s filter \"( ANN =~ 'chromosome_number_variation|exon_loss_variant|rare_amino_acid|stop_lost|transcript_ablation|coding_sequence|regulatory_region_ablation|TFBS|exon_loss|truncation|start_lost|missense|splice|stop_gained|frame' )\"", opt$snpsift_jar)
                 if (filterpass)
                     cmd = sprintf(paste(catcmd, "%s | %s | %s | bcftools view -i 'FILTER==\"PASS\"' | bgzip -c > %s"),
                                   vcf, onepline, filt, tmp.path)
@@ -316,8 +389,7 @@
                    "protein_pos", "distance")
             data.table::setnames(ann, fn)
             if ("AD" %in% names(geno(vcf))) {
-                adep = setnames(as.data.table(geno(vcf)$AD[, , 1:2]),
-                                c("ref", "alt"))
+                adep = setnames(as.data.table(geno(vcf)$AD[, 2, 1:2]), c("ref", "alt"))
                 gt = geno(vcf)$GT
             }
             else if (all(c("AU", "GU", "CU", "TU", "TAR", "TIR") %in%

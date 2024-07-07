@@ -59,6 +59,7 @@ def main(args):
         output=output_indel,
         input_type="vcf",
         context_type="ID",
+        collapse_to_SBS96=False,
         cosmic_version=cosmic_version,
         exome=False,
         genome_build=genome,
