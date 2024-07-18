@@ -25,22 +25,20 @@ include { UNZIP as UNZIP_GC                      } from '../../../modules/nf-cor
 include { UNZIP as UNZIP_LOCI                    } from '../../../modules/nf-core/unzip/main'
 include { UNZIP as UNZIP_RT                      } from '../../../modules/nf-core/unzip/main'
 
+ascat_alleles                       = WorkflowNfcasereports.create_file_channel(params.ascat_alleles)
+ascat_loci                          = WorkflowNfcasereports.create_file_channel(params.ascat_loci)
+ascat_loci_gc                       = WorkflowNfcasereports.create_file_channel(params.ascat_loci_gc)
+ascat_loci_rt                       = WorkflowNfcasereports.create_file_channel(params.ascat_loci_rt)
+chr_dir                             = WorkflowNfcasereports.create_file_channel(params.chr_dir)
+dbsnp                               = WorkflowNfcasereports.create_file_channel(params.dbsnp)
+fasta                               = WorkflowNfcasereports.create_file_channel(params.fasta)
+fasta_fai                           = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
+germline_resource                   = WorkflowNfcasereports.create_file_channel(params.germline_resource)
+known_indels                        = WorkflowNfcasereports.create_file_channel(params.known_indels)
+known_snps                          = WorkflowNfcasereports.create_file_channel(params.known_snps)
+pon                                 = WorkflowNfcasereports.create_file_channel(params.pon)
 
 workflow PREPARE_GENOME {
-    take:
-    ascat_alleles     // channel: [optional]  ascat allele files
-    ascat_loci        // channel: [optional]  ascat loci files
-    ascat_loci_gc     // channel: [optional]  ascat gc content file
-    ascat_loci_rt     // channel: [optional]  ascat replictiming file
-    chr_dir           // channel: [optional]  chromosome files
-    dbsnp             // channel: [optional]  dbsnp
-    fasta             // channel: [mandatory] fasta
-    fasta_fai         // channel: [optional]  fasta_fai
-    germline_resource // channel: [optional]  germline_resource
-    known_indels      // channel: [optional]  known_indels
-    known_snps        // channel: [optional]  known_snps
-    pon               // channel: [optional]  pon
-
 
     main:
     fasta = fasta.map{ fasta -> [ [ id:fasta.baseName ], fasta ] }

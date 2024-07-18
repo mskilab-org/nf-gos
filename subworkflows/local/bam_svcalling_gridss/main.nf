@@ -7,13 +7,14 @@
 include { GRIDSS_GRIDSS   } from '../../../modules/local/gridss/gridss/main.nf'
 include { GRIDSS_SOMATIC  } from '../../../modules/local/gridss/somaticFilter/main.nf'
 
+fasta                               = WorkflowNfcasereports.create_file_channel(params.fasta)
+fasta_fai                           = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
+blacklist_gridss                    = WorkflowNfcasereports.create_file_channel(params.blacklist_gridss)
+
 workflow BAM_SVCALLING_GRIDSS {
     take:
     cram                                              // channel: [mandatory] [ meta, normalcram, normalcrai, tumorcram, tumorcrai ]
-    fasta                                             // channel: [mandatory] reference fasta
-    fasta_fai                                         // channel: [mandatory] reference fasta index
     bwa_index                                         // channel: [mandatory] bwa index path
-    blacklist_gridss                                  // optional: blacklist bed file for gridss
 
 
     main:

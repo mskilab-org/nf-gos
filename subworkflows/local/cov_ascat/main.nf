@@ -5,18 +5,17 @@
 include { ASCAT_SEG } from '../../../modules/local/ascat/main'
 include { EXTRACT_PURITYPLOIDY } from '../../../modules/local/ascat/main'
 
+field                  = WorkflowNfcasereports.create_value_channel(params.field_ascat)
+hets_threshold         = WorkflowNfcasereports.create_value_channel(params.hets_thresh_ascat)
+penalty                = WorkflowNfcasereports.create_value_channel(params.penalty_ascat)
+gc_correct             = WorkflowNfcasereports.create_value_channel(params.gc_correct_ascat)
+rebin_width            = WorkflowNfcasereports.create_value_channel(params.rebin_width_ascat)
+from_maf               = WorkflowNfcasereports.create_value_channel(params.from_maf_ascat)
 
 workflow COV_ASCAT {
 
     take:
     inputs              // [ meta, hets, cbs_cov ]
-    field
-    hets_threshold
-    penalty
-    gc_correct
-    rebin_width
-    from_maf
-
 
     main:
     versions     = Channel.empty()

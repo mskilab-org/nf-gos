@@ -4,8 +4,8 @@
     mskilab-org/nf-jabba
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Github : https://tanubrata/mskilab-org/nf-jabba
-    Website: https://nf-co.re/nfjabba
-    Slack  : https://nfcore.slack.com/channels/nfjabba
+    Website: https://nf-co.re/nfcasereports
+    Slack  : https://nfcore.slack.com/channels/nfcasereports
 ----------------------------------------------------------------------------------------
 */
 
@@ -47,9 +47,9 @@ params.known_indels_vqsr     = WorkflowMain.getGenomeAttribute(params, 'known_in
 //params.pon_tbi               = WorkflowMain.getGenomeAttribute(params, 'pon_tbi')
 params.snpeff_db             = WorkflowMain.getGenomeAttribute(params, 'snpeff_db')
 params.snpeff_genome         = WorkflowMain.getGenomeAttribute(params, 'snpeff_genome')
-//params.vep_cache_version     = WorkflowMain.getGenomeAttribute(params, 'vep_cache_version')
-//params.vep_genome            = WorkflowMain.getGenomeAttribute(params, 'vep_genome')
-//params.vep_species           = WorkflowMain.getGenomeAttribute(params, 'vep_species')
+params.vep_cache_version     = WorkflowMain.getGenomeAttribute(params, 'vep_cache_version')
+params.vep_genome            = WorkflowMain.getGenomeAttribute(params, 'vep_genome')
+params.vep_species           = WorkflowMain.getGenomeAttribute(params, 'vep_species')
 params.indel_mask            = WorkflowMain.getGenomeAttribute(params, 'indel_mask')
 params.germ_sv_db            = WorkflowMain.getGenomeAttribute(params, 'germ_sv_db')
 params.simple_seq_db         = WorkflowMain.getGenomeAttribute(params, 'simple_seq_db')
@@ -95,7 +95,7 @@ params.ref_hrdetect     = WorkflowMain.getGenomeAttribute(params, 'ref_hrdetect'
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-params.input_restart = WorkflowNfjabba.retrieveInput(params, log)
+params.input_restart = WorkflowNfcasereports.retrieveInput(params, log)
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -127,13 +127,13 @@ WorkflowMain.initialise(workflow, params, log)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { NFJABBA } from './workflows/nfjabba'
+include { NFCASEREPORTS } from './workflows/nfcasereports'
 
 //
 // WORKFLOW: Run main mskilab-org/nf-jabba analysis pipeline
 //
-workflow MSKILABORG_NFJABBA {
-    NFJABBA ()
+workflow MSKILABORG_NFCASEREPORTS {
+    NFCASEREPORTS ()
 }
 
 /*
@@ -147,7 +147,7 @@ workflow MSKILABORG_NFJABBA {
 // See: https://github.com/nf-core/rnaseq/issues/619
 //
 workflow {
-    MSKILABORG_NFJABBA ()
+    MSKILABORG_NFCASEREPORTS ()
 }
 
 /*

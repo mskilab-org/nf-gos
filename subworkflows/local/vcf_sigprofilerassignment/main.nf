@@ -4,12 +4,12 @@
 
 include { SIGPROFILERASSIGNMENT } from '../../../modules/local/sigprofilerassignment/main.nf'
 
+genome          = WorkflowNfcasereports.create_value_channel(params.sigprofilerassignment_genome)
+cosmic_version  = WorkflowNfcasereports.create_value_channel(params.sigprofilerassignment_cosmic_version)
 workflow VCF_SIGPROFILERASSIGNMENT {
     // defining inputs
     take:
     input                                             // required: [meta, vcf, tbi]
-    genome
-    cosmic_version
 
     //Creating empty channels for output
     main:

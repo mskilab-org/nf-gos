@@ -4,13 +4,14 @@
 
 include { HETPILEUPS } from '../../../modules/local/hetpileups/main.nf'
 
+hapmap_sites         = WorkflowNfcasereports.create_file_channel(params.hapmap_sites)
+filter               = WorkflowNfcasereports.create_value_channel(params.filter_hets)
+max_depth            = WorkflowNfcasereports.create_value_channel(params.max_depth)
+
 workflow BAM_HETPILEUPS {
     // defining inputs
     take:
     input                                             // required: Format should be [meta, tumor bam, normal bam] : BAM only!!!
-	filter
-	max_depth
-	hapmap_sites
 
     //Creating empty channels for output
     main:

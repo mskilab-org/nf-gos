@@ -5,16 +5,17 @@
 include { FRAGCOUNTER } from '../../../modules/local/fragcounter/main.nf'
 include { REBIN_RAW_FRAGCOUNTER } from '../../../modules/local/fragcounter/main.nf'
 
+gcmapdir       = WorkflowNfcasereports.create_file_channel(params.gcmapdir_frag)
+windowsize     = WorkflowNfcasereports.create_value_channel(params.windowsize_frag)
+minmapq        = WorkflowNfcasereports.create_value_channel(params.minmapq_frag)
+midpoint       = WorkflowNfcasereports.create_value_channel(params.midpoint_frag)
+paired         = WorkflowNfcasereports.create_value_channel(params.paired_frag)
+exome          = WorkflowNfcasereports.create_value_channel(params.exome_frag)
+
 workflow BAM_FRAGCOUNTER {
     // defining inputs
     take:
     input                                             // required: Format should be [meta, bam, bai] : can also provide cram & crai
-    midpoint
-    windowsize
-    gcmapdir
-    minmapq
-    paired
-    exome
 
     //Creating empty channels for output
     main:

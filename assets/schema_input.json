@@ -162,21 +162,6 @@
                 "format": "file-path",
                 "exists": true
             },
-            "cov": {
-                "errorMessage": "COV file cannot contain spaces and must have extension '.rds' or '.txt'",
-                "anyOf": [
-                    {
-                        "type": "string",
-                        "pattern": "^\\S+\\.(rds|txt)$"
-                    },
-                    {
-                        "type": "string",
-                        "maxLength": 0
-                    }
-                ],
-                "format": "file-path",
-                "exists": true
-            },
             "hets": {
                 "errorMessage": "Pileups file and must have extension '.txt'",
                 "anyOf": [
@@ -200,159 +185,47 @@
                 "format": "file-path",
                 "exists": true
             },
-            "ploidy": {
-                "errorMessage": "purityploidy file must have extension '.rds' or be a number",
+            "frag_cov": {
+                "errorMessage": "COV file cannot contain spaces and must have extension '.rds' or '.txt'",
                 "anyOf": [
                     {
                         "type": "string",
-                        "pattern": "^\\S+\\.rds$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^NA$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^/dev/null$"
+                        "pattern": "^\\S+\\.(rds|txt)$"
                     },
                     {
                         "type": "string",
                         "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+            "dryclean_cov": {
+                "errorMessage": "COV file cannot contain spaces and must have extension '.rds' or '.txt'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.(rds|txt)$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+            "ploidy": {
+                "errorMessage": "ploidy must be a number",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
                     },
                     {
                         "type": "number"
                     }
                 ],
-            },
-            "vcf": {
-                "errorMessage": "VCF file for reads 1 cannot contain spaces and must have extension '.vcf' or '.vcf.gz'",
-                "anyOf": [
-                    {
-                        "type": "string",
-                        "pattern": "^\\S+\\.vcf(\\.gz)?$"
-                    },
-                    {
-                        "type": "string",
-                        "maxLength": 0
-                    }
-                ],
-                "format": "file-path",
-                "exists": true
-            },
-            "vcf2": {
-                "errorMessage": "VCF file for reads 1 cannot contain spaces and must have extension '.vcf' or '.vcf.gz'",
-                "anyOf": [
-                    {
-                        "type": "string",
-                        "pattern": "^\\S+\\.vcf(\\.gz)?$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^NA$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^/dev/null$"
-                    },
-                    {
-                        "type": "string",
-                        "maxLength": 0
-                    }
-                ],
-                "format": "file-path",
-                "exists": true
-            },
-            "snv_vcf_somatic": {
-                "errorMessage": "Sage somatic VCF output file cannot contain spaces and must have extension '.vcf' or '.vcf.gz'",
-                "anyOf": [
-                    {
-                        "type": "string",
-                        "pattern": "^\\S+\\.vcf(\\.gz)?$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^NA$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^/dev/null$"
-                    },
-                    {
-                        "type": "string",
-                        "maxLength": 0
-                    }
-                ],
-                "format": "file-path",
-                "exists": true
-            },
-            "snv_tbi_somatic": {
-                "errorMessage": "Sage somatic VCF tbi file cannot contain spaces and must have extension '.tbi' or '.gz.tbi'",
-                "anyOf": [
-                    {
-                        "type": "string",
-                        "pattern": "^\\S+\\.tbi(\\.gz.tbi)?$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^NA$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^/dev/null$"
-                    },
-                    {
-                        "type": "string",
-                        "maxLength": 0
-                    }
-                ],
-                "format": "file-path",
-                "exists": true
-            },
-            "snv_vcf_germline": {
-                "errorMessage": "Sage germline VCF output file cannot contain spaces and must have extension '.vcf' or '.vcf.gz'",
-                "anyOf": [
-                    {
-                        "type": "string",
-                        "pattern": "^\\S+\\.vcf(\\.gz)?$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^NA$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^/dev/null$"
-                    },
-                    {
-                        "type": "string",
-                        "maxLength": 0
-                    }
-                ],
-                "format": "file-path",
-                "exists": true
-            },
-            "snv_tbi_germline": {
-                "errorMessage": "Sage germline VCF tbi file cannot contain spaces and must have extension '.tbi' or '.gz.tbi'",
-                "anyOf": [
-                    {
-                        "type": "string",
-                        "pattern": "^\\S+\\.tbi(\\.gz.tbi)?$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^NA$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^/dev/null$"
-                    },
-                    {
-                        "type": "string",
-                        "maxLength": 0
-                    }
-                ],
-                "format": "file-path",
-                "exists": true
             },
             "seg": {
                 "errorMessage": "SEG file cannot contain spaces and must have extension '.rds'",
@@ -400,7 +273,45 @@
                 "format": "file-path",
                 "exists": true
             },
-            "ggraph": {
+            "vcf": {
+                "errorMessage": "VCF file for reads 1 cannot contain spaces and must have extension '.vcf' or '.vcf.gz'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.vcf(\\.gz)?$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+            "vcf2": {
+                "errorMessage": "VCF file for reads 2 cannot contain spaces and must have extension '.vcf' or '.vcf.gz'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.vcf(\\.gz)?$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+            "jabba_rds": {
                 "errorMessage": "jabba.rds file and must have extension '.rds'",
                 "anyOf": [
                     {
@@ -423,9 +334,397 @@
                 "format": "file-path",
                 "exists": true
             },
-            "variantcaller": {
-                "type": "string"
-            }
+            "ni_balanced_rds": {
+                "errorMessage": "balanced_gg.rds file and must have extension '.rds'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.rds$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+            "lp_balanced_rds": {
+                "errorMessage": "balanced_gg.rds file and must have extension '.rds'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.rds$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+            "events": {
+                "errorMessage": "complex.rds file and must have extension '.rds'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.rds$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+            "fusions": {
+                "errorMessage": "fusions.rds file and must have extension '.rds'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.rds$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+            "snv_somatic_vcf": {
+                "errorMessage": "Sage somatic VCF output file cannot contain spaces and must have extension '.vcf' or '.vcf.gz'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.vcf(\\.gz)?$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+            "snv_somatic_tbi": {
+                "errorMessage": "Sage somatic VCF tbi file cannot contain spaces and must have extension '.tbi' or '.gz.tbi'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.tbi(\\.gz.tbi)?$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+            "snv_germline_vcf": {
+                "errorMessage": "Sage germline VCF output file cannot contain spaces and must have extension '.vcf' or '.vcf.gz'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.vcf(\\.gz)?$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+            "snv_germline_tbi": {
+                "errorMessage": "Sage germline VCF tbi file cannot contain spaces and must have extension '.tbi' or '.gz.tbi'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.tbi(\\.gz.tbi)?$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+            "variant_somatic_ann": {
+                "errorMessage": "Annotated somatic VCF file cannot contain spaces and must have extension '.vcf' ",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.vcf$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+            "variant_somatic_bcf": {
+                "errorMessage": "Annotated somatic BCF file cannot contain spaces and must have extension '.bcf' ",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.bcf$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+            "variant_germline_ann": {
+                "errorMessage": "Annotated germline VCF file cannot contain spaces and must have extension '.vcf' ",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.vcf$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+            "variant_germline_bcf": {
+                "errorMessage": "Annotated germline BCF file cannot contain spaces and must have extension '.bcf' ",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.bcf$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+            "snv_multiplicity": {
+                "errorMessage": "SNV Multiplicity file cannot contain spaces and must have extension '.rds'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.rds$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+            "sbs_signatures": {
+                "errorMessage": "SBS Signatures file cannot have spaces and must have extension '.txt'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.txt$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+            "indel_signatures": {
+                "errorMessage": "SBS Signatures file cannot have spaces and must have extension '.txt'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.txt$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+            "signatures_matrix": {
+                "errorMessage": "SBS Signatures file cannot have spaces and must have extension '.txt'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.txt$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+            "hrdetect": {
+                "errorMessage": "HRDetect file cannot contain spaces and must have extension '.rds'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.rds$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
         },
         "required": ["patient", "sample"]
     }

@@ -1,9 +1,10 @@
 include { FUSIONS } from '../../../modules/local/fusions/main.nf'
 
+gencode                     = WorkflowNfcasereports.create_file_channel(params.gencode_fusions)
+
 workflow GGRAPH_FUSIONS {
     take:
     input           // required: format [val(meta), path(gGraph)]
-    gencode
 
     main:
     versions            = Channel.empty()

@@ -5,14 +5,15 @@
 
 include { CBS } from '../../../modules/local/cbs/main.nf'
 
+cnsignif                     = WorkflowNfcasereports.create_value_channel(params.cnsignif_cbs)
+field                        = WorkflowNfcasereports.create_value_channel(params.field_cbs)
+name                         = WorkflowNfcasereports.create_value_channel(params.name_cbs)
+
 // Define the main workflow process
 workflow COV_CBS {
     // Define the input parameters for the main workflow
     take:
-    cov_cbs         // channel: [mandatory] [ meta, tumor_cov, normal_cov ]
-    cnsignif_cbs
-    field_cbs
-    name_cbs
+    cov         // channel: [mandatory] [ meta, tumor_cov, normal_cov ]
 
     main:
     cbs_cov_rds             = Channel.empty()
@@ -20,7 +21,7 @@ workflow COV_CBS {
     cbs_nseg_rds            = Channel.empty()
     versions                = Channel.empty()
 
-    CBS(cov_cbs, cnsignif_cbs, field_cbs, name_cbs)
+    CBS(cov, cnsignif, field, name)
 
     cbs_cov_rds              = CBS.out.cbs_cov_rds
     cbs_seg_rds              = CBS.out.cbs_seg_rds

@@ -8,36 +8,39 @@ include { COERCE_SEQNAMES as COERCE_SEQNAMES_SOM_SV } from '../../../modules/loc
 include { COERCE_SEQNAMES as COERCE_SEQNAMES_UNFIL_SOM_SV } from '../../../modules/local/jabba/main.nf'
 include { COERCE_SEQNAMES as COERCE_SEQNAMES_HETS } from '../../../modules/local/jabba/main.nf'
 
+blacklist_coverage		    = WorkflowNfcasereports.create_file_channel(params.blacklist_coverage_jabba)
+blacklist_junctions        = WorkflowNfcasereports.create_value_channel(params.blacklist_junctions_jabba)
+geno					     = WorkflowNfcasereports.create_value_channel(params.geno_jabba)
+indel					     = WorkflowNfcasereports.create_value_channel(params.indel_jabba)
+tfield					 = WorkflowNfcasereports.create_value_channel(params.tfield_jabba)
+iter					     = WorkflowNfcasereports.create_value_channel(params.iter_jabba)
+rescue_window				 = WorkflowNfcasereports.create_value_channel(params.rescue_window_jabba)
+rescue_all				 = WorkflowNfcasereports.create_value_channel(params.rescue_all_jabba)
+nudgebalanced				 = WorkflowNfcasereports.create_value_channel(params.nudgebalanced_jabba)
+edgenudge					 = WorkflowNfcasereports.create_value_channel(params.edgenudge_jabba)
+strict					 = WorkflowNfcasereports.create_value_channel(params.strict_jabba)
+allin					     = WorkflowNfcasereports.create_value_channel(params.allin_jabba)
+field					     = WorkflowNfcasereports.create_value_channel(params.field_jabba)
+maxna					     = WorkflowNfcasereports.create_value_channel(params.maxna_jabba)
+purity					 = WorkflowNfcasereports.create_value_channel(params.purity_jabba)
+pp_method					 = WorkflowNfcasereports.create_value_channel(params.pp_method_jabba)
+cnsignif					 = WorkflowNfcasereports.create_value_channel(params.cnsignif_jabba)
+slack					     = WorkflowNfcasereports.create_value_channel(params.slack_jabba)
+linear					 = WorkflowNfcasereports.create_value_channel(params.linear_jabba)
+tilim					     = WorkflowNfcasereports.create_value_channel(params.tilim_jabba)
+epgap					     = WorkflowNfcasereports.create_value_channel(params.epgap_jabba)
+fix_thres					 = WorkflowNfcasereports.create_value_channel(params.fix_thres_jabba)
+lp					     = WorkflowNfcasereports.create_value_channel(params.lp_jabba)
+ism					     = WorkflowNfcasereports.create_value_channel(params.ism_jabba)
+filter_loose				 = WorkflowNfcasereports.create_value_channel(params.filter_loose_jabba)
+gurobi					 = WorkflowNfcasereports.create_value_channel(params.gurobi_jabba)
+nonintegral				 = WorkflowNfcasereports.create_value_channel(params.nonintegral_jabba)
+verbose					 = WorkflowNfcasereports.create_value_channel(params.verbose_jabba)
+help					     = WorkflowNfcasereports.create_value_channel(params.help_jabba)
+
 workflow COV_JUNC_TUMOR_ONLY_JABBA {
     take:
     inputs  // [ meta, junction, cov, j_supp, hets, ploidy, seg_cbs, nseg_cbs ]
-    blacklist_junctions
-    geno
-    indel
-    tfield
-    iter
-    rescue_window
-    rescue_all
-    nudgebalanced
-    edgenudge
-    strict
-    allin
-    field
-    maxna
-    blacklist_coverage
-    purity
-    pp_method
-    cnsignif
-    slack
-    linear
-    tilim
-    epgap
-    fix_thres
-    lp
-    ism
-    filter_loose
-    gurobi
-    verbose
 
     main:
     versions            = Channel.empty()
@@ -162,33 +165,6 @@ workflow COV_JUNC_JABBA {
 
     take:
     inputs  // [ meta, junction, cov, j_supp, hets, ploidy, seg_cbs, nseg_cbs ]
-    blacklist_junctions
-    geno
-    indel
-    tfield
-    iter
-    rescue_window
-    rescue_all
-    nudgebalanced
-    edgenudge
-    strict
-    allin
-    field
-    maxna
-    blacklist_coverage
-    purity
-    pp_method
-    cnsignif
-    slack
-    linear
-    tilim
-    epgap
-    fix_thres
-    lp
-    ism
-    filter_loose
-    gurobi
-    verbose
 
     main:
     versions            = Channel.empty()

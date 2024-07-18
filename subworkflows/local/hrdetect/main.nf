@@ -4,12 +4,13 @@
 
 include { HRDETECT } from '../../../modules/local/hrdetect/main.nf'
 
+ref_fasta                               = WorkflowNfcasereports.create_file_channel(params.fasta)
+genome_version  = WorkflowNfcasereports.create_value_channel(params.ref_hrdetect)
+
 workflow JUNC_SNV_GGRAPH_HRDETECT {
 
     take:
     inputs  // [ meta, junction, hets, snv_somatic, snv_somatic_tbi, jabba_rds]
-    ref_fasta
-    genome_version
 
     main:
     versions            = Channel.empty()

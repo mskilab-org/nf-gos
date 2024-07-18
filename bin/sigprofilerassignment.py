@@ -29,7 +29,7 @@ def main(args):
     input_dir = args.input_directory
     output_sbs = './sbs_results'
     output_indel = './indel_results'
-    output_sigmat = './sigmat_results'
+    sigmat_project = 'sigmat_results'
     genome = args.genome or 'GRCh37'
     cosmic_version = args.cosmic_version or 3.4
 
@@ -72,7 +72,7 @@ def main(args):
 
     print('running matrix generator...')
     matrices = matGen.SigProfilerMatrixGeneratorFunc(
-        output_sigmat,
+        sigmat_project,
         genome,
         input_dir,
     )
