@@ -115,6 +115,11 @@
                         "git_sha": "f2d63bd5b68925f98f572eed70993d205cc694b7",
                         "installed_by": ["modules"]
                     },
+                    "parabricks/fq2bam": {
+                        "branch": "master",
+                        "git_sha": "3e52a04aa60e0cb5cea0487b9ae2fdd04f874027",
+                        "installed_by": ["modules"]
+                    },
                     "samtools/collatefastq": {
                         "branch": "master",
                         "git_sha": "911696ea0b62df80e900ef244d7867d177971f73",

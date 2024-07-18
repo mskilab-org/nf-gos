@@ -602,6 +602,7 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS                 } from '../modules/nf-core
 
 // Map input reads to reference genome
 include { FASTQ_ALIGN_BWAMEM_MEM2                     } from '../subworkflows/local/fastq_align_bwamem_mem2/main'
+include { FASTQ_PARABRICKS_FQ2BAM                     } from '../subworkflows/local/fastq_parabricks_fq2bam/main'
 
 // Merge and index BAM files (optional)
 include { BAM_MERGE_INDEX_SAMTOOLS                    } from '../subworkflows/local/bam_merge_index_samtools/main'
@@ -854,12 +855,24 @@ workflow NFCASEREPORTS {
         else [ meta, reads ]
     }
 
-    FASTQ_ALIGN_BWAMEM_MEM2(
-        reads_for_alignment,
-        index_alignment
-    )
-    // merge existing BAMs with newly mapped ones
-    bam_mapped = alignment_existing_outputs.mix(FASTQ_ALIGN_BWAMEM_MEM2.out.bam)
+    // GPU Alignment
+    if (params.aligner == "fq2bam") {
+        FASTQ_PARABRICKS_FQ2BAM(
+            input_fastq,
+            known_sites_indels
+        )
+        // merge existing BAMs with newly mapped ones
+        bam_mapped = alignment_existing_outputs.mix(FASTQ_PARABRICKS_FQ2BAM.out.bam)
+    } else {
+        FASTQ_ALIGN_BWAMEM_MEM2(
+            reads_for_alignment,
+            index_alignment
+        )
+        // merge existing BAMs with newly mapped ones
+        bam_mapped = alignment_existing_outputs.mix(FASTQ_ALIGN_BWAMEM_MEM2.out.bam)
+    }
+
+
 
     // Grouping the bams from the same samples not to stall the workflow
     bam_mapped = bam_mapped.map{ meta, bam ->
