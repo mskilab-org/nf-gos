@@ -6,11 +6,11 @@ include { JUNCTION_FILTER } from '../../../modules/local/junction_filter/main.nf
 
 junction_pon_gridss                 = WorkflowNfcasereports.create_file_channel(params.junction_pon_gridss)
 gnomAD_sv_db                        = WorkflowNfcasereports.create_file_channel(params.gnomAD_sv_db)
+padding                             = WorkflowNfcasereports.create_value_channel(params.pad_junc_filter)
 
 workflow SV_JUNCTION_FILTER {
     take:
     input                  //format: [meta, filtered_sv_vcf]
-    padding
 
     main:
     versions                = Channel.empty()

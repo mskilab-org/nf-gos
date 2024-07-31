@@ -8,7 +8,6 @@ process SNV_MULTIPLICITY {
         'mskilab/snv_multiplicity:0.0.3' }"
 
     input:
-    // tuple val(meta), path(somatic_snv), path(somatic_snv_tbi), path(germline_snv), path(germline_snv_tbi), path(jabba_rds)
     tuple val(meta), path(somatic_snv, stageAs: "somatic_snv.vcf"), path(germline_snv, stageAs: "germline_snv.vcf"), path(jabba_rds)
     path(ref)
     path(ref_fai)

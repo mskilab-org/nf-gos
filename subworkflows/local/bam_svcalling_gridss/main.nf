@@ -42,11 +42,11 @@ workflow BAM_SVCALLING_GRIDSS {
 
 }
 
+pondir_gridss = WorkflowNfcasereports.create_file_channel(params.pon_gridss)
 
 workflow BAM_SVCALLING_GRIDSS_SOMATIC {
     take:
     vcf
-    pondir_gridss
 
     main:
     versions                = Channel.empty()

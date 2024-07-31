@@ -340,203 +340,22 @@ inputs.map{
 
 // Initialize file channels based on params, defined in the params.genomes[params.genome] scope
 
-ascat_alleles                       = WorkflowNfcasereports.create_file_channel(params.ascat_alleles)
-ascat_loci                          = WorkflowNfcasereports.create_file_channel(params.ascat_loci)
-ascat_loci_gc                       = WorkflowNfcasereports.create_file_channel(params.ascat_loci_gc)
-ascat_loci_rt                       = WorkflowNfcasereports.create_file_channel(params.ascat_loci_rt)
-cf_chrom_len                        = WorkflowNfcasereports.create_file_channel(params.cf_chrom_len)
-chr_dir                             = WorkflowNfcasereports.create_file_channel(params.chr_dir)
 dbsnp                               = WorkflowNfcasereports.create_file_channel(params.dbsnp)
 fasta                               = WorkflowNfcasereports.create_file_channel(params.fasta)
 fasta_fai                           = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
 germline_resource                   = WorkflowNfcasereports.create_file_channel(params.germline_resource)
 known_indels                        = WorkflowNfcasereports.create_file_channel(params.known_indels)
 known_snps                          = WorkflowNfcasereports.create_file_channel(params.known_snps)
-mappability                         = WorkflowNfcasereports.create_file_channel(params.mappability)
 pon                                 = WorkflowNfcasereports.create_file_channel(params.pon)
-
-// SVABA
-indel_mask                          = WorkflowNfcasereports.create_file_channel(params.indel_mask)
-germ_sv_db                          = WorkflowNfcasereports.create_file_channel(params.germ_sv_db)
-simple_seq_db                       = WorkflowNfcasereports.create_file_channel(params.simple_seq_db)
-
-// GRIDSS
-blacklist_gridss                    = WorkflowNfcasereports.create_file_channel(params.blacklist_gridss)
-pon_gridss                          = WorkflowNfcasereports.create_file_channel(params.pon_gridss)
-
-//SV Junction Filtering
-junction_pon_svaba                  = WorkflowNfcasereports.create_file_channel(params.junction_pon_svaba)
-junction_pon_gridss                 = WorkflowNfcasereports.create_file_channel(params.junction_pon_gridss)
-gnomAD_sv_db                        = WorkflowNfcasereports.create_file_channel(params.gnomAD_sv_db)
-
-// FragCounter
-gcmapdir_frag                       = WorkflowNfcasereports.create_file_channel(params.gcmapdir_frag)
-
-// HetPileups
-hapmap_sites                        = WorkflowNfcasereports.create_file_channel(params.hapmap_sites)
-
-// Dryclean
-pon_dryclean                        = WorkflowNfcasereports.create_file_channel(params.pon_dryclean)
-blacklist_path_dryclean             = WorkflowNfcasereports.create_file_channel(params.blacklist_path_dryclean)
-germline_file_dryclean              = WorkflowNfcasereports.create_file_channel(params.germline_file_dryclean)
-
-// JaBbA
-blacklist_coverage_jabba		    = WorkflowNfcasereports.create_file_channel(params.blacklist_coverage_jabba)
-
-// Fusions
-gencode_fusions                     = WorkflowNfcasereports.create_file_channel(params.gencode_fusions)
-
-// Allelic CN
-mask_non_integer_balance            = WorkflowNfcasereports.create_file_channel(params.mask_non_integer_balance)
-mask_lp_phased_balance              = WorkflowNfcasereports.create_file_channel(params.mask_lp_phased_balance)
-
-// Sage
-somatic_hotspots_sage               = WorkflowNfcasereports.create_file_channel(params.somatic_hotspots)
-panel_bed_sage                      = WorkflowNfcasereports.create_file_channel(params.panel_bed)
-high_confidence_bed_sage            = WorkflowNfcasereports.create_file_channel(params.high_confidence_bed)
-ensembl_data_dir_sage               = WorkflowNfcasereports.create_file_channel(params.ensembl_data_dir)
-gnomAD_snv_db                       = WorkflowNfcasereports.create_file_channel(params.gnomAD_snv_db)
-gnomAD_snv_db_tbi                   = WorkflowNfcasereports.create_file_channel(params.gnomAD_snv_db_tbi)
-sage_germline_pon                   = WorkflowNfcasereports.create_file_channel(params.sage_germline_pon)
-sage_germline_pon_tbi               = WorkflowNfcasereports.create_file_channel(params.sage_germline_pon_tbi)
-
-// Pave
-sage_pon_pave                       = WorkflowNfcasereports.create_file_channel(params.sage_pon)
-sage_blocklist_regions_pave         = WorkflowNfcasereports.create_file_channel(params.sage_blocklist_regions)
-sage_blocklist_sites_pave           = WorkflowNfcasereports.create_file_channel(params.sage_blocklist_sites)
-clinvar_annotations_pave            = WorkflowNfcasereports.create_file_channel(params.clinvar_annotations)
-segment_mappability_pave            = WorkflowNfcasereports.create_file_channel(params.segment_mappability)
-driver_gene_panel_pave              = WorkflowNfcasereports.create_file_channel(params.driver_gene_panel)
-ensembl_data_resources_pave         = WorkflowNfcasereports.create_file_channel(params.ensembl_data_resources)
-gnomad_resource_pave                = WorkflowNfcasereports.create_file_channel(params.gnomad_resource)
-
 
 // Initialize value channels based on params, defined in the params.genomes[params.genome] scope
 
-ascat_genome        = WorkflowNfcasereports.create_value_channel(params.ascat_genome)
-dbsnp_vqsr          = WorkflowNfcasereports.create_value_channel(params.dbsnp_vqsr)
-known_indels_vqsr   = WorkflowNfcasereports.create_value_channel(params.known_indels_vqsr)
-known_snps_vqsr     = WorkflowNfcasereports.create_value_channel(params.known_snps_vqsr)
 snpeff_genome       = WorkflowNfcasereports.create_value_channel(params.snpeff_genome)
 snpeff_db           = WorkflowNfcasereports.create_value_channel(params.snpeff_db)
 snpeff_db_full     = params.snpeff_db && params.snpeff_genome   ? Channel.value("${params.snpeff_genome}.${params.snpeff_db}") : Channel.empty()
 vep_cache_version   = WorkflowNfcasereports.create_value_channel(params.vep_cache_version)
 vep_genome          = WorkflowNfcasereports.create_value_channel(params.vep_genome)
 vep_species         = WorkflowNfcasereports.create_value_channel(params.vep_species)
-error_rate          = WorkflowNfcasereports.create_value_channel(params.error_rate)
-
-//SV Junction Filter
-junction_padding     = WorkflowNfcasereports.create_value_channel(params.pad_junc_filter)
-
-// Hetpileups
-filter_hets          = WorkflowNfcasereports.create_value_channel(params.filter_hets)
-max_depth            = WorkflowNfcasereports.create_value_channel(params.max_depth)
-
-// FragCounter
-windowsize_frag     = WorkflowNfcasereports.create_value_channel(params.windowsize_frag)
-minmapq_frag        = WorkflowNfcasereports.create_value_channel(params.minmapq_frag)
-midpoint_frag       = WorkflowNfcasereports.create_value_channel(params.midpoint_frag)
-paired_frag         = WorkflowNfcasereports.create_value_channel(params.paired_frag)
-exome_frag          = WorkflowNfcasereports.create_value_channel(params.exome_frag)
-
-// Dryclean
-center_dryclean            = WorkflowNfcasereports.create_value_channel(params.center_dryclean)
-cbs_dryclean                 = WorkflowNfcasereports.create_value_channel(params.cbs_dryclean)
-cnsignif_dryclean            = WorkflowNfcasereports.create_value_channel(params.cnsignif_dryclean)
-wholeGenome_dryclean         = WorkflowNfcasereports.create_value_channel(params.wholeGenome_dryclean)
-blacklist_dryclean           = WorkflowNfcasereports.create_value_channel(params.blacklist_dryclean)
-germline_filter_dryclean     = WorkflowNfcasereports.create_value_channel(params.germline_filter_dryclean)
-field_dryclean               = WorkflowNfcasereports.create_value_channel(params.field_dryclean)
-build_dryclean               = WorkflowNfcasereports.create_value_channel(params.build_dryclean)
-
-// ASCAT_seg
-field_ascat                  = WorkflowNfcasereports.create_value_channel(params.field_ascat)
-hets_thresh_ascat            = WorkflowNfcasereports.create_value_channel(params.hets_thresh_ascat)
-penalty_ascat                = WorkflowNfcasereports.create_value_channel(params.penalty_ascat)
-gc_correct_ascat             = WorkflowNfcasereports.create_value_channel(params.gc_correct_ascat)
-rebin_width_ascat            = WorkflowNfcasereports.create_value_channel(params.rebin_width_ascat)
-from_maf_ascat               = WorkflowNfcasereports.create_value_channel(params.from_maf_ascat)
-
-// CBS
-cnsignif_cbs                     = WorkflowNfcasereports.create_value_channel(params.cnsignif_cbs)
-field_cbs                        = WorkflowNfcasereports.create_value_channel(params.field_cbs)
-name_cbs                         = WorkflowNfcasereports.create_value_channel(params.name_cbs)
-
-// JaBbA
-blacklist_junctions_jabba        = WorkflowNfcasereports.create_value_channel(params.blacklist_junctions_jabba)
-geno_jabba					     = WorkflowNfcasereports.create_value_channel(params.geno_jabba)
-indel_jabba					     = WorkflowNfcasereports.create_value_channel(params.indel_jabba)
-tfield_jabba					 = WorkflowNfcasereports.create_value_channel(params.tfield_jabba)
-iter_jabba					     = WorkflowNfcasereports.create_value_channel(params.iter_jabba)
-rescue_window_jabba				 = WorkflowNfcasereports.create_value_channel(params.rescue_window_jabba)
-rescue_all_jabba				 = WorkflowNfcasereports.create_value_channel(params.rescue_all_jabba)
-nudgebalanced_jabba				 = WorkflowNfcasereports.create_value_channel(params.nudgebalanced_jabba)
-edgenudge_jabba					 = WorkflowNfcasereports.create_value_channel(params.edgenudge_jabba)
-strict_jabba					 = WorkflowNfcasereports.create_value_channel(params.strict_jabba)
-allin_jabba					     = WorkflowNfcasereports.create_value_channel(params.allin_jabba)
-field_jabba					     = WorkflowNfcasereports.create_value_channel(params.field_jabba)
-maxna_jabba					     = WorkflowNfcasereports.create_value_channel(params.maxna_jabba)
-purity_jabba					 = WorkflowNfcasereports.create_value_channel(params.purity_jabba)
-ploidy_jab     					 = WorkflowNfcasereports.create_value_channel(params.ploidy_jabba)
-pp_method_jabba					 = WorkflowNfcasereports.create_value_channel(params.pp_method_jabba)
-cnsignif_jabba					 = WorkflowNfcasereports.create_value_channel(params.cnsignif_jabba)
-slack_jabba					     = WorkflowNfcasereports.create_value_channel(params.slack_jabba)
-linear_jabba					 = WorkflowNfcasereports.create_value_channel(params.linear_jabba)
-tilim_jabba					     = WorkflowNfcasereports.create_value_channel(params.tilim_jabba)
-epgap_jabba					     = WorkflowNfcasereports.create_value_channel(params.epgap_jabba)
-fix_thres_jabba					 = WorkflowNfcasereports.create_value_channel(params.fix_thres_jabba)
-lp_jabba					     = WorkflowNfcasereports.create_value_channel(params.lp_jabba)
-ism_jabba					     = WorkflowNfcasereports.create_value_channel(params.ism_jabba)
-filter_loose_jabba				 = WorkflowNfcasereports.create_value_channel(params.filter_loose_jabba)
-gurobi_jabba					 = WorkflowNfcasereports.create_value_channel(params.gurobi_jabba)
-nonintegral_jabba				 = WorkflowNfcasereports.create_value_channel(params.nonintegral_jabba)
-verbose_jabba					 = WorkflowNfcasereports.create_value_channel(params.verbose_jabba)
-help_jabba					     = WorkflowNfcasereports.create_value_channel(params.help_jabba)
-
-//Allelic CN (Non-integer balance)
-field_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.field_non_integer_balance)
-hets_thresh_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.hets_thresh_non_integer_balance)
-overwrite_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.overwrite_non_integer_balance)
-lambda_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.lambda_non_integer_balance)
-allin_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.allin_non_integer_balance)
-fix_thresh_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.fix_thresh_non_integer_balance)
-nodebounds_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.nodebounds_non_integer_balance)
-ism_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.ism_non_integer_balance)
-build_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.build_non_integer_balance)
-epgap_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.epgap_non_integer_balance)
-tilim_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.tilim_non_integer_balance)
-gurobi_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.gurobi_non_integer_balance)
-pad_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.pad_non_integer_balance)
-
-// ...(LP Phased balance)
-lambda_lp_phased_balance  = WorkflowNfcasereports.create_value_channel(params.lambda_lp_phased_balance)
-cnloh_lp_phased_balance  = WorkflowNfcasereports.create_value_channel(params.cnloh_lp_phased_balance)
-major_lp_phased_balance  = WorkflowNfcasereports.create_value_channel(params.major_lp_phased_balance)
-allin_lp_phased_balance  = WorkflowNfcasereports.create_value_channel(params.allin_lp_phased_balance)
-marginal_lp_phased_balance  = WorkflowNfcasereports.create_value_channel(params.marginal_lp_phased_balance)
-from_maf_lp_phased_balance  = WorkflowNfcasereports.create_value_channel(params.from_maf_lp_phased_balance)
-ism_lp_phased_balance  = WorkflowNfcasereports.create_value_channel(params.ism_lp_phased_balance)
-epgap_lp_phased_balance  = WorkflowNfcasereports.create_value_channel(params.epgap_lp_phased_balance)
-hets_thresh_lp_phased_balance  = WorkflowNfcasereports.create_value_channel(params.hets_thresh_lp_phased_balance)
-min_bins_lp_phased_balance  = WorkflowNfcasereports.create_value_channel(params.min_bins_lp_phased_balance)
-min_width_lp_phased_balance = params.min_width_lp_phased_balance || params.min_width_lp_phased_balance == 0 ? params.min_width_lp_phased_balance : Channel.empty()
-trelim_lp_phased_balance  = WorkflowNfcasereports.create_value_channel(params.trelim_lp_phased_balance)
-reward_lp_phased_balance  = WorkflowNfcasereports.create_value_channel(params.reward_lp_phased_balance)
-nodefileind_lp_phased_balance  = WorkflowNfcasereports.create_value_channel(params.nodefileind_lp_phased_balance)
-tilim_lp_phased_balance  = WorkflowNfcasereports.create_value_channel(params.tilim_lp_phased_balance)
-
-// HRDetect
-ref_genome_version_hrdetect  = WorkflowNfcasereports.create_value_channel(params.ref_hrdetect)
-
-// Sage
-ref_genome_version_sage        = WorkflowNfcasereports.create_value_channel(params.ref_genome_version)
-
-// Pave
-ref_genome_version_pave        = WorkflowNfcasereports.create_value_channel(params.ref_genome_version)
-
-// SigprofilerAssignment
-sigprofilerassignment_genome          = WorkflowNfcasereports.create_value_channel(params.sigprofilerassignment_genome)
-sigprofilerassignment_cosmic_version  = WorkflowNfcasereports.create_value_channel(params.sigprofilerassignment_cosmic_version)
 
 // Initialize files channels based on params, not defined within the params.genomes[params.genome] scope
 if (params.snpeff_cache) {
@@ -1044,7 +863,7 @@ workflow NFCASEREPORTS {
 
     if (!params.tumor_only) {
         //somatic filter for GRIDSS
-        BAM_SVCALLING_GRIDSS_SOMATIC(vcf_from_gridss_gridss, pon_gridss)
+        BAM_SVCALLING_GRIDSS_SOMATIC(vcf_from_gridss_gridss)
 
         versions = versions.mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.versions)
         vcf_from_sv_calling = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_high_confidence)
@@ -1058,10 +877,7 @@ workflow NFCASEREPORTS {
 
     // if tumor only, filter the junctions
     if (params.tumor_only) {
-        JUNCTION_FILTER(
-            vcf_from_gridss_gridss,
-            junction_padding
-        )
+        JUNCTION_FILTER( vcf_from_gridss_gridss)
 
         final_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.final_filtered_sv_rds)
         final_filtered_sv_rds_for_merge = final_filtered_sv_rds
