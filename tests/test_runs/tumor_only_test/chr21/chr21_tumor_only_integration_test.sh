@@ -34,7 +34,7 @@ nextflow run "$pipeline_dir" \
     -c "$pipeline_dir/tests/nextflow_chr21_test.config" \
     -c $nygc_config \
     -dump-channels trace,trace2 \
-    -params-file ./params_chr21_tumor_only_test.json \
+    -params-file ./params.json \
 	-profile singularity	\
 	-with-report "report_$(date +'%Y%m%d_%H%M%S').html"	\
 	-with-trace	\

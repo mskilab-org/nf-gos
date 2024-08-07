@@ -36,7 +36,7 @@ nextflow run "$pipeline_dir" \
     -c "$pipeline_dir/tests/nextflow_full_test.config" \
     -c $nygc_config \
     -dump-channels trace \
-    -params-file ./params_full_integration_tumor_only_test.json \
+    -params-file ./params.json \
 	-profile singularity	\
 	-with-report "report_$(date +'%Y%m%d_%H%M%S').html"	\
 	-with-trace	\

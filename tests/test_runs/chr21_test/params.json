@@ -1,11 +1,10 @@
 {
-    "input": "./full_integration_test_samplesheet.csv",
-    "step": "sv_calling",
+    "input": "./samplesheet.csv",
     "fasta": "/gpfs/commons/home/sdider/DB/GATK/human_g1k_v37_decoy.fasta",
     "fasta_fai": "/gpfs/commons/home/sdider/DB/GATK/human_g1k_v37_decoy.fasta.fai",
     "bwa": "/gpfs/commons/home/sdider/DB/GATK/bwa/",
-    "outdir": "./full_test_results",
-    "pon_dryclean": "/gpfs/commons/home/tdey/data/dryclean/MONSTER_PON_RAW/MONSTER_PON_RAW_SORTED/fixed.detergent.rds",
+    "outdir": "./results",
+    "pon_dryclean": "/gpfs/commons/home/sdider/Projects/nf-casereports/tests/test_data/chr21_pon.rds",
     "field_dryclean": "reads",
     "genome": "GATK.GRCh37",
     "email": "shihabdider@gmail.com"
