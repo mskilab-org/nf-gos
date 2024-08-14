@@ -8,7 +8,7 @@ process PURPLE {
         'biocontainers/hmftools-purple:4.0.2--hdfd78af_0' }"
 
     input:
-    tuple val(meta), path(amber), path(cobalt), path(sv_tumor_vcf), path(sv_tumor_tbi), path(smlv_tumor_vcf), path(smlv_normal_vcf)
+    tuple val(meta), path(amber), path(cobalt), path(sv_tumor_vcf), path(sv_tumor_tbi), path(smlv_tumor_vcf), path(smlv_tumor_tbi), path(smlv_normal_vcf), path(smlv_normal_tbi)
     path genome_fasta
     val genome_ver
     path genome_fai
@@ -59,8 +59,6 @@ process PURPLE {
         -amber ${amber} \\
         -cobalt ${cobalt} \\
         ${sv_tumor_vcf_arg} \\
-        ${sv_normal_vcf_arg} \\
-        ${sv_tumor_recovery_vcf_arg} \\
         ${smlv_tumor_vcf_arg} \\
         ${smlv_normal_vcf_arg} \\
         -ref_genome ${genome_fasta} \\
@@ -100,5 +98,20 @@ process PURPLE {
     touch purple/${meta.tumor_id}.purple.sv.vcf.gz
 
     echo -e '${task.process}:\\n  stub: noversions\\n' > versions.yml
+    """
+}
+
+process EXTRACT_PURITYPLOIDY {
+    input:
+    tuple val(meta), path(purple_dir)
+
+    output:
+    tuple val(meta), env(purity_val), emit: purity_val
+    tuple val(meta), env(ploidy_val), emit: ploidy_val
+
+    script:
+    """
+    export purity_val=\$(awk 'NR==2 {print \$1}' ${purple_dir}/${meta.tumor_id}.purple.purity.tsv)
+    export ploidy_val=\$(awk 'NR==2 {print \$5}' ${purple_dir}/${meta.tumor_id}.purple.purity.tsv)
     """
 }

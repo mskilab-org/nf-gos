@@ -1,2 +1,2 @@
-patient,sex,status,sample,bam,bai,ploidy
-JTS-1501,XX,1,JTS-1501_T,/gpfs/commons/groups/imielinski_lab/projects/gGnome/Flow/MergeBams/20230202_tnbc_illumina/MergeBams/JTS-1501/aligned.bam,/gpfs/commons/groups/imielinski_lab/projects/gGnome/Flow/MergeBams/20230202_tnbc_illumina/MergeBams/JTS-1501/aligned.bam.bai,1.98
+patient,sex,status,sample,bam,bai
+JTS-1501,XX,1,JTS-1501_T,/gpfs/commons/groups/imielinski_lab/projects/gGnome/Flow/MergeBams/20230202_tnbc_illumina/MergeBams/JTS-1501/aligned.bam,/gpfs/commons/groups/imielinski_lab/projects/gGnome/Flow/MergeBams/20230202_tnbc_illumina/MergeBams/JTS-1501/aligned.bam.bai

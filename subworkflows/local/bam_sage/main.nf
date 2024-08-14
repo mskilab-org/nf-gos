@@ -94,9 +94,9 @@ workflow BAM_SAGE_TUMOR_ONLY_FILTER {
         dbsnp,
         dbsnp_tbi,
         gnomAD_snv_db,
-        gnomeAD_snv_db_tbi,
-        sage_germ_pon,
-        sage_germ_pon_tbi,
+        gnomAD_snv_db_tbi,
+        sage_germline_pon,
+        sage_germline_pon_tbi,
         mills_gold_indel,
         mills_gold_indel_tbi
     )

@@ -25,17 +25,15 @@ workflow BAM_SVCALLING_GRIDSS {
 
     GRIDSS_GRIDSS(cram, fasta, fasta_fai, bwa_index, blacklist_gridss)
 
-    vcf                    = GRIDSS_GRIDSS.out.vcf
-    vcf_index              = GRIDSS_GRIDSS.out.vcf_index
-    assembly_bam           = GRIDSS_GRIDSS.out.assembly
+    vcf                    = GRIDSS_GRIDSS.out.filtered_vcf
+    vcf_index              = GRIDSS_GRIDSS.out.filtered_vcf_index
 
 
     versions = versions.mix(GRIDSS_GRIDSS.out.versions)
 
     emit:
-    vcf
+    vcf     // channel: [mandatory] [ meta, pass filltered vcf, pass filtered vcf tbi ]
     vcf_index
-    assembly_bam
 
 
     versions
@@ -55,16 +53,15 @@ workflow BAM_SVCALLING_GRIDSS_SOMATIC {
 
     GRIDSS_SOMATIC(vcf, pondir_gridss)
 
-    somatic_all             = GRIDSS_SOMATIC.out.somatic_all_vcf
     somatic_high_confidence = GRIDSS_SOMATIC.out.somatic_high_vcf
+    somatic_all             = GRIDSS_SOMATIC.out.somatic_all_vcf
+    all_vcf = Channel.empty().mix(somatic_all, somatic_high_confidence)
 
     versions                = GRIDSS_SOMATIC.out.versions
 
-    all_vcf = Channel.empty().mix(somatic_all, somatic_high_confidence)
-
     emit:
+    somatic_high_confidence // channel: [mandatory] [ meta, high confidence somatic vcf, high confidence somatic vcf tbi ]
     somatic_all
-    somatic_high_confidence
     all_vcf
 
     versions

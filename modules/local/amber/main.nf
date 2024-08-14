@@ -56,3 +56,54 @@ process AMBER {
     echo -e '${task.process}:\\n  stub: noversions\\n' > versions.yml
     """
 }
+
+process MAKE_HET_SITES {
+    tag "${meta.id}"
+    label 'process_low'
+
+    input:
+    tuple val(meta), path(amber_dir)
+
+    output:
+    tuple val(meta), path("*sites.txt"), emit: sites
+    path 'versions.yml'            , emit: versions
+
+    when:
+    task.ext.when == null || task.ext.when
+
+    script:
+    def args = task.ext.args ?: ''
+    def baf_tsv = "${amber_dir}/${meta.tumor_id}.amber.baf.tsv.gz"
+
+    """
+    echo "seqnames start end alt.count.t ref.count.t alt.count.n ref.count.n" > sites.txt
+    zcat ${baf_tsv} | awk 'NR>1 {
+        # Calculate alt.count.t using tumorModifiedBAF
+        alt_count_t = int(\$5 * \$4)  # \$4 is tumorModifiedBAF
+
+        # Calculate ref.count.t using tumorModifiedBAF
+        ref_count_t = int(\$5 * (1 - \$4))  # \$4 is tumorModifiedBAF
+
+        # Calculate alt.count.n using normalBAF
+        alt_count_n = int(\$8 * \$6)
+
+        # Calculate ref.count.n using normalBAF
+        ref_count_n = int(\$8 * (1 - \$6))
+
+        # Print the results
+        print \$1, \$2, \$2, alt_count_t, ref_count_t, alt_count_n, ref_count_n
+    }' >> sites.txt
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        amber: 0.1
+    END_VERSIONS
+    """
+
+    stub:
+    """
+    touch sites.txt
+
+    echo -e '${task.process}:\\n  stub: noversions\\n' > versions.yml
+    """
+}

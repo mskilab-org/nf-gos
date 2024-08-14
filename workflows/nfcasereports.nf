@@ -47,18 +47,18 @@ def checkPathParamList = [
 ]
 
 def toolParamMap = [
-    "fragcounter": [
-        params.gcmapdir_frag
-    ],
-    "dryclean": [
-        params.pon_dryclean,
-    ],
     "gridss": [
         params.blacklist_gridss,
         params.pon_gridss
     ],
     "hetpileups" : [
         params.hapmap_sites
+    ],
+    "fragcounter": [
+        params.gcmapdir_frag
+    ],
+    "dryclean": [
+        params.pon_dryclean,
     ],
     "fusions"    : [
         params.gencode_fusions
@@ -79,9 +79,62 @@ def toolParamMap = [
         params.panel_bed,
         params.high_confidence_bed
     ],
+    "purple"    : [
+        params.het_sites_amber,
+        params.gc_profile,
+    ],
 ]
 
-skip_tools = params.skip_tools ? params.skip_tools.split(',') : []
+tools_used = params.tools ? params.tools.split(',') : ["all"]
+
+tool_dependency_map = [
+    "aligner": ["indexing"],
+    "gridss": ["aligner"],
+    "hetpileups": ["aligner"],
+    "fragcounter": ["aligner"],
+    "dryclean": ["fragcounter"],
+    "cbs": ["dryclean"],
+    "ascat": ["hetpileups", "dryclean"],
+    "jabba": ["gridss", "hetpileups", "dryclean", "cbs", "ascat"],
+    "non_integer_balance": ["hetpileups", "dryclean", "jabba"],
+    "lp_phased_balance": ["non_integer_balance", "hetpileups"],
+    "events": ["jabba", "non_integer_balance"],
+    "fusions": ["jabba", "non_integer_balance"],
+    "sage": ["aligner"],
+    "purple": ["aligner", "gridss", "sage"],
+    "snpeff": ["sage"],
+    "snv_multiplicity": ["jabba", "snpeff"],
+    "signatures": ["sage"],
+    "hrdetect": ["gridss", "hetpileups", "jabba", "sage"]
+]
+
+// Recursive function to collect all dependencies
+def collectDependencies(tool, collected = []) {
+    def dependencies = tool_dependency_map[tool]
+    if (dependencies) {
+        dependencies.each { dep ->
+            if (!collected.contains(dep)) {
+                collected << dep
+                collectDependencies(dep, collected)
+            }
+        }
+    }
+    return collected
+}
+
+// Populate tools_used by recursively adding dependencies from tool_dependency_map
+if (params.tools) {
+    tools_used = params.tools.split(',').toList()
+    def all_dependencies = []
+    tools_used.each { tool ->
+        all_dependencies.addAll(collectDependencies(tool))
+    }
+    tools_used.addAll(all_dependencies.unique())
+} else {
+    tools_used = ["all"]
+}
+
+println "Tools that will be run: ${tools_used}"
 
 if (!params.dbsnp && !params.known_indels) {
     if (!params.skip_tools || (params.skip_tools && !params.skip_tools.contains('baserecalibrator'))) {
@@ -97,7 +150,9 @@ if ((params.download_cache) && (params.snpeff_cache || params.vep_cache)) {
 }
 
 toolParamMap.each { tool, toolParams ->
-    checkPathParamList.addAll(toolParams)
+    if (tools_used.contains("all") || tools_used.contains(tool)) {
+        checkPathParamList.addAll(toolParams)
+    }
 }
 
 
@@ -230,7 +285,7 @@ inputs = ch_from_samplesheet.map {
     seg,
     nseg,
     vcf,
-    vcf2,
+    vcf_tbi,
     jabba_rds,
     ni_balanced_gg,
     lp_balanced_gg,
@@ -265,7 +320,7 @@ inputs = ch_from_samplesheet.map {
         seg: seg,
         nseg: nseg,
         vcf: vcf,
-        vcf2: vcf2,
+        vcf_tbi: vcf_tbi,
         jabba_rds: jabba_rds,
         ni_balanced_gg: ni_balanced_gg,
         lp_balanced_gg: lp_balanced_gg,
@@ -328,7 +383,7 @@ inputs = inputs
 // Fails when missing sex information for CNV tools
 inputs.map{
     if (it.meta.sex == 'NA') {
-        log.warn "Please specify sex information for each sample in your samplesheet when using '--tools' with 'ascat' if known for comparison"
+        log.warn "Please specify sex information (if known) for each sample in your samplesheet when using ASCAT"
     }
 }
 
@@ -469,12 +524,22 @@ include { BAM_FRAGCOUNTER as NORMAL_FRAGCOUNTER        } from '../subworkflows/l
 include { COV_DRYCLEAN as TUMOR_DRYCLEAN               } from '../subworkflows/local/cov_dryclean/main'
 include { COV_DRYCLEAN as NORMAL_DRYCLEAN              } from '../subworkflows/local/cov_dryclean/main'
 
-//ASCAT
-include { COV_ASCAT                                   } from '../subworkflows/local/cov_ascat/main'
-include { EXTRACT_PURITYPLOIDY                        } from '../modules/local/ascat/main'
-
 // CBS
 include { COV_CBS as CBS                              } from '../subworkflows/local/cov_cbs/main'
+
+// SAGE
+include { BAM_SAGE                              } from '../subworkflows/local/bam_sage/main'
+include { BAM_SAGE_TUMOR_ONLY_FILTER            } from '../subworkflows/local/bam_sage/main'
+
+// SNPEFF
+include { VCF_SNPEFF as VCF_SNPEFF_SOMATIC                              } from '../subworkflows/local/vcf_snpeff/main'
+include { VCF_SNPEFF as VCF_SNPEFF_GERMLINE                             } from '../subworkflows/local/vcf_snpeff/main'
+
+//ASCAT
+include { COV_ASCAT                                   } from '../subworkflows/local/cov_ascat/main'
+
+// PURPLE
+include { BAM_COV_PURPLE                                      } from '../subworkflows/local/bam_cov_purple/main'
 
 // JaBbA
 if (params.tumor_only) {
@@ -500,14 +565,6 @@ include { JUNC_SNV_GGRAPH_HRDETECT } from '../subworkflows/local/hrdetect/main'
 //STRELKA2
 include { BAM_SOMATIC_STRELKA                        } from '../subworkflows/local/bam_somatic_strelka/main'
 include { BAM_GERMLINE_STRELKA                       } from '../subworkflows/local/bam_germline_strelka/main'
-
-// SAGE
-include { BAM_SAGE                              } from '../subworkflows/local/bam_sage/main'
-include { BAM_SAGE_TUMOR_ONLY_FILTER            } from '../subworkflows/local/bam_sage/main'
-
-// SNPEFF
-include { VCF_SNPEFF as VCF_SNPEFF_SOMATIC                              } from '../subworkflows/local/vcf_snpeff/main'
-include { VCF_SNPEFF as VCF_SNPEFF_GERMLINE                             } from '../subworkflows/local/vcf_snpeff/main'
 
 // SNV MULTIPLICITY
 include { VCF_SNV_MULTIPLICITY           } from '../subworkflows/local/vcf_snv_multiplicity/main'
@@ -553,176 +610,178 @@ workflow NFCASEREPORTS {
 
     // Build indices if needed
     // ##############################
-    PREPARE_GENOME()
+    if (tools_used.contains("all") || tools_used.contains("indexing")) {
+        PREPARE_GENOME()
 
-    // Gather built indices or get them from the params
-    // Built from the fasta file:
-    dict       = params.dict        ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect()
-                                    : PREPARE_GENOME.out.dict
-    fasta_fai  = WorkflowNfcasereports.create_file_channel(params.fasta_fai, PREPARE_GENOME.out.fasta_fai)
-    bwa        = WorkflowNfcasereports.create_file_channel(params.bwa, PREPARE_GENOME.out.bwa)
-    bwamem2    = WorkflowNfcasereports.create_file_channel(params.bwamem2, PREPARE_GENOME.out.bwamem2)
+        // Gather built indices or get them from the params
+        // Built from the fasta file:
+        dict       = params.dict        ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect()
+                                        : PREPARE_GENOME.out.dict
+        fasta_fai  = WorkflowNfcasereports.create_file_channel(params.fasta_fai, PREPARE_GENOME.out.fasta_fai)
+        bwa        = WorkflowNfcasereports.create_file_channel(params.bwa, PREPARE_GENOME.out.bwa)
+        bwamem2    = WorkflowNfcasereports.create_file_channel(params.bwamem2, PREPARE_GENOME.out.bwamem2)
 
-    // Gather index for mapping given the chosen aligner
-    index_alignment = (params.aligner == "bwa-mem") ? bwa :
-        params.aligner == "bwa-mem2" ? bwamem2 : null
+        // Gather index for mapping given the chosen aligner
+        index_alignment = (params.aligner == "bwa-mem") ? bwa :
+            params.aligner == "bwa-mem2" ? bwamem2 : null
 
-    // TODO: add a params for msisensorpro_scan
-    msisensorpro_scan      = PREPARE_GENOME.out.msisensorpro_scan
+        // TODO: add a params for msisensorpro_scan
+        msisensorpro_scan      = PREPARE_GENOME.out.msisensorpro_scan
 
-    // For ASCAT, extracted from zip or tar.gz files:
-    allele_files           = PREPARE_GENOME.out.allele_files
-    chr_files              = PREPARE_GENOME.out.chr_files
-    gc_file                = PREPARE_GENOME.out.gc_file
-    loci_files             = PREPARE_GENOME.out.loci_files
-    rt_file                = PREPARE_GENOME.out.rt_file
+        // For ASCAT, extracted from zip or tar.gz files:
+        allele_files           = PREPARE_GENOME.out.allele_files
+        chr_files              = PREPARE_GENOME.out.chr_files
+        gc_file                = PREPARE_GENOME.out.gc_file
+        loci_files             = PREPARE_GENOME.out.loci_files
+        rt_file                = PREPARE_GENOME.out.rt_file
 
-    dbsnp_tbi              = WorkflowNfcasereports.create_index_channel(params.dbsnp, params.dbsnp_tbi, PREPARE_GENOME.out.dbsnp_tbi)
-    //do not change to Channel.value([]), the check for its existence then fails for Getpileupsumamries
-    germline_resource_tbi  = params.germline_resource ? params.germline_resource_tbi ? Channel.fromPath(params.germline_resource_tbi).collect() : PREPARE_GENOME.out.germline_resource_tbi : []
-    known_indels_tbi       = WorkflowNfcasereports.create_index_channel(params.known_indels, params.known_indels_tbi, PREPARE_GENOME.out.known_indels_tbi)
-    known_snps_tbi         = WorkflowNfcasereports.create_index_channel(params.known_snps, params.known_snps_tbi, PREPARE_GENOME.out.known_snps_tbi)
-    pon_tbi                = WorkflowNfcasereports.create_index_channel(params.pon, params.pon_tbi, PREPARE_GENOME.out.pon_tbi)
+        dbsnp_tbi              = WorkflowNfcasereports.create_index_channel(params.dbsnp, params.dbsnp_tbi, PREPARE_GENOME.out.dbsnp_tbi)
+        //do not change to Channel.value([]), the check for its existence then fails for Getpileupsumamries
+        germline_resource_tbi  = params.germline_resource ? params.germline_resource_tbi ? Channel.fromPath(params.germline_resource_tbi).collect() : PREPARE_GENOME.out.germline_resource_tbi : []
+        known_indels_tbi       = WorkflowNfcasereports.create_index_channel(params.known_indels, params.known_indels_tbi, PREPARE_GENOME.out.known_indels_tbi)
+        known_snps_tbi         = WorkflowNfcasereports.create_index_channel(params.known_snps, params.known_snps_tbi, PREPARE_GENOME.out.known_snps_tbi)
+        pon_tbi                = WorkflowNfcasereports.create_index_channel(params.pon, params.pon_tbi, PREPARE_GENOME.out.pon_tbi)
 
-    // known_sites is made by grouping both the dbsnp and the known snps/indels resources
-    // Which can either or both be optional
-    known_sites_indels     = dbsnp.concat(known_indels).collect()
-    known_sites_indels_tbi = dbsnp_tbi.concat(known_indels_tbi).collect()
+        // known_sites is made by grouping both the dbsnp and the known snps/indels resources
+        // Which can either or both be optional
+        known_sites_indels     = dbsnp.concat(known_indels).collect()
+        known_sites_indels_tbi = dbsnp_tbi.concat(known_indels_tbi).collect()
 
-    known_sites_snps       = dbsnp.concat(known_snps).collect()
-    known_sites_snps_tbi   = dbsnp_tbi.concat(known_snps_tbi).collect()
+        known_sites_snps       = dbsnp.concat(known_snps).collect()
+        known_sites_snps_tbi   = dbsnp_tbi.concat(known_snps_tbi).collect()
 
-    // Build intervals if needed
-    PREPARE_INTERVALS(fasta_fai, params.intervals, params.no_intervals)
+        // Build intervals if needed
+        PREPARE_INTERVALS(fasta_fai, params.intervals, params.no_intervals)
 
-    // Intervals for speed up preprocessing/variant calling by spread/gather
-    // [interval.bed] all intervals in one file
-    intervals_bed_combined         = WorkflowNfcasereports.create_file_channel(params.no_intervals, PREPARE_INTERVALS.out.intervals_bed_combined)
-    intervals_bed_gz_tbi_combined  = WorkflowNfcasereports.create_file_channel(params.no_intervals, PREPARE_INTERVALS.out.intervals_bed_gz_tbi_combined)
+        // Intervals for speed up preprocessing/variant calling by spread/gather
+        // [interval.bed] all intervals in one file
+        intervals_bed_combined         = WorkflowNfcasereports.create_file_channel(params.no_intervals, PREPARE_INTERVALS.out.intervals_bed_combined)
+        intervals_bed_gz_tbi_combined  = WorkflowNfcasereports.create_file_channel(params.no_intervals, PREPARE_INTERVALS.out.intervals_bed_gz_tbi_combined)
 
-    // For QC during preprocessing, we don't need any intervals (MOSDEPTH doesn't take them for WGS)
-    intervals_for_preprocessing = params.wes ?
-        intervals_bed_combined.map{it -> [ [ id:it.baseName ], it ]}.collect() :
-        Channel.value([ [ id:'null' ], [] ])
+        // For QC during preprocessing, we don't need any intervals (MOSDEPTH doesn't take them for WGS)
+        intervals_for_preprocessing = params.wes ?
+            intervals_bed_combined.map{it -> [ [ id:it.baseName ], it ]}.collect() :
+            Channel.value([ [ id:'null' ], [] ])
 
-    intervals            = PREPARE_INTERVALS.out.intervals_bed        // [ interval, num_intervals ] multiple interval.bed files, divided by useful intervals for scatter/gather
-    intervals_bed_gz_tbi = PREPARE_INTERVALS.out.intervals_bed_gz_tbi // [ interval_bed, tbi, num_intervals ] multiple interval.bed.gz/.tbi files, divided by useful intervals for scatter/gather
+        intervals            = PREPARE_INTERVALS.out.intervals_bed        // [ interval, num_intervals ] multiple interval.bed files, divided by useful intervals for scatter/gather
+        intervals_bed_gz_tbi = PREPARE_INTERVALS.out.intervals_bed_gz_tbi // [ interval_bed, tbi, num_intervals ] multiple interval.bed.gz/.tbi files, divided by useful intervals for scatter/gather
 
-    intervals_and_num_intervals = intervals.map{ interval, num_intervals ->
-        if ( num_intervals < 1 ) [ [], num_intervals ]
-        else [ interval, num_intervals ]
+        intervals_and_num_intervals = intervals.map{ interval, num_intervals ->
+            if ( num_intervals < 1 ) [ [], num_intervals ]
+            else [ interval, num_intervals ]
+        }
+
+        intervals_bed_gz_tbi_and_num_intervals = intervals_bed_gz_tbi.map{ intervals, num_intervals ->
+            if ( num_intervals < 1 ) [ [], [], num_intervals ]
+            else [ intervals[0], intervals[1], num_intervals ]
+        }
+
+        // Gather used softwares versions
+        versions = versions.mix(PREPARE_GENOME.out.versions)
+        versions = versions.mix(PREPARE_INTERVALS.out.versions)
     }
-
-    intervals_bed_gz_tbi_and_num_intervals = intervals_bed_gz_tbi.map{ intervals, num_intervals ->
-        if ( num_intervals < 1 ) [ [], [], num_intervals ]
-        else [ intervals[0], intervals[1], num_intervals ]
-    }
-
-    // Gather used softwares versions
-    versions = versions.mix(PREPARE_GENOME.out.versions)
-    versions = versions.mix(PREPARE_INTERVALS.out.versions)
 
     // Alignment
     // ##############################
+    if (tools_used.contains("all") || tools_used.contains("aligner")) {
+        input_fastq = inputs.filter { it.bam.isEmpty() }.map { it -> [it.meta, [it.fastq_1, it.fastq_2]] }
+        alignment_existing_outputs = inputs.map { it -> [it.meta, it.bam] }.filter { !it[1].isEmpty() }
 
-    input_fastq = inputs.filter { it.bam.isEmpty() }.map { it -> [it.meta, [it.fastq_1, it.fastq_2]] }
-    alignment_existing_outputs = inputs.map { it -> [it.meta, it.bam] }.filter { !it[1].isEmpty() }
+        // QC
+        FASTQC(input_fastq)
 
-    // QC
-    FASTQC(input_fastq)
+        reports = reports.mix(FASTQC.out.zip.collect{ meta, logs -> logs })
+        versions = versions.mix(FASTQC.out.versions.first())
 
-    reports = reports.mix(FASTQC.out.zip.collect{ meta, logs -> logs })
-    versions = versions.mix(FASTQC.out.versions.first())
+        //skipping the UMI Conscensus calling step for now
+        reads_for_fastp = input_fastq
 
-    //skipping the UMI Conscensus calling step for now
-    reads_for_fastp = input_fastq
+        // Trimming and/or splitting
+        if (params.trim_fastq && params.split_fastq > 0) {
+            log.warn "You have mentioned trim_fastq to `$params.trim_fastq`, will do trimming"
+            save_trimmed_fail = false
+            save_merged = false
+            FASTP(
+                reads_for_fastp,
+                [], // we are not using any adapter fastas at the moment
+                save_trimmed_fail,
+                save_merged
+            )
 
-    // Trimming and/or splitting
-    if (params.trim_fastq && params.split_fastq > 0) {
-        log.warn "You have mentioned trim_fastq to `$params.trim_fastq`, will do trimming"
-        save_trimmed_fail = false
-        save_merged = false
-        FASTP(
-            reads_for_fastp,
-            [], // we are not using any adapter fastas at the moment
-            save_trimmed_fail,
-            save_merged
-        )
+            reports = reports.mix(FASTP.out.json.collect{ meta, json -> json })
+            reports = reports.mix(FASTP.out.html.collect{ meta, html -> html })
 
-        reports = reports.mix(FASTP.out.json.collect{ meta, json -> json })
-        reports = reports.mix(FASTP.out.html.collect{ meta, html -> html })
+            if (params.split_fastq) {
+                reads_for_alignment = FASTP.out.reads.map{ meta, reads ->
+                    read_files = reads.sort(false) { a,b -> a.getName().tokenize('.')[0] <=> b.getName().tokenize('.')[0] }.collate(2)
+                    [ meta + [ size:read_files.size() ], read_files ]
+                }.transpose()
+            } else reads_for_alignment = FASTP.out.reads
 
-        if (params.split_fastq) {
-            reads_for_alignment = FASTP.out.reads.map{ meta, reads ->
-                read_files = reads.sort(false) { a,b -> a.getName().tokenize('.')[0] <=> b.getName().tokenize('.')[0] }.collate(2)
-                [ meta + [ size:read_files.size() ], read_files ]
-            }.transpose()
-        } else reads_for_alignment = FASTP.out.reads
+            versions = versions.mix(FASTP.out.versions)
 
-        versions = versions.mix(FASTP.out.versions)
+        } else {
+            println "Skipping trimming since trim_fastq is false"
+            reads_for_alignment = reads_for_fastp
+        }
 
-    } else {
-        println "Skipping trimming since trim_fastq is false"
-        reads_for_alignment = reads_for_fastp
+        // STEP 1: MAPPING READS TO REFERENCE GENOME
+        // reads will be sorted
+        reads_for_alignment = reads_for_alignment.map{ meta, reads ->
+            // Update meta.id to meta.sample if no multiple lanes or splitted fastqs
+            if (meta.size * meta.num_lanes == 1) [ meta + [ id:meta.sample ], reads ]
+            else [ meta, reads ]
+        }
+
+        // GPU Alignment
+        if (params.aligner == "fq2bam") {
+            FASTQ_PARABRICKS_FQ2BAM(
+                input_fastq,
+                known_sites_indels
+            )
+            // merge existing BAMs with newly mapped ones
+            bam_mapped = alignment_existing_outputs.mix(FASTQ_PARABRICKS_FQ2BAM.out.bam)
+        } else {
+            FASTQ_ALIGN_BWAMEM_MEM2(
+                reads_for_alignment,
+                index_alignment
+            )
+            // merge existing BAMs with newly mapped ones
+            bam_mapped = alignment_existing_outputs.mix(FASTQ_ALIGN_BWAMEM_MEM2.out.bam)
+        }
+
+
+
+        // Grouping the bams from the same samples not to stall the workflow
+        bam_mapped = bam_mapped.map{ meta, bam ->
+
+            // Update meta.id to be meta.sample, ditching sample-lane that is not needed anymore
+            // Update meta.data_type
+            // Remove no longer necessary fields:
+            //   read_group: Now in the BAM header
+            //    num_lanes: only needed for mapping
+            //         size: only needed for mapping
+
+            // Use groupKey to make sure that the correct group can advance as soon as it is complete
+            // and not stall the workflow until all reads from all channels are mapped
+            [ groupKey( meta - meta.subMap('num_lanes', 'read_group', 'size') + [ id:meta.sample ], (meta.num_lanes ?: 1) * (meta.size ?: 1)), bam ]
+        }.groupTuple()
+
+        // bams are merged (when multiple lanes from the same sample) and indexed
+        BAM_MERGE_INDEX_SAMTOOLS(bam_mapped)
+
+        // Gather used softwares versions
+        versions = versions.mix(BAM_MERGE_INDEX_SAMTOOLS.out.versions)
+
+        // Gather used softwares versions
+        versions = versions.mix(FASTQ_ALIGN_BWAMEM_MEM2.out.versions)
+
+        alignment_bams_final = BAM_MERGE_INDEX_SAMTOOLS.out.bam_bai.map({ meta, bam, bai -> [ meta.id, meta, bam, bai ] })
     }
-
-    // STEP 1: MAPPING READS TO REFERENCE GENOME
-    // reads will be sorted
-    reads_for_alignment = reads_for_alignment.map{ meta, reads ->
-        // Update meta.id to meta.sample no multiple lanes or splitted fastqs
-        if (meta.size * meta.num_lanes == 1) [ meta + [ id:meta.sample ], reads ]
-        else [ meta, reads ]
-    }
-
-    // GPU Alignment
-    if (params.aligner == "fq2bam") {
-        FASTQ_PARABRICKS_FQ2BAM(
-            input_fastq,
-            known_sites_indels
-        )
-        // merge existing BAMs with newly mapped ones
-        bam_mapped = alignment_existing_outputs.mix(FASTQ_PARABRICKS_FQ2BAM.out.bam)
-    } else {
-        FASTQ_ALIGN_BWAMEM_MEM2(
-            reads_for_alignment,
-            index_alignment
-        )
-        // merge existing BAMs with newly mapped ones
-        bam_mapped = alignment_existing_outputs.mix(FASTQ_ALIGN_BWAMEM_MEM2.out.bam)
-    }
-
-
-
-    // Grouping the bams from the same samples not to stall the workflow
-    bam_mapped = bam_mapped.map{ meta, bam ->
-
-        // Update meta.id to be meta.sample, ditching sample-lane that is not needed anymore
-        // Update meta.data_type
-        // Remove no longer necessary fields:
-        //   read_group: Now in the BAM header
-        //    num_lanes: only needed for mapping
-        //         size: only needed for mapping
-
-        // Use groupKey to make sure that the correct group can advance as soon as it is complete
-        // and not stall the workflow until all reads from all channels are mapped
-        [ groupKey( meta - meta.subMap('num_lanes', 'read_group', 'size') + [ id:meta.sample ], (meta.num_lanes ?: 1) * (meta.size ?: 1)), bam ]
-    }.groupTuple()
-
-    // bams are merged (when multiple lanes from the same sample) and indexed
-    BAM_MERGE_INDEX_SAMTOOLS(bam_mapped)
-
-    // Gather used softwares versions
-    versions = versions.mix(BAM_MERGE_INDEX_SAMTOOLS.out.versions)
-
-    // Gather used softwares versions
-    versions = versions.mix(FASTQ_ALIGN_BWAMEM_MEM2.out.versions)
-
-    alignment_bams_final = BAM_MERGE_INDEX_SAMTOOLS.out.bam_bai.map({ meta, bam, bai -> [ meta.id, meta, bam, bai ] })
 
     // BAM Postprocessing
     // ##############################
-
-    if (params.postprocess_bams) {
+    if (tools_used.contains("all") || tools_used.contains("postprocessing")) {
         cram_markduplicates_no_spark = Channel.empty()
 
         // STEP 2: markduplicates (+QC) + convert to CRAM
@@ -812,764 +871,863 @@ workflow NFCASEREPORTS {
 
     // SV Calling
     // ##############################
+    if (tools_used.contains("all") || tools_used.contains("gridss")) {
 
-    // Filter out bams for which SV calling has already been done
-    bam_sv_inputs = inputs.filter { it.vcf.isEmpty() }.map { it -> [it.meta.id] }
-    bam_sv_calling = alignment_bams_final
-        .join(bam_sv_inputs)
-        .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
-    gridss_existing_outputs = inputs.map { it -> [it.meta, it.vcf] }.filter { !it[1].isEmpty() }
+        // Filter out bams for which SV calling has already been done
+        bam_sv_inputs = inputs.filter { it.vcf.isEmpty() }.map { it -> [it.meta.id] }
+        bam_sv_calling = alignment_bams_final
+            .join(bam_sv_inputs)
+            .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
+        gridss_existing_outputs = inputs.map { it -> [it.meta, it.vcf, it.vcf_tbi] }.filter { !it[1].isEmpty() && !it[2].isEmpty() }
 
-    if (params.tumor_only) {
-        // add empty arrays to stand-in for normals
-        bam_sv_calling_pair = bam_sv_calling_status.tumor.map{ meta, bam, bai -> [ meta, [], [], bam, bai ] }
-    } else {
-        // getting the tumor and normal cram files separated
-        bam_sv_calling_status = bam_sv_calling.branch{
-            normal: it[0].status == 0
-            tumor:  it[0].status == 1
+        if (params.tumor_only) {
+            bam_sv_calling_status = bam_sv_calling.branch{
+                tumor:  it[0].status == 1
+            }
+
+            // add empty arrays to stand-in for normals
+            bam_sv_calling_pair = bam_sv_calling_status.tumor.map{ meta, bam, bai -> [ meta + [tumor_id: meta.sample], [], [], bam, bai ] }
+        } else {
+            // getting the tumor and normal cram files separated
+            bam_sv_calling_status = bam_sv_calling.branch{
+                normal: it[0].status == 0
+                tumor:  it[0].status == 1
+            }
+
+            // All normal samples
+            bam_sv_calling_normal_for_crossing = bam_sv_calling_status.normal.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
+
+            // All tumor samples
+            bam_sv_calling_tumor_for_crossing = bam_sv_calling_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
+
+            // Crossing the normal and tumor samples to create tumor and normal pairs
+            bam_sv_calling_pair = bam_sv_calling_normal_for_crossing.cross(bam_sv_calling_tumor_for_crossing)
+                .map { normal, tumor ->
+                    def meta = [:]
+
+                    meta.id         = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
+                    meta.normal_id  = normal[1].sample
+                    meta.patient    = normal[0]
+                    meta.sex        = normal[1].sex
+                    meta.tumor_id   = tumor[1].sample
+
+                    [ meta, normal[2], normal[3], tumor[2], tumor[3] ]
+            }
         }
 
-        // All normal samples
-        bam_sv_calling_normal_for_crossing = bam_sv_calling_status.normal.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
+        bam_sv_calling_pair.view()
+        BAM_SVCALLING_GRIDSS(
+            bam_sv_calling_pair,
+            bwa
+        )
 
-        // All tumor samples
-        bam_sv_calling_tumor_for_crossing = bam_sv_calling_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
+        vcf_from_gridss_gridss = Channel.empty()
+            .mix(BAM_SVCALLING_GRIDSS.out.vcf)
+            .mix(gridss_existing_outputs)
+        versions = versions.mix(BAM_SVCALLING_GRIDSS.out.versions)
 
-        // Crossing the normal and tumor samples to create tumor and normal pairs
-        bam_sv_calling_pair = bam_sv_calling_normal_for_crossing.cross(bam_sv_calling_tumor_for_crossing)
-            .map { normal, tumor ->
-                def meta = [:]
+        if (params.tumor_only) {
+            vcf_from_sv_calling_for_merge = vcf_from_gridss_gridss
+                .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
 
-                meta.id         = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
-                meta.normal_id  = normal[1].sample
-                meta.patient    = normal[0]
-                meta.sex        = normal[1].sex
-                meta.tumor_id   = tumor[1].sample
+            JUNCTION_FILTER(vcf_from_gridss_gridss)
 
-                [ meta, normal[2], normal[3], tumor[2], tumor[3] ]
+            final_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.final_filtered_sv_rds)
+            final_filtered_sv_rds_for_merge = final_filtered_sv_rds
+                .map { it -> [ it[0].patient, it[1] ] } // meta.patient, rds
+            pon_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.pon_filtered_sv_rds)
+        } else {
+            //somatic filter for GRIDSS
+            BAM_SVCALLING_GRIDSS_SOMATIC(vcf_from_gridss_gridss)
+
+            versions = versions.mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.versions)
+            vcf_somatic_high_conf = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_high_confidence)
+            vcf_from_sv_calling_for_merge = vcf_somatic_high_conf
+                .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
+
+            unfiltered_som_sv = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_all)
+            unfiltered_som_sv_for_merge = unfiltered_som_sv
+                .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
         }
-    }
-
-    BAM_SVCALLING_GRIDSS(
-        bam_sv_calling_pair,
-        bwa
-    )
-
-    vcf_from_gridss_gridss = Channel.empty()
-        .mix(BAM_SVCALLING_GRIDSS.out.vcf)
-        .mix(gridss_existing_outputs)
-    versions = versions.mix(BAM_SVCALLING_GRIDSS.out.versions)
-
-    if (!params.tumor_only) {
-        //somatic filter for GRIDSS
-        BAM_SVCALLING_GRIDSS_SOMATIC(vcf_from_gridss_gridss)
-
-        versions = versions.mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.versions)
-        vcf_from_sv_calling = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_high_confidence)
-        vcf_from_sv_calling_for_merge = vcf_from_sv_calling
-            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
-
-        unfiltered_som_sv = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_all)
-        unfiltered_som_sv_for_merge = unfiltered_som_sv
-            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
-    }
-
-    // if tumor only, filter the junctions
-    if (params.tumor_only) {
-        JUNCTION_FILTER( vcf_from_gridss_gridss)
-
-        final_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.final_filtered_sv_rds)
-        final_filtered_sv_rds_for_merge = final_filtered_sv_rds
-            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
-        pon_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.pon_filtered_sv_rds)
     }
 
     // HETPILEUPS
     // ##############################
-    if (!params.tumor_only) {
-        bam_hetpileups_inputs = inputs.filter { it.hets.isEmpty() }.map { it -> [it.meta.id] }
-        bam_hetpileups_calling = alignment_bams_final
-            .join(bam_hetpileups_inputs)
+    if (tools_used.contains("all") || tools_used.contains("hetpileups")) {
+        if (!params.tumor_only) {
+            bam_hetpileups_inputs = inputs.filter { it.hets.isEmpty() }.map { it -> [it.meta.id] }
+            bam_hetpileups_calling = alignment_bams_final
+                .join(bam_hetpileups_inputs)
+                .map{ it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
+
+            hetpileups_existing_outputs = inputs
+                .map { it -> [it.meta, it.hets] }
+                .filter { !it[1].isEmpty() }
+                .branch{
+                    normal: it[0].status == 0
+                    tumor:  it[0].status == 1
+                }
+
+            // getting the tumor and normal cram files separated
+            bam_hetpileups_status = bam_hetpileups_calling.branch{
+                normal: it[0].status == 0
+                tumor:  it[0].status == 1
+            }
+
+            // All normal samples
+            bam_hetpileups_normal_for_crossing = bam_hetpileups_status.normal.map{ meta, bam, bai -> [ meta.patient, meta + [id: meta.sample], bam, bai ] }
+
+            // All tumor samples
+            bam_hetpileups_tumor_for_crossing = bam_hetpileups_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta + [id: meta.sample], bam, bai ] }
+
+            // Crossing the normal and tumor samples to create tumor and normal pairs
+            bam_hetpileups_pair = bam_hetpileups_normal_for_crossing.cross(bam_hetpileups_tumor_for_crossing)
+                .map { normal, tumor ->
+                    def meta = [:]
+                    meta.id         = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
+                    meta.normal_id  = normal[1].sample
+                    meta.patient    = normal[0]
+                    meta.sex        = normal[1].sex
+                    meta.tumor_id   = tumor[1].sample
+
+                    [ meta, normal[2], normal[3], tumor[2], tumor[3] ]
+                }
+
+
+            BAM_HETPILEUPS(bam_hetpileups_pair)
+            versions = versions.mix(BAM_HETPILEUPS.out.versions)
+
+            sites_from_het_pileups_wgs = Channel.empty()
+                .mix(BAM_HETPILEUPS.out.het_pileups_wgs)
+                .mix(hetpileups_existing_outputs)
+
+            hets_sites_for_merge = sites_from_het_pileups_wgs
+                .map { it -> [ it[0].patient, it[1] ] } // meta.patient, hets
+        }
+    }
+    // FRAGCOUNTER
+    // ##############################
+    if (tools_used.contains("all") || tools_used.contains("fragcounter")) {
+        bam_fragcounter_inputs = inputs.filter { it.frag_cov.isEmpty() }.map { it -> [it.meta.id] }
+        bam_fragcounter_calling = alignment_bams_final
+            .join(bam_fragcounter_inputs)
             .map{ it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
 
-        hetpileups_existing_outputs = inputs
-            .map { it -> [it.meta, it.hets] }
+        fragcounter_existing_outputs = inputs
+            .map { it -> [it.meta, it.frag_cov] }
             .filter { !it[1].isEmpty() }
             .branch{
                 normal: it[0].status == 0
                 tumor:  it[0].status == 1
             }
 
-        // getting the tumor and normal cram files separated
-        bam_hetpileups_status = bam_hetpileups_calling.branch{
-            normal: it[0].status == 0
-            tumor:  it[0].status == 1
-        }
-
-        // All normal samples
-        bam_hetpileups_normal_for_crossing = bam_hetpileups_status.normal.map{ meta, bam, bai -> [ meta.patient, meta + [id: meta.sample], bam, bai ] }
-
-        // All tumor samples
-        bam_hetpileups_tumor_for_crossing = bam_hetpileups_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta + [id: meta.sample], bam, bai ] }
-
-        // Crossing the normal and tumor samples to create tumor and normal pairs
-        bam_hetpileups_pair = bam_hetpileups_normal_for_crossing.cross(bam_hetpileups_tumor_for_crossing)
-            .map { normal, tumor ->
-                def meta = [:]
-                meta.id         = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
-                meta.normal_id  = normal[1].sample
-                meta.patient    = normal[0]
-                meta.sex        = normal[1].sex
-                meta.tumor_id   = tumor[1].sample
-
-                [ meta, normal[2], normal[3], tumor[2], tumor[3] ]
-            }
-
-
-        BAM_HETPILEUPS(bam_hetpileups_pair)
-        versions = versions.mix(BAM_HETPILEUPS.out.versions)
-
-        sites_from_het_pileups_wgs = Channel.empty()
-            .mix(BAM_HETPILEUPS.out.het_pileups_wgs)
-            .mix(hetpileups_existing_outputs)
-
-        hets_sites_for_merge = sites_from_het_pileups_wgs
-            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, hets
-    }
-    // FRAGCOUNTER
-    // ##############################
-
-    bam_fragcounter_inputs = inputs.filter { it.frag_cov.isEmpty() }.map { it -> [it.meta.id] }
-    bam_fragcounter_calling = alignment_bams_final
-        .join(bam_fragcounter_inputs)
-        .map{ it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
-
-    fragcounter_existing_outputs = inputs
-        .map { it -> [it.meta, it.frag_cov] }
-        .filter { !it[1].isEmpty() }
-        .branch{
-            normal: it[0].status == 0
-            tumor:  it[0].status == 1
-        }
-
-    if (params.tumor_only) {
-        bam_fragcounter_status = bam_fragcounter_calling.branch{
-            tumor:  it[0].status == 1
-        }
-    } else {
         // getting the tumor and normal bam files separated
         bam_fragcounter_status = bam_fragcounter_calling.branch{
             normal: it[0].status == 0
             tumor:  it[0].status == 1
         }
+
+        if (!params.tumor_only) {
+            NORMAL_FRAGCOUNTER(bam_fragcounter_status.normal)
+            normal_frag_cov = Channel.empty()
+                .mix(NORMAL_FRAGCOUNTER.out.fragcounter_cov)
+                .mix(fragcounter_existing_outputs.normal)
+        }
+
+        TUMOR_FRAGCOUNTER(bam_fragcounter_status.tumor)
+
+        tumor_frag_cov = Channel.empty()
+            .mix(TUMOR_FRAGCOUNTER.out.fragcounter_cov)
+            .mix(fragcounter_existing_outputs.tumor)
+
+        // Only need one versions because its just one program (fragcounter)
+        versions = versions.mix(TUMOR_FRAGCOUNTER.out.versions)
     }
-
-    if (!params.tumor_only) {
-        NORMAL_FRAGCOUNTER(bam_fragcounter_status.normal)
-        normal_frag_cov = Channel.empty()
-            .mix(NORMAL_FRAGCOUNTER.out.fragcounter_cov)
-            .mix(fragcounter_existing_outputs.normal)
-    }
-
-    TUMOR_FRAGCOUNTER(bam_fragcounter_status.tumor)
-
-    tumor_frag_cov = Channel.empty()
-        .mix(TUMOR_FRAGCOUNTER.out.fragcounter_cov)
-        .mix(fragcounter_existing_outputs.tumor)
-
-    // Only need one versions because its just one program (fragcounter)
-    versions = versions.mix(TUMOR_FRAGCOUNTER.out.versions)
 
     // Dryclean
     // ##############################
-    cov_dryclean_inputs = inputs
-        .filter { it.dryclean_cov.isEmpty() }
-        .map { it -> [it.meta] }
-        .branch{
-            normal: it[0].status == 0
-            tumor:  it[0].status == 1
+    if (tools_used.contains("all") || tools_used.contains("dryclean")) {
+        cov_dryclean_inputs = inputs
+            .filter { it.dryclean_cov.isEmpty() }
+            .map { it -> [it.meta] }
+            .branch{
+                normal: it[0].status == 0
+                tumor:  it[0].status == 1
+            }
+
+        cov_dryclean_tumor_input = tumor_frag_cov
+            .join(cov_dryclean_inputs.tumor)
+            .map{ it -> [ it[0], it[1] ] } // meta, frag_cov
+
+        dryclean_existing_outputs = inputs
+            .map { it -> [it.meta, it.dryclean_cov] }
+            .filter { !it[1].isEmpty() }
+            .branch{
+                normal: it[0].status == 0
+                tumor:  it[0].status == 1
+            }
+
+        // Dryclean for both tumor & normal
+        TUMOR_DRYCLEAN(cov_dryclean_tumor_input)
+
+        dryclean_tumor_cov = Channel.empty()
+            .mix(TUMOR_DRYCLEAN.out.dryclean_cov)
+            .mix(dryclean_existing_outputs.tumor)
+        dryclean_tumor_cov_for_merge = dryclean_tumor_cov
+            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, dryclean_cov
+
+        // Only need one versions because it's one program (dryclean)
+        versions = versions.mix(TUMOR_DRYCLEAN.out.versions)
+
+        if (!params.tumor_only) {
+            cov_dryclean_normal_input = normal_frag_cov
+                .join(cov_dryclean_inputs.normal)
+                .map{ it -> [ it[0], it[1] ] } // meta, frag_cov
+
+            NORMAL_DRYCLEAN(cov_dryclean_normal_input)
+
+            dryclean_normal_cov = Channel.empty()
+                .mix(NORMAL_DRYCLEAN.out.dryclean_cov)
+                .mix(dryclean_existing_outputs.normal)
         }
-
-    cov_dryclean_tumor_input = tumor_frag_cov
-        .join(cov_dryclean_inputs.tumor)
-        .map{ it -> [ it[0], it[1] ] } // meta, frag_cov
-
-    cov_dryclean_normal_input = normal_frag_cov
-        .join(cov_dryclean_inputs.normal)
-        .map{ it -> [ it[0], it[1] ] } // meta, frag_cov
-
-    dryclean_existing_outputs = inputs
-        .map { it -> [it.meta, it.dryclean_cov] }
-        .filter { !it[1].isEmpty() }
-        .branch{
-            normal: it[0].status == 0
-            tumor:  it[0].status == 1
-        }
-
-    // Dryclean for both tumor & normal
-    TUMOR_DRYCLEAN(cov_dryclean_tumor_input)
-
-    dryclean_tumor_cov = Channel.empty()
-        .mix(TUMOR_DRYCLEAN.out.dryclean_cov)
-        .mix(dryclean_existing_outputs.tumor)
-    dryclean_tumor_cov_for_merge = dryclean_tumor_cov
-        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, dryclean_cov
-
-    // Only need one versions because it's one program (dryclean)
-    versions = versions.mix(TUMOR_DRYCLEAN.out.versions)
-
-    if (!params.tumor_only) {
-        NORMAL_DRYCLEAN(cov_dryclean_normal_input)
-
-        dryclean_normal_cov = Channel.empty()
-            .mix(NORMAL_DRYCLEAN.out.dryclean_cov)
-            .mix(dryclean_existing_outputs.normal)
     }
 
     // CBS
     // ##############################
+    if (tools_used.contains("all") || tools_used.contains("cbs")) {
+        cbs_inputs = inputs
+            .filter { it.seg.isEmpty() || it.nseg.isEmpty() }
+            .map { it -> [it.meta] }
+            .branch{
+                normal: it[0].status == 0
+                tumor:  it[0].status == 1
+            }
 
-    cbs_inputs = inputs
-        .filter { it.seg.isEmpty() || it.nseg.isEmpty() }
-        .map { it -> [it.meta] }
-        .branch{
+        cbs_tumor_input = dryclean_tumor_cov
+            .join(cbs_inputs.tumor)
+            .map{ it -> [ it[0].patient, it[0], it[1] ] } // meta.patient, meta, dryclean tumor cov
+
+        cbs_normal_input = dryclean_normal_cov
+            .join(cbs_inputs.normal)
+            .map{ it -> [ it[0].patient, it[0], it[1] ] } // meta.patient, meta, dryclean normal cov
+
+        cbs_existing_seg = inputs
+            .map { it -> [it.meta, it.seg] }
+            .filter { !it[1].isEmpty() }
+
+        cbs_existing_nseg = inputs
+            .map { it -> [it.meta, it.nseg] }
+            .filter { !it[1].isEmpty() }
+
+        cov_cbs = cbs_tumor_input.cross(cbs_normal_input)
+            .map { tumor, normal ->
+                def meta = [:]
+                    meta.id             = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
+                    meta.sample         = "${tumor[1].sample}".toString()
+                    meta.normal_id      = normal[1].sample
+                    meta.patient        = normal[0]
+                    meta.sex            = normal[1].sex
+                    meta.tumor_id       = tumor[1].sample
+
+                    [ meta, tumor[2], normal[2] ]
+            }
+
+        CBS(cov_cbs)
+
+        versions = versions.mix(CBS.out.versions)
+
+        cbs_seg_rds = Channel.empty()
+            .mix(CBS.out.cbs_seg_rds)
+            .mix(cbs_existing_seg)
+        cbs_seg_for_merge = cbs_seg_rds
+            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, cbs_seg
+
+        cbs_nseg_rds = Channel.empty()
+            .mix(CBS.out.cbs_nseg_rds)
+            .mix(cbs_existing_nseg)
+        cbs_nseg_for_merge = cbs_nseg_rds
+            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, cbs_nseg
+    }
+
+    // SNV Calling
+    // ##############################
+    if (tools_used.contains("all") || tools_used.contains("sage")) {
+        // Filter out bams for which SNV calling has already been done
+        if (params.tumor_only) {
+            bam_snv_inputs = inputs
+                .filter { it.snv_somatic_vcf.isEmpty() }
+                .map { it -> [it.meta.id] }
+        } else {
+            bam_snv_inputs = inputs
+                .filter { it.snv_somatic_vcf.isEmpty() || it.snv_germline_vcf.isEmpty() }
+                .map { it -> [it.meta.id] }
+        }
+
+        bam_snv_calling = alignment_bams_final
+            .join(bam_snv_inputs)
+            .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
+
+        snv_somatic_existing_outputs = inputs
+            .map { it -> [it.meta, it.snv_somatic_vcf, it.snv_somatic_tbi] }
+            .filter { !it[1].isEmpty() && !it[2].isEmpty()}
+
+        if (!params.tumor_only) {
+            snv_germline_existing_outputs = inputs
+                .map { it -> [it.meta, it.snv_germline_vcf, it.snv_germline_tbi] }
+                .filter { !it[1].isEmpty() && !it[2].isEmpty()}
+        }
+
+        // getting the tumor and normal bams separated
+        bam_snv_calling_status = bam_snv_calling.branch{
             normal: it[0].status == 0
             tumor:  it[0].status == 1
         }
 
-    cbs_tumor_input = dryclean_tumor_cov
-        .join(cbs_inputs.tumor)
-        .map{ it -> [ it[0].patient, it[0], it[1] ] } // meta.patient, meta, dryclean tumor cov
+        if (params.tumor_only) {
+            bam_snv_calling_pair = bam_snv_calling_status.tumor.map{ meta, bam, bai -> [ meta + [tumor_id: meta.sample], [], [], bam, bai ] }
+        } else {
+            // All normal samples
+            bam_snv_calling_normal_for_crossing = bam_snv_calling_status.normal.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
 
-    cbs_normal_input = dryclean_normal_cov
-        .join(cbs_inputs.normal)
-        .map{ it -> [ it[0].patient, it[0], it[1] ] } // meta.patient, meta, dryclean normal cov
+            // All tumor samples
+            bam_snv_calling_tumor_for_crossing = bam_snv_calling_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
 
-    cbs_existing_seg = inputs
-        .map { it -> [it.meta, it.seg] }
-        .filter { !it[1].isEmpty() }
+            // Crossing the normal and tumor samples to create tumor and normal pairs
+            bam_snv_calling_pair = bam_snv_calling_normal_for_crossing.cross(bam_snv_calling_tumor_for_crossing)
+                .map { normal, tumor ->
+                    def meta = [:]
 
-    cbs_existing_nseg = inputs
-        .map { it -> [it.meta, it.nseg] }
-        .filter { !it[1].isEmpty() }
+                    meta.id         = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
+                    meta.normal_id  = normal[1].sample
+                    meta.patient    = normal[0]
+                    meta.sex        = normal[1].sex
+                    meta.tumor_id   = tumor[1].sample
 
-    cov_cbs = cbs_tumor_input.cross(cbs_normal_input)
-        .map { tumor, normal ->
-            def meta = [:]
-                meta.id             = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
-                meta.sample         = "${tumor[1].sample}".toString()
-                meta.normal_id      = normal[1].sample
-                meta.patient        = normal[0]
-                meta.sex            = normal[1].sex
-                meta.tumor_id       = tumor[1].sample
-
-                [ meta, tumor[2], normal[2] ]
-        }
-
-    CBS(cov_cbs)
-
-    versions = versions.mix(CBS.out.versions)
-
-    cbs_seg_rds = Channel.empty()
-        .mix(CBS.out.cbs_seg_rds)
-        .mix(cbs_existing_seg)
-    cbs_seg_for_merge = cbs_seg_rds
-        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, cbs_seg
-
-    cbs_nseg_rds = Channel.empty()
-        .mix(CBS.out.cbs_nseg_rds)
-        .mix(cbs_existing_nseg)
-    cbs_nseg_for_merge = cbs_nseg_rds
-        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, cbs_nseg
-
-    // ASCAT
-    // ##############################
-
-    if (!params.tumor_only) {
-        ascat_inputs = inputs.filter { it.ploidy.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
-        ascat_inputs_hets = hets_sites_for_merge
-            .join(ascat_inputs)
-            .map { it -> [ it[0], it[1] ] } // meta.patient, hets
-        ascat_inputs_cov = dryclean_tumor_cov_for_merge
-            .join(ascat_inputs)
-            .map { it -> [ it[0], it[1] ] } // meta.patient, cov
-
-        ascat_existing_outputs = inputs.map { it -> [it.meta, it.ploidy] }.filter { !it[1].isEmpty() }
-
-        ascat_input = ascat_inputs
-            .join(ascat_inputs_hets)
-            .join(ascat_inputs_cov)
-            .map { patient, meta, hets, cov ->
-                [
-                    meta,
-                    hets,
-                    cov,
-                ]
+                    [ meta, normal[2], normal[3], tumor[2], tumor[3] ]
             }
 
-        COV_ASCAT(ascat_input)
+        }
 
-        versions = versions.mix(COV_ASCAT.out.versions)
+        dict_sage = dict.map{ id, dict -> dict }
+
+        BAM_SAGE(
+            bam_snv_calling_pair,
+            dict_sage
+        )
+
+        versions = versions.mix(BAM_SAGE.out.versions)
+
+        filtered_somatic_vcf = Channel.empty()
+            .mix(BAM_SAGE.out.sage_pass_filtered_somatic_vcf)
+            .mix(snv_somatic_existing_outputs)
+        filtered_somatic_vcf_for_merge = filtered_somatic_vcf
+            .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, filtered somatic snv vcf, tbi
+
+        if (!params.tumor_only) {
+            germline_vcf = Channel.empty()
+                .mix(BAM_SAGE.out.sage_germline_vcf)
+                .mix(snv_germline_existing_outputs)
+            germline_vcf_for_merge = germline_vcf
+                .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, germline snv vcf, tbi
+        }
+
+        if (params.tumor_only) {
+            BAM_SAGE_TUMOR_ONLY_FILTER(
+                filtered_somatic_vcf,
+                dbsnp_tbi,
+                known_indels_tbi
+            )
+
+            filtered_somatic_vcf = Channel.empty()
+                .mix(BAM_SAGE_TUMOR_ONLY_FILTER.out.sage_filtered_vcf)
+            filtered_somatic_vcf_for_merge = filtered_somatic_vcf
+                .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, filtered somatic snv vcf, tbi
+        }
+    }
+
+    // Variant Annotation
+    // ##############################
+    if (tools_used.contains("all") || tools_used.contains("snpeff")) {
+        variant_somatic_ann_inputs = inputs
+            .filter { it.variant_somatic_ann.isEmpty() || it.variant_somatic_bcf.isEmpty() }
+            .map { it -> [it.meta.patient, it.meta] }
+
+        variant_ann_input_somatic = variant_somatic_ann_inputs
+            .join(filtered_somatic_vcf_for_merge)
+            .map { it -> [ it[1], it[2], it[3] ] } // meta, filtered (pass and tumor-only filter) snvs, tbi
+
+
+        variant_somatic_ann_existing_outputs = inputs.map { it -> [it.meta, it.variant_somatic_ann] }.filter { !it[1].isEmpty() }
+        variant_somatic_bcf_existing_outputs = inputs.map { it -> [it.meta, it.variant_somatic_bcf] }.filter { !it[1].isEmpty() }
+
+        VCF_SNPEFF_SOMATIC(
+            variant_ann_input_somatic,
+            snpeff_db_full,
+            snpeff_cache
+        )
+
+        snv_somatic_annotations = Channel.empty()
+            .mix(VCF_SNPEFF_SOMATIC.out.snpeff_vcf)
+            .mix(variant_somatic_ann_existing_outputs)
+        snv_somatic_annotations_for_merge = snv_somatic_annotations
+            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, annotated somatic snv vcf
+
+        snv_somatic_bcf_annotations = Channel.empty()
+            .mix(VCF_SNPEFF_SOMATIC.out.snpeff_bcf)
+            .mix(variant_somatic_bcf_existing_outputs)
+
+        if (!params.tumor_only) {
+            variant_germline_ann_inputs = inputs
+                .filter { it.variant_germline_ann.isEmpty() || it.variant_germline_bcf.isEmpty() }
+                .map { it -> [it.meta.patient, it.meta] }
+
+            variant_ann_input_germline = variant_germline_ann_inputs
+                .join(germline_vcf_for_merge)
+                .map { it -> [ it[1], it[2], it[3] ] } // meta, germline snvs, tbi
+
+            variant_germline_ann_existing_outputs = inputs.map { it -> [it.meta, it.variant_germline_ann] }.filter { !it[1].isEmpty() }
+            variant_germline_bcf_existing_outputs = inputs.map { it -> [it.meta, it.variant_germline_bcf] }.filter { !it[1].isEmpty() }
+
+            VCF_SNPEFF_GERMLINE(
+                variant_ann_input_germline,
+                snpeff_db_full,
+                snpeff_cache
+            )
+
+            snv_germline_annotations = Channel.empty()
+                .mix(VCF_SNPEFF_GERMLINE.out.snpeff_vcf)
+                .mix(variant_germline_ann_existing_outputs)
+            snv_germline_annotations_for_merge = snv_germline_annotations
+                .map { it -> [ it[0].patient, it[1] ] } // meta.patient, annotated germline snv vcf
+
+            snv_germline_bcf_annotations = Channel.empty()
+                .mix(VCF_SNPEFF_GERMLINE.out.snpeff_bcf)
+                .mix(variant_germline_bcf_existing_outputs)
+        }
+    }
+
+
+    // PURPLE
+    // ##############################
+    if (tools_used.contains("all") || tools_used.contains("purple")) {
+        // this channel is for merging with alignment_bams_final
+        purple_inputs = inputs.filter { it.ploidy.isEmpty() }.map { it -> [it.meta.id] }
+        // need a channel with patient and meta for merging with rest
+        purple_inputs_for_merge = inputs.filter { it.ploidy.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
+
+        purple_inputs_bams = alignment_bams_final
+            .join(purple_inputs)
+            .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
+
+        // getting the tumor and normal bams separated
+        bam_purple_status = purple_inputs_bams.branch{
+            normal: it[0].status == 0
+            tumor:  it[0].status == 1
+        }
+
+        if (params.tumor_only) {
+            bam_purple_pair = bam_snv_calling_status.tumor.map{ meta, bam, bai -> [ meta + [tumor_id: meta.sample], bam, bai, [], [] ] }
+            purple_inputs_snv_germline = Channel.empty()
+
+        } else {
+            // All normal samples
+            bam_purple_normal_for_crossing = bam_purple_status.normal.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
+
+            // All tumor samples
+            bam_purple_tumor_for_crossing = bam_purple_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
+
+            // Crossing the normal and tumor samples to create tumor and normal pairs
+            bam_purple_pair = bam_purple_normal_for_crossing.cross(bam_purple_tumor_for_crossing)
+                .map { normal, tumor ->
+                    def meta = [:]
+
+                    meta.id         = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
+                    meta.normal_id  = normal[1].sample
+                    meta.patient    = normal[0]
+                    meta.sex        = normal[1].sex
+                    meta.tumor_id   = tumor[1].sample
+
+                    [ meta, tumor[2], tumor[3], normal[2], normal[3]]
+            }
+
+            // germline snvs
+            purple_inputs_snv_germline = purple_inputs_for_merge
+                .join(germline_vcf_for_merge)
+                .map { it -> [ it[1], it[2], it[3] ] } // meta, vcf, tbi
+        }
+
+        purple_inputs_sv = purple_inputs_for_merge
+            .join(vcf_from_sv_calling_for_merge)
+            .map { it -> [ it[1], it[2], it[3] ] } // meta, vcf, tbi
+
+
+        purple_inputs_snv = purple_inputs_for_merge
+            .join(filtered_somatic_vcf_for_merge)
+            .map { it -> [ it[1], it[2], it[3] ] } // meta, vcf, tbi
+
+
+        purple_existing_outputs = inputs.map { it -> [it.meta, it.ploidy] }.filter { !it[1].isEmpty() }
+
+        BAM_COV_PURPLE(bam_purple_pair, purple_inputs_sv, purple_inputs_snv, purple_inputs_snv_germline)
+
+        versions = versions.mix(BAM_COV_PURPLE.out.versions)
         ploidy = Channel.empty()
-            .mix(COV_ASCAT.out.ploidy)
-            .mix(ascat_existing_outputs)
+            .mix(BAM_COV_PURPLE.out.ploidy)
+            .mix(purple_existing_outputs)
 
         ploidy_for_merge = ploidy
             .map { it -> [ it[0].patient, it[1] ] } // meta.patient, ploidy
     }
 
-    // JaBbA
+    // ASCAT
     // ##############################
-    jabba_inputs = inputs.filter { it.jabba_rds.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
-    jabba_inputs_sv = vcf_from_sv_calling_for_merge
-        .join(jabba_inputs)
-        .map { it -> [ it[0], it[1] ] } // meta.patient, vcf
+    if (tools_used.contains("all") || tools_used.contains("ascat")) {
+        if (!params.tumor_only) {
+            ascat_inputs = inputs.filter { it.ploidy.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
+            ascat_inputs_hets = hets_sites_for_merge
+                .join(ascat_inputs)
+                .map { it -> [ it[0], it[1] ] } // meta.patient, hets
+            ascat_inputs_cov = dryclean_tumor_cov_for_merge
+                .join(ascat_inputs)
+                .map { it -> [ it[0], it[1] ] } // meta.patient, cov
 
-    jabba_inputs_unfiltered_sv = unfiltered_som_sv_for_merge
-        .join(jabba_inputs)
-        .map { it -> [ it[0], it[1] ] } // meta.patient, unfiltered_som_sv
+            ascat_existing_outputs = inputs.map { it -> [it.meta, it.ploidy] }.filter { !it[1].isEmpty() }
 
-    if (params.tumor_only) {
-        jabba_inputs_junction_filtered_sv = final_filtered_sv_rds_for_merge
-            .join(jabba_inputs)
-            .map { it -> [ it[0], it[1] ] } // meta.patient, pon and gnomaD filtered sv (for tumor only)
+            ascat_input = ascat_inputs
+                .join(ascat_inputs_hets)
+                .join(ascat_inputs_cov)
+                .map { patient, meta, hets, cov ->
+                    [
+                        meta,
+                        hets,
+                        cov,
+                    ]
+                }
+
+            COV_ASCAT(ascat_input)
+
+            versions = versions.mix(COV_ASCAT.out.versions)
+            ploidy = Channel.empty()
+                .mix(COV_ASCAT.out.ploidy)
+                .mix(ascat_existing_outputs)
+
+            ploidy_for_merge = ploidy
+                .map { it -> [ it[0].patient, it[1] ] } // meta.patient, ploidy
+        }
     }
 
-    jabba_inputs_hets = hets_sites_for_merge
-        .join(jabba_inputs)
-        .map { it -> [ it[0], it[1] ] } // meta.patient, hets
+    // JaBbA
+    // ##############################
+    if (tools_used.contains("all") || tools_used.contains("jabba")) {
+        jabba_inputs = inputs.filter { it.jabba_rds.isEmpty() && it.meta.status == 1}.map { it -> [it.meta.patient, it.meta] }
+        jabba_inputs_sv = vcf_from_sv_calling_for_merge
+            .join(jabba_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, vcf
 
-    jabba_inputs_cov = dryclean_tumor_cov_for_merge
-        .join(jabba_inputs)
-        .map { it -> [ it[0], it[1] ] } // meta.patient, cov
+        jabba_inputs_unfiltered_sv = unfiltered_som_sv_for_merge
+            .join(jabba_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, unfiltered_som_sv
 
-    if (!params.tumor_only) {
+        if (params.tumor_only) {
+            jabba_inputs_junction_filtered_sv = final_filtered_sv_rds_for_merge
+                .join(jabba_inputs)
+                .map { it -> [ it[0], it[1] ] } // meta.patient, pon and gnomaD filtered sv (for tumor only)
+        }
+
+        jabba_inputs_hets = hets_sites_for_merge
+            .join(jabba_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, hets
+
+        jabba_inputs_cov = dryclean_tumor_cov_for_merge
+            .join(jabba_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, cov
+
         jabba_inputs_ploidy = ploidy_for_merge
             .join(jabba_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, ploidy
-    } else {
-        jabba_inputs_ploidy = inputs.map { it -> [it.meta.patient, it.ploidy] }.filter { !it[1].isEmpty() }
+
+        jabba_inputs_cbs_seg = cbs_seg_for_merge
+            .join(jabba_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, cbs_seg
+
+        jabba_inputs_cbs_nseg = cbs_nseg_for_merge
+            .join(jabba_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, cbs_nseg
+
+        jabba_existing_outputs = inputs.map { it -> [it.meta, it.jabba_rds] }.filter { !it[1].isEmpty() }
+
+        if (params.tumor_only) {
+            jabba_inputs = jabba_inputs
+                .join(jabba_inputs_cov)
+                .join(jabba_inputs_ploidy)
+                .join(jabba_inputs_junction_filtered_sv)
+                .map{ patient, meta, cov, ploidy, junction ->
+                    [
+                        meta,
+                        junction,
+                        cov,
+                        [],
+                        [],
+                        ploidy,
+                        [],
+                        []
+                    ]
+                }
+        } else {
+            // join all previous outputs to be used as input for jabba
+            jabba_inputs = jabba_inputs
+                .join(jabba_inputs_cov)
+                .join(jabba_inputs_hets)
+                .join(jabba_inputs_ploidy)
+                .join(jabba_inputs_cbs_seg)
+                .join(jabba_inputs_cbs_nseg)
+                .join(jabba_inputs_sv)
+                .join(jabba_inputs_unfiltered_sv)
+                .map{ patient, meta, cov, hets, ploidy, seg, nseg, junction, j_supp ->
+                    [
+                        meta,
+                        junction,
+                        cov,
+                        j_supp,
+                        hets,
+                        ploidy,
+                        seg,
+                        nseg
+                    ]
+                }
+        }
+
+        JABBA(jabba_inputs)
+
+        jabba_rds = Channel.empty()
+            .mix(JABBA.out.jabba_rds)
+            .mix(jabba_existing_outputs)
+        jabba_rds_for_merge = jabba_rds
+            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, jabba rds
+        versions = versions.mix(JABBA.out.versions)
     }
-
-    jabba_inputs_cbs_seg = cbs_seg_for_merge
-        .join(jabba_inputs)
-        .map { it -> [ it[0], it[1] ] } // meta.patient, cbs_seg
-
-    jabba_inputs_cbs_nseg = cbs_nseg_for_merge
-        .join(jabba_inputs)
-        .map { it -> [ it[0], it[1] ] } // meta.patient, cbs_nseg
-
-    jabba_existing_outputs = inputs.map { it -> [it.meta, it.jabba_rds] }.filter { !it[1].isEmpty() }
-
-    if (params.tumor_only) {
-        jabba_inputs = jabba_inputs
-            .join(jabba_inputs_cov)
-            .join(jabba_inputs_ploidy)
-            .join(jabba_inputs_junction_filtered_sv)
-            .map{ patient, meta, cov, ploidy, junction ->
-                [
-                    meta,
-                    junction,
-                    cov,
-                    [],
-                    [],
-                    ploidy,
-                    [],
-                    []
-                ]
-            }
-    } else {
-        // join all previous outputs to be used as input for jabba
-        jabba_inputs = jabba_inputs
-            .join(jabba_inputs_cov)
-            .join(jabba_inputs_hets)
-            .join(jabba_inputs_ploidy)
-            .join(jabba_inputs_cbs_seg)
-            .join(jabba_inputs_cbs_nseg)
-            .join(jabba_inputs_sv)
-            .join(jabba_inputs_unfiltered_sv)
-            .map{ patient, meta, cov, hets, ploidy, seg, nseg, junction, j_supp ->
-                [
-                    meta,
-                    junction,
-                    cov,
-                    j_supp,
-                    hets,
-                    ploidy,
-                    seg,
-                    nseg
-                ]
-            }
-    }
-
-    JABBA(jabba_inputs)
-
-    jabba_rds = Channel.empty()
-        .mix(JABBA.out.jabba_rds)
-        .mix(jabba_existing_outputs)
-    jabba_rds_for_merge = jabba_rds
-        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, jabba rds
-    versions = versions.mix(JABBA.out.versions)
 
     // Non-integer balance
     // ##############################
-    non_integer_balance_inputs = inputs.filter { it.ni_balanced_gg.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
+    if (tools_used.contains("all") || tools_used.contains("non_integer_balance")) {
+        non_integer_balance_inputs = inputs.filter { it.ni_balanced_gg.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
 
-    non_integer_balance_inputs_jabba_rds = jabba_rds_for_merge
-        .join(non_integer_balance_inputs)
-        .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
+        non_integer_balance_inputs_jabba_rds = jabba_rds_for_merge
+            .join(non_integer_balance_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
 
-    non_integer_balance_inputs_hets = hets_sites_for_merge
-        .join(non_integer_balance_inputs)
-        .map { it -> [ it[0], it[1] ] } // meta.patient, hets
+        non_integer_balance_inputs_hets = hets_sites_for_merge
+            .join(non_integer_balance_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, hets
 
-    non_integer_balance_inputs_cov = dryclean_tumor_cov_for_merge
-        .join(non_integer_balance_inputs)
-        .map { it -> [ it[0], it[1] ] } // meta.patient, cov
+        non_integer_balance_inputs_cov = dryclean_tumor_cov_for_merge
+            .join(non_integer_balance_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, cov
 
-    non_integer_balance_existing_outputs = inputs.map { it -> [it.meta, it.ni_balanced_gg] }.filter { !it[1].isEmpty() }
+        non_integer_balance_existing_outputs = inputs.map { it -> [it.meta, it.ni_balanced_gg] }.filter { !it[1].isEmpty() }
 
-    non_integer_balance_inputs = non_integer_balance_inputs
-        .join(non_integer_balance_inputs_jabba_rds)
-        .join(non_integer_balance_inputs_hets)
-        .join(non_integer_balance_inputs_cov)
-        .map{ patient, meta, rds, hets, cov -> [ meta, rds, cov, hets ] }
+        non_integer_balance_inputs = non_integer_balance_inputs
+            .join(non_integer_balance_inputs_jabba_rds)
+            .join(non_integer_balance_inputs_hets)
+            .join(non_integer_balance_inputs_cov)
+            .map{ patient, meta, rds, hets, cov -> [ meta, rds, cov, hets ] }
 
-    NON_INTEGER_BALANCE(non_integer_balance_inputs, bwa)
-    versions = Channel.empty().mix(NON_INTEGER_BALANCE.out.versions)
+        NON_INTEGER_BALANCE(non_integer_balance_inputs, bwa)
+        versions = Channel.empty().mix(NON_INTEGER_BALANCE.out.versions)
 
-    non_integer_balance_balanced_gg = Channel.empty()
-        .mix(NON_INTEGER_BALANCE.out.non_integer_balance_balanced_gg)
-        .mix(non_integer_balance_existing_outputs)
-    non_integer_balance_balanced_gg_for_merge = non_integer_balance_balanced_gg
-        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, non integer balanced ggraph
+        non_integer_balance_balanced_gg = Channel.empty()
+            .mix(NON_INTEGER_BALANCE.out.non_integer_balance_balanced_gg)
+            .mix(non_integer_balance_existing_outputs)
+        non_integer_balance_balanced_gg_for_merge = non_integer_balance_balanced_gg
+            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, non integer balanced ggraph
+    }
 
     // LP Phased Balance
     // ##############################
-    lp_phased_balance_inputs = inputs.filter { it.lp_balanced_gg.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
-    lp_phased_balance_inputs_ni_balanced_gg = non_integer_balance_balanced_gg_for_merge
-        .join(lp_phased_balance_inputs)
-        .map { it -> [ it[0], it[1] ] } // meta.patient, non integer balanced ggraph
-    lp_phased_balance_inputs_hets = hets_sites_for_merge
-        .join(lp_phased_balance_inputs)
-        .map { it -> [ it[0], it[1] ] } // meta.patient, hets
+    if (tools_used.contains("all") || tools_used.contains("lp_phased_balance")) {
+        lp_phased_balance_inputs = inputs.filter { it.lp_balanced_gg.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
+        lp_phased_balance_inputs_ni_balanced_gg = non_integer_balance_balanced_gg_for_merge
+            .join(lp_phased_balance_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, non integer balanced ggraph
+        lp_phased_balance_inputs_hets = hets_sites_for_merge
+            .join(lp_phased_balance_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, hets
 
-    lp_phased_balance_inputs = lp_phased_balance_inputs
-        .join(lp_phased_balance_inputs_ni_balanced_gg)
-        .join(lp_phased_balance_inputs_hets)
-        .map{ patient, meta, balanced_gg, hets -> [ meta, balanced_gg, hets ] }
+        lp_phased_balance_inputs = lp_phased_balance_inputs
+            .join(lp_phased_balance_inputs_ni_balanced_gg)
+            .join(lp_phased_balance_inputs_hets)
+            .map{ patient, meta, balanced_gg, hets -> [ meta, balanced_gg, hets ] }
 
-    lp_phased_balance_existing_outputs = inputs.map { it -> [it.meta, it.lp_balanced_gg] }.filter { !it[1].isEmpty() }
+        lp_phased_balance_existing_outputs = inputs.map { it -> [it.meta, it.lp_balanced_gg] }.filter { !it[1].isEmpty() }
 
-    LP_PHASED_BALANCE(lp_phased_balance_inputs)
+        LP_PHASED_BALANCE(lp_phased_balance_inputs)
 
-    lp_phased_balance_balanced_gg = Channel.empty()
-        .mix(LP_PHASED_BALANCE.out.lp_phased_balance_balanced_gg)
-        .mix(lp_phased_balance_existing_outputs)
+        lp_phased_balance_balanced_gg = Channel.empty()
+            .mix(LP_PHASED_BALANCE.out.lp_phased_balance_balanced_gg)
+            .mix(lp_phased_balance_existing_outputs)
+    }
 
     // Events
     // ##############################
-    events_inputs = inputs.filter { it.events.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
-    events_input_jabba_rds = jabba_rds_for_merge
-        .join(events_inputs)
-        .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
-    events_input_non_integer_balance = non_integer_balance_balanced_gg_for_merge
-        .join(events_inputs)
-        .map { it -> [ it[0], it[1] ] } // meta.patient, balanced_gg
+    if (tools_used.contains("all") || tools_used.contains("events")) {
+        events_inputs = inputs.filter { it.events.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
+        events_input_jabba_rds = jabba_rds_for_merge
+            .join(events_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
+        events_input_non_integer_balance = non_integer_balance_balanced_gg_for_merge
+            .join(events_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, balanced_gg
 
-    events_existing_outputs = inputs.map { it -> [it.meta, it.events] }.filter { !it[1].isEmpty() }
+        events_existing_outputs = inputs.map { it -> [it.meta, it.events] }.filter { !it[1].isEmpty() }
 
-    events_input = events_inputs
-        .join(events_input_jabba_rds)
-        .join(events_input_non_integer_balance)
-        .map{ patient, meta, rds, balanced_gg -> [ meta, rds, balanced_gg ] }
+        events_input = events_inputs
+            .join(events_input_jabba_rds)
+            .join(events_input_non_integer_balance)
+            .map{ patient, meta, rds, balanced_gg -> [ meta, rds, balanced_gg ] }
 
-    EVENTS(events_input)
+        EVENTS(events_input)
 
-    events_versions = Channel.empty().mix(EVENTS.out.versions)
-    events = Channel.empty()
-        .mix(EVENTS.out.events_output)
-        .mix(events_existing_outputs)
+        events_versions = Channel.empty().mix(EVENTS.out.versions)
+        events = Channel.empty()
+            .mix(EVENTS.out.events_output)
+            .mix(events_existing_outputs)
+    }
 
     // Fusions
     // ##############################
-    fusions_inputs = inputs.filter { it.fusions.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
-    fusions_input_jabba_rds = jabba_rds_for_merge
-        .join(fusions_inputs)
-        .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
-    fusions_input_non_integer_balance = non_integer_balance_balanced_gg_for_merge
-        .join(fusions_inputs)
-        .map { it -> [ it[0], it[1] ] } // meta.patient, balanced_gg
+    if (tools_used.contains("all") || tools_used.contains("fusions")) {
+        fusions_inputs = inputs.filter { it.fusions.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
+        fusions_input_jabba_rds = jabba_rds_for_merge
+            .join(fusions_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
+        fusions_input_non_integer_balance = non_integer_balance_balanced_gg_for_merge
+            .join(fusions_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, balanced_gg
 
-    fusions_existing_outputs = inputs.map { it -> [it.meta, it.fusions] }.filter { !it[1].isEmpty() }
+        fusions_existing_outputs = inputs.map { it -> [it.meta, it.fusions] }.filter { !it[1].isEmpty() }
 
-    fusions_input = fusions_inputs
-        .join(fusions_input_jabba_rds)
-        .join(fusions_input_non_integer_balance)
-        .map{ patient, meta, rds, balanced_gg -> [ meta, rds, balanced_gg ] }
+        fusions_input = fusions_inputs
+            .join(fusions_input_jabba_rds)
+            .join(fusions_input_non_integer_balance)
+            .map{ patient, meta, rds, balanced_gg -> [ meta, rds, balanced_gg ] }
 
-    FUSIONS(fusions_input)
-    fusions = Channel.empty()
-        .mix(FUSIONS.out.fusions_output)
-        .mix(fusions_existing_outputs)
-    versions = Channel.empty().mix(FUSIONS.out.versions)
-
-    // SNV Calling
-    // ##############################
-
-    // Filter out bams for which SNV calling has already been done
-    if (params.tumor_only) {
-        bam_snv_inputs = inputs
-            .filter { it.snv_somatic_vcf.isEmpty() }
-            .map { it -> [it.meta.id] }
-    } else {
-        bam_snv_inputs = inputs
-            .filter { it.snv_somatic_vcf.isEmpty() || it.snv_germline_vcf.isEmpty() }
-            .map { it -> [it.meta.id] }
+        FUSIONS(fusions_input)
+        fusions = Channel.empty()
+            .mix(FUSIONS.out.fusions_output)
+            .mix(fusions_existing_outputs)
+        versions = Channel.empty().mix(FUSIONS.out.versions)
     }
 
-    bam_snv_calling = alignment_bams_final
-        .join(bam_snv_inputs)
-        .map { it -> [ it[1].patient, it[1], it[2], it[3] ] } // meta.patient, meta, bam, bai
-
-    snv_somatic_existing_outputs = inputs
-        .map { it -> [it.meta, it.snv_somatic_vcf, it.snv_somatic_tbi] }
-        .filter { !it[1].isEmpty() && !it[2].isEmpty()}
-
-    if (!params.tumor_only) {
-        snv_germline_existing_outputs = inputs
-            .map { it -> [it.meta, it.snv_germline_vcf, it.snv_germline_tbi] }
-            .filter { !it[1].isEmpty() && !it[2].isEmpty()}
-    }
-
-    if (params.tumor_only) {
-        bam_snv_calling_status = bam_snv_calling.branch{
-            tumor:  it[1].status == 1
-        }
-
-        bam_snv_calling_pair = bam_snv_calling_status.tumor.map{ meta, bam, bai -> [ meta, [], [], bam, bai ] }
-    } else {
-        // getting the tumor and normal cram files separated
-        bam_snv_calling_status = bam_snv_calling.branch{
-            normal: it[1].status == 0
-            tumor:  it[1].status == 1
-        }
-
-
-        // Crossing the normal and tumor samples to create tumor and normal pairs
-        bam_snv_calling_pair = bam_snv_calling_status.normal.cross(bam_snv_calling_status.tumor)
-            .map { normal, tumor ->
-                def meta = [:]
-
-                meta.id         = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
-                meta.normal_id  = normal[1].sample
-                meta.patient    = normal[0]
-                meta.sex        = normal[1].sex
-                meta.tumor_id   = tumor[1].sample
-
-                [ meta, normal[2], normal[3], tumor[2], tumor[3] ]
-        }
-    }
-
-    dict_sage = dict.map{ id, dict -> dict }
-
-    BAM_SAGE(
-        bam_snv_calling_pair,
-        dict_sage
-    )
-
-    versions = versions.mix(BAM_SAGE.out.versions)
-
-    filtered_somatic_vcf = Channel.empty()
-        .mix(BAM_SAGE.out.sage_pass_filtered_somatic_vcf)
-        .mix(snv_somatic_existing_outputs)
-    filtered_somatic_vcf_for_merge = filtered_somatic_vcf
-        .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, filtered somatic snv vcf, tbi
-
-    if (!params.tumor_only) {
-        germline_vcf = Channel.empty()
-            .mix(BAM_SAGE.out.sage_germline_vcf)
-            .mix(snv_germline_existing_outputs)
-        germline_vcf_for_merge = germline_vcf
-            .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, germline snv vcf, tbi
-    }
-
-    if (params.tumor_only) {
-        BAM_SAGE_TUMOR_ONLY_FILTER(
-            filtered_somatic_vcf,
-            dbsnp_tbi,
-            known_indels_tbi
-        )
-
-        filtered_somatic_vcf = Channel.empty()
-            .mix(BAM_SAGE_TUMOR_ONLY_FILTER.out.sage_filtered_vcf)
-        filtered_somatic_vcf_for_merge = filtered_somatic_vcf
-            .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, filtered somatic snv vcf, tbi
-    }
-
-    // Variant Annotation
-    // ##############################
-    variant_somatic_ann_inputs = inputs
-        .filter { it.variant_somatic_ann.isEmpty() || it.variant_somatic_bcf.isEmpty() }
-        .map { it -> [it.meta.patient, it.meta] }
-
-    variant_ann_input_somatic = variant_somatic_ann_inputs
-        .join(filtered_somatic_vcf_for_merge)
-        .map { it -> [ it[1], it[2], it[3] ] } // meta, filtered (pass and tumor-only filter) snvs, tbi
-
-
-    variant_somatic_ann_existing_outputs = inputs.map { it -> [it.meta, it.variant_somatic_ann] }.filter { !it[1].isEmpty() }
-    variant_somatic_bcf_existing_outputs = inputs.map { it -> [it.meta, it.variant_somatic_bcf] }.filter { !it[1].isEmpty() }
-
-    VCF_SNPEFF_SOMATIC(
-        variant_ann_input_somatic,
-        snpeff_db_full,
-        snpeff_cache
-    )
-
-    snv_somatic_annotations = Channel.empty()
-        .mix(VCF_SNPEFF_SOMATIC.out.snpeff_vcf)
-        .mix(variant_somatic_ann_existing_outputs)
-    snv_somatic_annotations_for_merge = snv_somatic_annotations
-        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, annotated somatic snv vcf
-
-    snv_somatic_bcf_annotations = Channel.empty()
-        .mix(VCF_SNPEFF_SOMATIC.out.snpeff_bcf)
-        .mix(variant_somatic_bcf_existing_outputs)
-
-    if (!params.tumor_only) {
-        variant_germline_ann_inputs = inputs
-            .filter { it.variant_germline_ann.isEmpty() || it.variant_germline_bcf.isEmpty() }
-            .map { it -> [it.meta.patient, it.meta] }
-
-        variant_ann_input_germline = variant_germline_ann_inputs
-            .join(germline_vcf_for_merge)
-            .map { it -> [ it[1], it[2], it[3] ] } // meta, germline snvs, tbi
-
-        variant_germline_ann_existing_outputs = inputs.map { it -> [it.meta, it.variant_germline_ann] }.filter { !it[1].isEmpty() }
-        variant_germline_bcf_existing_outputs = inputs.map { it -> [it.meta, it.variant_germline_bcf] }.filter { !it[1].isEmpty() }
-
-        VCF_SNPEFF_GERMLINE(
-            variant_ann_input_germline,
-            snpeff_db_full,
-            snpeff_cache
-        )
-
-        snv_germline_annotations = Channel.empty()
-            .mix(VCF_SNPEFF_GERMLINE.out.snpeff_vcf)
-            .mix(variant_germline_ann_existing_outputs)
-        snv_germline_annotations_for_merge = snv_germline_annotations
-            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, annotated germline snv vcf
-
-        snv_germline_bcf_annotations = Channel.empty()
-            .mix(VCF_SNPEFF_GERMLINE.out.snpeff_bcf)
-            .mix(variant_germline_bcf_existing_outputs)
-    }
     // SNV Multiplicity
     // ##############################
-    if (!params.tumor_only) {
-        snv_multiplicity_inputs = inputs.filter { it.snv_multiplicity.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
+    if (tools_used.contains("all") || tools_used.contains("snv_multiplicity")) {
+        if (!params.tumor_only) {
+            snv_multiplicity_inputs = inputs.filter { it.snv_multiplicity.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
 
-        snv_multiplicity_inputs_somatic_vcf = snv_somatic_annotations_for_merge
-            .join(snv_multiplicity_inputs)
-            .map { it -> [ it[0], it[1] ] } // meta.patient, annotated somatic snv vcf
-        snv_multiplicity_inputs_germline_vcf = snv_germline_annotations_for_merge
-            .join(snv_multiplicity_inputs)
-            .map { it -> [ it[0], it[1] ] } // meta.patient, annotated germline snv vcf
-        snv_multiplicity_inputs_jabba_rds = jabba_rds_for_merge
-            .join(snv_multiplicity_inputs)
-            .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
+            snv_multiplicity_inputs_somatic_vcf = snv_somatic_annotations_for_merge
+                .join(snv_multiplicity_inputs)
+                .map { it -> [ it[0], it[1] ] } // meta.patient, annotated somatic snv vcf
+            snv_multiplicity_inputs_germline_vcf = snv_germline_annotations_for_merge
+                .join(snv_multiplicity_inputs)
+                .map { it -> [ it[0], it[1] ] } // meta.patient, annotated germline snv vcf
+            snv_multiplicity_inputs_jabba_rds = jabba_rds_for_merge
+                .join(snv_multiplicity_inputs)
+                .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
 
-        snv_multiplicity_existing_outputs = inputs.map { it -> [it.meta, it.snv_multiplicity] }.filter { !it[1].isEmpty() }
+            snv_multiplicity_existing_outputs = inputs.map { it -> [it.meta, it.snv_multiplicity] }.filter { !it[1].isEmpty() }
 
-        input_snv_multiplicity = snv_multiplicity_inputs
-            .join(snv_multiplicity_inputs_somatic_vcf)
-            .join(snv_multiplicity_inputs_germline_vcf)
-            .join(snv_multiplicity_inputs_jabba_rds)
-            .map{
-                patient, meta, somatic_ann, germline_ann, ggraph ->
-                [ meta, somatic_ann, germline_ann, ggraph ]
-            }
+            input_snv_multiplicity = snv_multiplicity_inputs
+                .join(snv_multiplicity_inputs_somatic_vcf)
+                .join(snv_multiplicity_inputs_germline_vcf)
+                .join(snv_multiplicity_inputs_jabba_rds)
+                .map{
+                    patient, meta, somatic_ann, germline_ann, ggraph ->
+                    [ meta, somatic_ann, germline_ann, ggraph ]
+                }
 
-        VCF_SNV_MULTIPLICITY(input_snv_multiplicity)
+            VCF_SNV_MULTIPLICITY(input_snv_multiplicity)
 
-        snv_multiplicity = Channel.empty()
-            .mix(VCF_SNV_MULTIPLICITY.out.snv_multiplicity_rds)
-            .mix(snv_multiplicity_existing_outputs)
+            snv_multiplicity = Channel.empty()
+                .mix(VCF_SNV_MULTIPLICITY.out.snv_multiplicity_rds)
+                .mix(snv_multiplicity_existing_outputs)
+        }
     }
 
     // Signatures
     // ##############################
-    signatures_inputs = inputs
-        .filter { it.sbs_signatures.isEmpty() || it.indel_signatures.isEmpty() || it.signatures_matrix.isEmpty()}
-        .map { it -> [it.meta.patient, it.meta] }
+    if (tools_used.contains("all") || tools_used.contains("signatures")) {
+        signatures_inputs = inputs
+            .filter { it.sbs_signatures.isEmpty() || it.indel_signatures.isEmpty() || it.signatures_matrix.isEmpty()}
+            .map { it -> [it.meta.patient, it.meta] }
 
-    signatures_inputs_somatic_vcf = signatures_inputs
-        .join(filtered_somatic_vcf_for_merge)
-        .map { it -> [ it[1], it[2], it[3] ] } // meta, somatic snv, tbi
+        signatures_inputs_somatic_vcf = signatures_inputs
+            .join(filtered_somatic_vcf_for_merge)
+            .map { it -> [ it[1], it[2], it[3] ] } // meta, somatic snv, tbi
 
-    sbs_signatures_existing_outputs = inputs.map { it -> [it.meta, it.sbs_signatures] }.filter { !it[1].isEmpty() }
-    indel_signatures_existing_outputs = inputs.map { it -> [it.meta, it.indel_signatures] }.filter { !it[1].isEmpty() }
-    signatures_matrix_existing_outputs = inputs.map { it -> [it.meta, it.signatures_matrix] }.filter { !it[1].isEmpty() }
+        sbs_signatures_existing_outputs = inputs.map { it -> [it.meta, it.sbs_signatures] }.filter { !it[1].isEmpty() }
+        indel_signatures_existing_outputs = inputs.map { it -> [it.meta, it.indel_signatures] }.filter { !it[1].isEmpty() }
+        signatures_matrix_existing_outputs = inputs.map { it -> [it.meta, it.signatures_matrix] }.filter { !it[1].isEmpty() }
 
-    VCF_SIGPROFILERASSIGNMENT(signatures_inputs_somatic_vcf)
+        VCF_SIGPROFILERASSIGNMENT(signatures_inputs_somatic_vcf)
 
-    sbs_signatures = Channel.empty()
-        .mix(VCF_SIGPROFILERASSIGNMENT.out.sbs_signatures)
-        .mix(sbs_signatures_existing_outputs)
-    indel_signatures = Channel.empty()
-        .mix(VCF_SIGPROFILERASSIGNMENT.out.indel_signatures)
-        .mix(indel_signatures_existing_outputs)
-    signatures_matrix = Channel.empty()
-        .mix(VCF_SIGPROFILERASSIGNMENT.out.signatures_matrix)
-        .mix(signatures_matrix_existing_outputs)
+        sbs_signatures = Channel.empty()
+            .mix(VCF_SIGPROFILERASSIGNMENT.out.sbs_signatures)
+            .mix(sbs_signatures_existing_outputs)
+        indel_signatures = Channel.empty()
+            .mix(VCF_SIGPROFILERASSIGNMENT.out.indel_signatures)
+            .mix(indel_signatures_existing_outputs)
+        signatures_matrix = Channel.empty()
+            .mix(VCF_SIGPROFILERASSIGNMENT.out.signatures_matrix)
+            .mix(signatures_matrix_existing_outputs)
+    }
 
     // HRDetect
     // ##############################
-    hrdetect_inputs = inputs
-        .filter { it.hrdetect.isEmpty() }
-        .map { it -> [it.meta.patient, it.meta] }
+    if (tools_used.contains("all") || tools_used.contains("hrdetect")) {
+        hrdetect_inputs = inputs
+            .filter { it.hrdetect.isEmpty() }
+            .map { it -> [it.meta.patient, it.meta] }
 
-    hrdetect_inputs_sv = vcf_from_sv_calling_for_merge
-        .join(hrdetect_inputs)
-        .map { it -> [ it[0], it[1] ] } // meta.patient, somatic/pon+gnomAD filtered sv
+        hrdetect_inputs_sv = vcf_from_sv_calling_for_merge
+            .join(hrdetect_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, somatic/pon+gnomAD filtered sv
 
-    hrdetect_inputs_hets = hets_sites_for_merge
-        .join(hrdetect_inputs)
-        .map { it -> [ it[0], it[1] ] } // meta.patient, hets
+        hrdetect_inputs_hets = hets_sites_for_merge
+            .join(hrdetect_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, hets
 
-    hrdetect_inputs_vcf = filtered_somatic_vcf_for_merge
-        .join(hrdetect_inputs)
-        .map { it -> [ it[0], it[1], it[2] ] } // meta.patient, somatic snv, tbi
+        hrdetect_inputs_vcf = filtered_somatic_vcf_for_merge
+            .join(hrdetect_inputs)
+            .map { it -> [ it[0], it[1], it[2] ] } // meta.patient, somatic snv, tbi
 
-    hrdetect_inputs_jabba_rds = jabba_rds_for_merge
-        .join(hrdetect_inputs)
-        .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
+        hrdetect_inputs_jabba_rds = jabba_rds_for_merge
+            .join(hrdetect_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
 
-    hrdetect_existing_outputs = inputs.map { it -> [it.meta, it.hrdetect] }.filter { !it[1].isEmpty() }
+        hrdetect_existing_outputs = inputs.map { it -> [it.meta, it.hrdetect] }.filter { !it[1].isEmpty() }
 
-    hrdetect_input = hrdetect_inputs
-        .join(hrdetect_inputs_sv)
-        .join(hrdetect_inputs_hets)
-        .join(hrdetect_inputs_vcf)
-        .join(hrdetect_inputs_jabba_rds)
-        .map{
-            patient,
-            meta,
-            sv,
-            hets,
-            snv,
-            snv_tbi,
-            jabba ->[ meta, sv, hets, snv, snv_tbi, jabba ]
-        }
+        hrdetect_input = hrdetect_inputs
+            .join(hrdetect_inputs_sv)
+            .join(hrdetect_inputs_hets)
+            .join(hrdetect_inputs_vcf)
+            .join(hrdetect_inputs_jabba_rds)
+            .map{
+                patient,
+                meta,
+                sv,
+                hets,
+                snv,
+                snv_tbi,
+                jabba ->[ meta, sv, hets, snv, snv_tbi, jabba ]
+            }
 
-        JUNC_SNV_GGRAPH_HRDETECT(hrdetect_input)
+            JUNC_SNV_GGRAPH_HRDETECT(hrdetect_input)
 
-        versions = versions.mix(JUNC_SNV_GGRAPH_HRDETECT.out.versions)
-        hrdetect_rds = Channel.empty()
-            .mix(JUNC_SNV_GGRAPH_HRDETECT.out.hrdetect_rds)
-            .mix(hrdetect_existing_outputs)
+            versions = versions.mix(JUNC_SNV_GGRAPH_HRDETECT.out.versions)
+            hrdetect_rds = Channel.empty()
+                .mix(JUNC_SNV_GGRAPH_HRDETECT.out.hrdetect_rds)
+                .mix(hrdetect_existing_outputs)
+    }
 }
 
 /*

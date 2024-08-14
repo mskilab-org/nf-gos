@@ -17,7 +17,7 @@ workflow SV_JUNCTION_FILTER {
     pon_filtered_sv_rds     = Channel.empty()
     final_filtered_sv_rds   = Channel.empty()
 
-    JUNCTION_FILTER(input, junction_pon, gnomAD_sv_db, padding)
+    JUNCTION_FILTER(input, junction_pon_gridss, gnomAD_sv_db, padding)
 
     final_filtered_sv_rds   = JUNCTION_FILTER.out.final_filtered_sv_rds
     pon_filtered_sv_rds     = JUNCTION_FILTER.out.pon_filtered_sv_rds

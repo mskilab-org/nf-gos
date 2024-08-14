@@ -8,7 +8,7 @@ process SAGE_GERMLINE {
         'quay.io/biocontainers/hmftools-sage:3.4--hdfd78af_1' }"
 
     input:
-    tuple val(meta), path(normal_bam_wgs, stageAs: "normal.bam"), path(normal_bai, stageAs: "normal.bam.bai"), path(tumor_bam_wgs, stageAs: "tumor.bam"), path(tumor_bai, stageAs: "tumor.bam.bai")
+    tuple val(meta), path(normal_bam_wgs), path(normal_bai), path(tumor_bam_wgs), path(tumor_bai)
     path(ref)
     path(ref_fai)
     path(ref_genome_dict)
@@ -35,7 +35,7 @@ process SAGE_GERMLINE {
         ${args} \\
         ${reference_arg} \\
         ${reference_bam_arg} \\
-        -tumor ${meta.id} \\
+        -tumor ${meta.tumor_id} \\
         -tumor_bam ${tumor_bam_wgs} \\
         -ref_genome ${ref} \\
         -ref_genome_version ${ref_genome_version} \\

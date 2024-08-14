@@ -9,11 +9,11 @@ process GRIDSS_SOMATIC {
 
 
     input:
-    tuple val(meta), path(gridss_output)
+    tuple val(meta), path(gridss_output), path(gridss_output_tbi)
     path(pondir_gridss)
 
     output:
-    tuple val(meta), path("*.high_confidence_somatic.vcf.bgz")              , emit: somatic_high_vcf,          optional:true
+    tuple val(meta), path("*.high_confidence_somatic.vcf.bgz"), path("*.high_confidence_somatic.vcf.bgz.tbi")             , emit: somatic_high_vcf,          optional:true
     tuple val(meta), path("*.high_and_low_confidence_somatic.vcf.bgz")      , emit: somatic_all_vcf,           optional:true
     path "versions.yml"                                                     , emit: versions
 

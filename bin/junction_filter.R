@@ -36,13 +36,16 @@ withAutoprint(
             message(paste0("Reading in the provided Junction PON from ", opt$pon))
             pon_object                     = readRDS(opt$pon)
             this_path                      = opt$sv
-            this_filt                      = gGnome:::read.juncs(this_path, chr.convert=FALSE)
-            message("read in the filtered SV file from:", this_path)
+            message("Reading in the filtered SV file from:", this_path)
+            this_filt                      = gGnome:::read.juncs(this_path, verbose=TRUE)
+            message("Checking overlaps between the provided SV vcf and Junction PON...")
             within_pon                     = suppressWarnings(suppressMessages(ra.overlaps(this_filt, pon_object, pad = opt$padding)))
+            message("Unique SVs that overlap with the PON:")
             filter_these                   = unique(within_pon[,"ra1.ix"])
+            message("NA values in the filtered SVs:")
             filter_these = filter_these[!is.na(filter_these)]  # Remove NAs
+            message("Filtering the provided SV vcf...")
             return_this_filtered_somatic   = this_filt[-filter_these]
-            message("Finished filtering of the provided SV vcf with Junction PON, now will filter by gnomAD...")
             rm(pon_object, filter_these, this_filt)
             ## gnomAD filtering
             gnomAD_object                  = readRDS(opt$gnomAD)

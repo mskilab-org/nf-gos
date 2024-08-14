@@ -9,7 +9,7 @@ process GRIDSS_GRIDSS {
 
 
     input:
-    tuple val(meta), path(normalbam, stageAs: "normal.bam"), path(normalbai, stageAs: "normal.bam.bai"), path(tumorbam, stageAs: "tumor.bam"), path(tumorbai, stageAs: "tumor.bam.bai")
+    tuple val(meta), path(normalbam), path(normalbai), path(tumorbam), path(tumorbai)
     path(fasta)
     path(fasta_fai)
     path(bwa_index)
@@ -17,13 +17,12 @@ process GRIDSS_GRIDSS {
 
 
     output:
-    tuple val(meta), path("*gridss.vcf.gz")                                  , emit: vcf,                optional:true
-    tuple val(meta), path("*gridss.vcf.gz.tbi")                              , emit: vcf_index,          optional:true
-    tuple val(meta), path("*.assembly.bam")                            , emit: assembly,           optional:true
-    tuple val(meta), path("*gridss.filtered.vcf.gz")                         , emit: filtered_vcf,       optional:true
-    tuple val(meta), path("*gridss.filtered.vcf.gz.tbi")                     , emit: filtered_vcf_index, optional:true
-    path "versions.yml"                                                , emit: versions
-
+    tuple val(meta), path("*gridss.vcf.gz"), path("*gridss.vcf.gz.tbi"), emit: vcf, optional:true
+    tuple val(meta), path("*gridss.vcf.gz.tbi"), emit: vcf_index, optional:true
+    tuple val(meta), path("*.assembly.bam"), emit: assembly, optional:true
+    tuple val(meta), path("*gridss.filtered.vcf.gz"), path("*gridss.filtered.vcf.gz.tbi"), emit: filtered_vcf
+    tuple val(meta), path("*gridss.filtered.vcf.gz.tbi"), emit: filtered_vcf_index, optional:true
+    path "versions.yml", emit: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -41,6 +40,7 @@ process GRIDSS_GRIDSS {
     ${bwa}
 
     gridss \\
+        --labels ${meta.normal_id},${meta.tumor_id} \\
         --output ${prefix}.vcf.gz \\
         --reference ${fasta} \\
         --threads ${task.cpus} \\
