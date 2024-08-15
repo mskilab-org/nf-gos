@@ -49,18 +49,32 @@ workflow BAM_COV_PURPLE {
 
     tumor_sv        = tumor_sv.map { meta, vcf, tbi -> [meta.patient, vcf, tbi] }
     tumor_snv        = tumor_snv.map { meta, vcf, tbi -> [meta.patient, vcf, tbi] }
-    normal_snv        = normal_snv.map { meta, vcf, tbi -> [meta.patient, vcf, tbi] }
+    if (!params.tumor_only) {
+        normal_snv        = normal_snv.map { meta, vcf, tbi -> [meta.patient, vcf, tbi] }
+    }
     meta = bams.map { meta, tbam, tbai, nbam, nbai -> [meta.patient, meta] }
 
-    purple_inputs = meta
-        .join(amber_dir)
-        .join(cobalt_dir)
-        .join(tumor_sv)
-        .join(tumor_snv)
-        .join(normal_snv)
-        .map { patient, meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf, germ_snv_tbi ->
-            [meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf, germ_snv_tbi]
-        }
+    if (params.tumor_only) {
+        purple_inputs = meta
+            .join(amber_dir)
+            .join(cobalt_dir)
+            .join(tumor_sv)
+            .join(tumor_snv)
+            .map { patient, meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi ->
+                [meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, [], []]
+            }
+    } else {
+        purple_inputs = meta
+            .join(amber_dir)
+            .join(cobalt_dir)
+            .join(tumor_sv)
+            .join(tumor_snv)
+            .join(normal_snv)
+            .map { patient, meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf, germ_snv_tbi ->
+                [meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf, germ_snv_tbi]
+            }
+
+    }
 
     PURPLE(
         purple_inputs,
@@ -78,6 +92,7 @@ workflow BAM_COV_PURPLE {
         [],
         []
     )
+
 
     // initializing outputs from fragcounter
     purple_dir        = Channel.empty().mix(PURPLE.out.purple_dir)
