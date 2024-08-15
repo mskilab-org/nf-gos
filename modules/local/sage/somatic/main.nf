@@ -172,7 +172,7 @@ process SAGE_TUMOR_ONLY_FILTER {
         mv 0000.vcf.gz filter_tumoronly/${meta.id}.sage.pass_filtered.nodbsnp.nognomAD.noPON.noMGIndel.vcf.gz && \\
         mv 0000.vcf.gz.tbi filter_tumoronly/${meta.id}.sage.pass_filtered.nodbsnp.nognomAD.noPON.noMGIndel.vcf.gz.tbi
 
-        cp filter_tumoronly/${meta.id}.sage.pass_filtered.nodbsnp.nognomAD.noPON.noMGIndel.vcf.gz.tbi ./${meta.id}.sage.pass_filtered.tumoronly.vcf.gz && \\
+        cp filter_tumoronly/${meta.id}.sage.pass_filtered.nodbsnp.nognomAD.noPON.noMGIndel.vcf.gz ./${meta.id}.sage.pass_filtered.tumoronly.vcf.gz && \\
         cp filter_tumoronly/${meta.id}.sage.pass_filtered.nodbsnp.nognomAD.noPON.noMGIndel.vcf.gz.tbi ./${meta.id}.sage.pass_filtered.tumoronly.vcf.gz.tbi
 
         rm -rf filter_tumoronly/
