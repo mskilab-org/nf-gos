@@ -20,10 +20,6 @@ log.info logo + paramsSummaryLog(workflow) + citation
 
 //Check input path parameters to see if they exist
 def checkPathParamList = [
-    params.ascat_alleles,
-    params.ascat_loci,
-    params.ascat_loci_gc,
-    params.ascat_loci_rt,
     params.bwa,
     params.bwamem2,
     params.cf_chrom_len,
@@ -90,14 +86,13 @@ tools_used = params.tools ? params.tools.split(',') : ["all"]
 tool_dependency_map = [
     "aligner": ["indexing"],
     "gridss": ["aligner"],
-    "hetpileups": ["aligner"],
+    "amber": ["aligner"],
     "fragcounter": ["aligner"],
     "dryclean": ["fragcounter"],
     "cbs": ["dryclean"],
-    "ascat": ["hetpileups", "dryclean"],
-    "jabba": ["gridss", "hetpileups", "dryclean", "cbs", "ascat"],
-    "non_integer_balance": ["hetpileups", "dryclean", "jabba"],
-    "lp_phased_balance": ["non_integer_balance", "hetpileups"],
+    "jabba": ["gridss", "amber", "dryclean", "cbs", "purple"],
+    "non_integer_balance": ["amber", "dryclean", "jabba"],
+    "lp_phased_balance": ["non_integer_balance", "amber"],
     "events": ["jabba", "non_integer_balance"],
     "fusions": ["jabba", "non_integer_balance"],
     "sage": ["aligner"],
@@ -105,7 +100,7 @@ tool_dependency_map = [
     "snpeff": ["sage"],
     "snv_multiplicity": ["jabba", "snpeff"],
     "signatures": ["sage"],
-    "hrdetect": ["gridss", "hetpileups", "jabba", "sage"]
+    "hrdetect": ["gridss", "amber", "jabba", "sage"]
 ]
 
 // Recursive function to collect all dependencies
@@ -279,6 +274,7 @@ inputs = ch_from_samplesheet.map {
     bam,
     bai,
     hets,
+    amber_dir,
     frag_cov,
     dryclean_cov,
     ploidy,
@@ -314,6 +310,7 @@ inputs = ch_from_samplesheet.map {
         bam: bam,
         bai: bai,
         hets: hets,
+        amber_dir: amber_dir,
         frag_cov: frag_cov,
         dryclean_cov: dryclean_cov,
         ploidy: ploidy,
@@ -383,7 +380,7 @@ inputs = inputs
 // Fails when missing sex information for CNV tools
 inputs.map{
     if (it.meta.sex == 'NA') {
-        log.warn "Please specify sex information (if known) for each sample in your samplesheet when using ASCAT"
+        log.warn "Please specify sex information (if known) for each sample in your samplesheet when using Amber"
     }
 }
 
@@ -443,103 +440,99 @@ vep_extra_files = []
 */
 
 // Create samplesheets to restart from different steps
-include { CHANNEL_ALIGN_CREATE_CSV                    } from '../subworkflows/local/channel_align_create_csv/main'
-include { CHANNEL_MARKDUPLICATES_CREATE_CSV           } from '../subworkflows/local/channel_markduplicates_create_csv/main'
-include { CHANNEL_BASERECALIBRATOR_CREATE_CSV         } from '../subworkflows/local/channel_baserecalibrator_create_csv/main'
-include { CHANNEL_APPLYBQSR_CREATE_CSV                } from '../subworkflows/local/channel_applybqsr_create_csv/main'
-include { CHANNEL_SVCALLING_CREATE_CSV                } from '../subworkflows/local/channel_svcalling_create_csv/main'
-include { CHANNEL_HETPILEUPS_CREATE_CSV               } from '../subworkflows/local/channel_hetpileups_create_csv/main'
+include { CHANNEL_ALIGN_CREATE_CSV } from '../subworkflows/local/channel_align_create_csv/main'
+include { CHANNEL_MARKDUPLICATES_CREATE_CSV } from '../subworkflows/local/channel_markduplicates_create_csv/main'
+include { CHANNEL_BASERECALIBRATOR_CREATE_CSV } from '../subworkflows/local/channel_baserecalibrator_create_csv/main'
+include { CHANNEL_APPLYBQSR_CREATE_CSV } from '../subworkflows/local/channel_applybqsr_create_csv/main'
+include { CHANNEL_SVCALLING_CREATE_CSV } from '../subworkflows/local/channel_svcalling_create_csv/main'
 
 // Download annotation cache if needed
-include { PREPARE_CACHE                               } from '../subworkflows/local/prepare_cache/main'
+include { PREPARE_CACHE } from '../subworkflows/local/prepare_cache/main'
 
 // Build indices if needed
-include { PREPARE_GENOME                              } from '../subworkflows/local/prepare_genome/main'
+include { PREPARE_GENOME } from '../subworkflows/local/prepare_genome/main'
 
 // Build intervals if needed
-include { PREPARE_INTERVALS                           } from '../subworkflows/local/prepare_intervals/main'
+include { PREPARE_INTERVALS } from '../subworkflows/local/prepare_intervals/main'
 
 // Convert BAM files to FASTQ files
 include { BAM_CONVERT_SAMTOOLS as CONVERT_FASTQ_INPUT } from '../subworkflows/local/bam_convert_samtools/main'
 
 // Run FASTQC
-include { FASTQC                                      } from '../modules/nf-core/fastqc/main'
+include { FASTQC } from '../modules/nf-core/fastqc/main'
 
 // TRIM/SPLIT FASTQ Files
-include { FASTP                                       } from '../modules/nf-core/fastp/main'
+include { FASTP } from '../modules/nf-core/fastp/main'
 
 // Loading the MULTIQC module
-include { MULTIQC                                     } from '../modules/nf-core/multiqc/main'
+include { MULTIQC } from '../modules/nf-core/multiqc/main'
 
 // Loading the module that dumps the versions of software being used
-include { CUSTOM_DUMPSOFTWAREVERSIONS                 } from '../modules/nf-core/custom/dumpsoftwareversions/main'
+include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 
 // Map input reads to reference genome
-include { FASTQ_ALIGN_BWAMEM_MEM2                     } from '../subworkflows/local/fastq_align_bwamem_mem2/main'
-include { FASTQ_PARABRICKS_FQ2BAM                     } from '../subworkflows/local/fastq_parabricks_fq2bam/main'
+include { FASTQ_ALIGN_BWAMEM_MEM2 } from '../subworkflows/local/fastq_align_bwamem_mem2/main'
+include { FASTQ_PARABRICKS_FQ2BAM } from '../subworkflows/local/fastq_parabricks_fq2bam/main'
 
 // Merge and index BAM files (optional)
-include { BAM_MERGE_INDEX_SAMTOOLS                    } from '../subworkflows/local/bam_merge_index_samtools/main'
+include { BAM_MERGE_INDEX_SAMTOOLS } from '../subworkflows/local/bam_merge_index_samtools/main'
 
 // Convert BAM files
-include { SAMTOOLS_CONVERT as BAM_TO_CRAM             } from '../modules/nf-core/samtools/convert/main'
-include { SAMTOOLS_CONVERT as BAM_TO_CRAM_MAPPING     } from '../modules/nf-core/samtools/convert/main'
+include { SAMTOOLS_CONVERT as BAM_TO_CRAM } from '../modules/nf-core/samtools/convert/main'
+include { SAMTOOLS_CONVERT as BAM_TO_CRAM_MAPPING } from '../modules/nf-core/samtools/convert/main'
 
 // Convert CRAM files (optional)
-include { SAMTOOLS_CONVERT as CRAM_TO_BAM             } from '../modules/nf-core/samtools/convert/main'
-include { SAMTOOLS_CONVERT as CRAM_TO_BAM_RECAL       } from '../modules/nf-core/samtools/convert/main'
-include { SAMTOOLS_CONVERT as CRAM_TO_BAM_FINAL       } from '../modules/nf-core/samtools/convert/main'
+include { SAMTOOLS_CONVERT as CRAM_TO_BAM } from '../modules/nf-core/samtools/convert/main'
+include { SAMTOOLS_CONVERT as CRAM_TO_BAM_RECAL } from '../modules/nf-core/samtools/convert/main'
+include { SAMTOOLS_CONVERT as CRAM_TO_BAM_FINAL } from '../modules/nf-core/samtools/convert/main'
 
 // Mark Duplicates (+QC)
-include { BAM_MARKDUPLICATES                          } from '../subworkflows/local/bam_markduplicates/main'
+include { BAM_MARKDUPLICATES } from '../subworkflows/local/bam_markduplicates/main'
 
 // QC on CRAM
-include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_NO_MD  } from '../subworkflows/local/cram_qc_mosdepth_samtools/main'
-include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_RECAL  } from '../subworkflows/local/cram_qc_mosdepth_samtools/main'
+include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_NO_MD } from '../subworkflows/local/cram_qc_mosdepth_samtools/main'
+include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_RECAL } from '../subworkflows/local/cram_qc_mosdepth_samtools/main'
 
 // Create recalibration tables
-include { BAM_BASERECALIBRATOR                        } from '../subworkflows/local/bam_baserecalibrator/main'
+include { BAM_BASERECALIBRATOR } from '../subworkflows/local/bam_baserecalibrator/main'
 
 // Create recalibrated cram files to use for variant calling (+QC)
-include { BAM_APPLYBQSR                               } from '../subworkflows/local/bam_applybqsr/main'
+include { BAM_APPLYBQSR } from '../subworkflows/local/bam_applybqsr/main'
 
 // Svaba
-include { BAM_SVCALLING_SVABA                         } from '../subworkflows/local/bam_svcalling_svaba/main'
+include { BAM_SVCALLING_SVABA } from '../subworkflows/local/bam_svcalling_svaba/main'
 
 //GRIDSS
-include { BAM_SVCALLING_GRIDSS                        } from '../subworkflows/local/bam_svcalling_gridss/main'
-include { BAM_SVCALLING_GRIDSS_SOMATIC                } from '../subworkflows/local/bam_svcalling_gridss/main'
+include { BAM_SVCALLING_GRIDSS } from '../subworkflows/local/bam_svcalling_gridss/main'
+include { BAM_SVCALLING_GRIDSS_SOMATIC } from '../subworkflows/local/bam_svcalling_gridss/main'
 
 // SV Junction Filtering
-include { SV_JUNCTION_FILTER as JUNCTION_FILTER       } from '../subworkflows/local/junction_filter/main'
+include { SV_JUNCTION_FILTER as JUNCTION_FILTER } from '../subworkflows/local/junction_filter/main'
 
-// HETPILEUPS
-include { BAM_HETPILEUPS                              } from '../subworkflows/local/bam_hetpileups/main'
+// AMBER
+include { BAM_AMBER } from '../subworkflows/local/bam_amber/main'
 
 // fragCounter
-include { BAM_FRAGCOUNTER as TUMOR_FRAGCOUNTER         } from '../subworkflows/local/bam_fragCounter/main'
-include { BAM_FRAGCOUNTER as NORMAL_FRAGCOUNTER        } from '../subworkflows/local/bam_fragCounter/main'
+include { BAM_FRAGCOUNTER as TUMOR_FRAGCOUNTER } from '../subworkflows/local/bam_fragCounter/main'
+include { BAM_FRAGCOUNTER as NORMAL_FRAGCOUNTER } from '../subworkflows/local/bam_fragCounter/main'
 
 // dryclean
-include { COV_DRYCLEAN as TUMOR_DRYCLEAN               } from '../subworkflows/local/cov_dryclean/main'
-include { COV_DRYCLEAN as NORMAL_DRYCLEAN              } from '../subworkflows/local/cov_dryclean/main'
+include { COV_DRYCLEAN as TUMOR_DRYCLEAN } from '../subworkflows/local/cov_dryclean/main'
+include { COV_DRYCLEAN as NORMAL_DRYCLEAN } from '../subworkflows/local/cov_dryclean/main'
 
 // CBS
-include { COV_CBS as CBS                              } from '../subworkflows/local/cov_cbs/main'
+include { COV_CBS as CBS } from '../subworkflows/local/cov_cbs/main'
 
 // SAGE
-include { BAM_SAGE                              } from '../subworkflows/local/bam_sage/main'
-include { BAM_SAGE_TUMOR_ONLY_FILTER            } from '../subworkflows/local/bam_sage/main'
+include { BAM_SAGE } from '../subworkflows/local/bam_sage/main'
+include { BAM_SAGE_TUMOR_ONLY_FILTER } from '../subworkflows/local/bam_sage/main'
 
 // SNPEFF
-include { VCF_SNPEFF as VCF_SNPEFF_SOMATIC                              } from '../subworkflows/local/vcf_snpeff/main'
-include { VCF_SNPEFF as VCF_SNPEFF_GERMLINE                             } from '../subworkflows/local/vcf_snpeff/main'
-
-//ASCAT
-include { COV_ASCAT                                   } from '../subworkflows/local/cov_ascat/main'
+include { VCF_SNPEFF as VCF_SNPEFF_SOMATIC } from '../subworkflows/local/vcf_snpeff/main'
+include { VCF_SNPEFF as VCF_SNPEFF_GERMLINE } from '../subworkflows/local/vcf_snpeff/main'
 
 // PURPLE
-include { BAM_COV_PURPLE                                      } from '../subworkflows/local/bam_cov_purple/main'
+include { BAM_COV_PURPLE } from '../subworkflows/local/bam_cov_purple/main'
 
 // JaBbA
 if (params.tumor_only) {
@@ -549,32 +542,32 @@ if (params.tumor_only) {
 }
 
 // Events
-include { GGRAPH_EVENTS as EVENTS                            } from '../subworkflows/local/events/main'
+include { GGRAPH_EVENTS as EVENTS } from '../subworkflows/local/events/main'
 
 // Fusions
-include { GGRAPH_FUSIONS as FUSIONS                            } from '../subworkflows/local/fusions/main'
+include { GGRAPH_FUSIONS as FUSIONS } from '../subworkflows/local/fusions/main'
 
 // Allelic CN
-include { COV_GGRAPH_NON_INTEGER_BALANCE as NON_INTEGER_BALANCE                            } from '../subworkflows/local/allelic_cn/main'
+include { COV_GGRAPH_NON_INTEGER_BALANCE as NON_INTEGER_BALANCE } from '../subworkflows/local/allelic_cn/main'
 
-include { COV_GGRAPH_LP_PHASED_BALANCE as LP_PHASED_BALANCE                            } from '../subworkflows/local/allelic_cn/main'
+include { COV_GGRAPH_LP_PHASED_BALANCE as LP_PHASED_BALANCE } from '../subworkflows/local/allelic_cn/main'
 
 // HRDetect
 include { JUNC_SNV_GGRAPH_HRDETECT } from '../subworkflows/local/hrdetect/main'
 
 //STRELKA2
-include { BAM_SOMATIC_STRELKA                        } from '../subworkflows/local/bam_somatic_strelka/main'
-include { BAM_GERMLINE_STRELKA                       } from '../subworkflows/local/bam_germline_strelka/main'
+include { BAM_SOMATIC_STRELKA } from '../subworkflows/local/bam_somatic_strelka/main'
+include { BAM_GERMLINE_STRELKA } from '../subworkflows/local/bam_germline_strelka/main'
 
 // SNV MULTIPLICITY
-include { VCF_SNV_MULTIPLICITY           } from '../subworkflows/local/vcf_snv_multiplicity/main'
+include { VCF_SNV_MULTIPLICITY } from '../subworkflows/local/vcf_snv_multiplicity/main'
 
 // PAVE
-include { VCF_PAVE as VCF_PAVE_SOMATIC                              } from '../subworkflows/local/vcf_pave/main'
-include { VCF_PAVE as VCF_PAVE_GERMLINE                              } from '../subworkflows/local/vcf_pave/main'
+include { VCF_PAVE as VCF_PAVE_SOMATIC } from '../subworkflows/local/vcf_pave/main'
+include { VCF_PAVE as VCF_PAVE_GERMLINE } from '../subworkflows/local/vcf_pave/main'
 
 // SigProfilerAssignment
-include { VCF_SIGPROFILERASSIGNMENT                              } from '../subworkflows/local/vcf_sigprofilerassignment/main'
+include { VCF_SIGPROFILERASSIGNMENT } from '../subworkflows/local/vcf_sigprofilerassignment/main'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -627,13 +620,6 @@ workflow NFCASEREPORTS {
 
         // TODO: add a params for msisensorpro_scan
         msisensorpro_scan      = PREPARE_GENOME.out.msisensorpro_scan
-
-        // For ASCAT, extracted from zip or tar.gz files:
-        allele_files           = PREPARE_GENOME.out.allele_files
-        chr_files              = PREPARE_GENOME.out.chr_files
-        gc_file                = PREPARE_GENOME.out.gc_file
-        loci_files             = PREPARE_GENOME.out.loci_files
-        rt_file                = PREPARE_GENOME.out.rt_file
 
         dbsnp_tbi              = WorkflowNfcasereports.create_index_channel(params.dbsnp, params.dbsnp_tbi, PREPARE_GENOME.out.dbsnp_tbi)
         //do not change to Channel.value([]), the check for its existence then fails for Getpileupsumamries
@@ -951,16 +937,16 @@ workflow NFCASEREPORTS {
         }
     }
 
-    // HETPILEUPS
+    // AMBER
     // ##############################
-    if (tools_used.contains("all") || tools_used.contains("hetpileups")) {
+    if (tools_used.contains("all") || tools_used.contains("amber")) {
         if (!params.tumor_only) {
-            bam_hetpileups_inputs = inputs.filter { it.hets.isEmpty() }.map { it -> [it.meta.id] }
-            bam_hetpileups_calling = alignment_bams_final
-                .join(bam_hetpileups_inputs)
+            bam_amber_inputs = inputs.filter { it.hets.isEmpty() && it.amber_dir.isEmpty() }.map { it -> [it.meta.id] }
+            bam_amber_calling = alignment_bams_final
+                .join(bam_amber_inputs)
                 .map{ it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
 
-            hetpileups_existing_outputs = inputs
+            amber_existing_outputs_hets = inputs
                 .map { it -> [it.meta, it.hets] }
                 .filter { !it[1].isEmpty() }
                 .branch{
@@ -968,20 +954,28 @@ workflow NFCASEREPORTS {
                     tumor:  it[0].status == 1
                 }
 
+            amber_existing_outputs_amber_dirs = inputs
+                .map { it -> [it.meta, it.amber_dir] }
+                .filter { !it[1].isEmpty() }
+                .branch{
+                    normal: it[0].status == 0
+                    tumor:  it[0].status == 1
+                }
+
             // getting the tumor and normal cram files separated
-            bam_hetpileups_status = bam_hetpileups_calling.branch{
+            bam_amber_status = bam_amber_calling.branch{
                 normal: it[0].status == 0
                 tumor:  it[0].status == 1
             }
 
             // All normal samples
-            bam_hetpileups_normal_for_crossing = bam_hetpileups_status.normal.map{ meta, bam, bai -> [ meta.patient, meta + [id: meta.sample], bam, bai ] }
+            bam_amber_normal_for_crossing = bam_amber_status.normal.map{ meta, bam, bai -> [ meta.patient, meta + [id: meta.sample], bam, bai ] }
 
             // All tumor samples
-            bam_hetpileups_tumor_for_crossing = bam_hetpileups_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta + [id: meta.sample], bam, bai ] }
+            bam_amber_tumor_for_crossing = bam_amber_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta + [id: meta.sample], bam, bai ] }
 
             // Crossing the normal and tumor samples to create tumor and normal pairs
-            bam_hetpileups_pair = bam_hetpileups_normal_for_crossing.cross(bam_hetpileups_tumor_for_crossing)
+            bam_amber_pair = bam_amber_normal_for_crossing.cross(bam_amber_tumor_for_crossing)
                 .map { normal, tumor ->
                     def meta = [:]
                     meta.id         = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
@@ -994,12 +988,19 @@ workflow NFCASEREPORTS {
                 }
 
 
-            BAM_HETPILEUPS(bam_hetpileups_pair)
-            versions = versions.mix(BAM_HETPILEUPS.out.versions)
+            BAM_AMBER(bam_amber_pair)
+            versions = versions.mix(BAM_AMBER.out.versions)
+
+            amber_dir = Channel.empty()
+                .mix(BAM_AMBER.out.amber_dir)
+                .mix(amber_existing_outputs_amber_dirs)
+
+            amber_dir_for_merge = amber_dir
+                .map { it -> [ it[0].patient, it[1] ] } // meta.patient, amber_dir
 
             sites_from_het_pileups_wgs = Channel.empty()
-                .mix(BAM_HETPILEUPS.out.het_pileups_wgs)
-                .mix(hetpileups_existing_outputs)
+                .mix(BAM_AMBER.out.sites)
+                .mix(amber_existing_outputs_hets)
 
             hets_sites_for_merge = sites_from_het_pileups_wgs
                 .map { it -> [ it[0].patient, it[1] ] } // meta.patient, hets
@@ -1356,6 +1357,10 @@ workflow NFCASEREPORTS {
                 .map { it -> [ it[1], it[2], it[3] ] } // meta, vcf, tbi
         }
 
+        purple_inputs_amber_dir = purple_inputs_for_merge
+            .join(amber_dir_for_merge)
+            .map { it -> [ it[1], it[2] ] } // meta, amber_dir
+
         purple_inputs_sv = purple_inputs_for_merge
             .join(vcf_from_sv_calling_for_merge)
             .map { it -> [ it[1], it[2], it[3] ] } // meta, vcf, tbi
@@ -1368,7 +1373,7 @@ workflow NFCASEREPORTS {
 
         purple_existing_outputs = inputs.map { it -> [it.meta, it.ploidy] }.filter { !it[1].isEmpty() }
 
-        BAM_COV_PURPLE(bam_purple_pair, purple_inputs_sv, purple_inputs_snv, purple_inputs_snv_germline)
+        BAM_COV_PURPLE(bam_purple_pair, amber_dir, purple_inputs_sv, purple_inputs_snv, purple_inputs_snv_germline)
 
         versions = versions.mix(BAM_COV_PURPLE.out.versions)
         ploidy = Channel.empty()
@@ -1377,43 +1382,6 @@ workflow NFCASEREPORTS {
 
         ploidy_for_merge = ploidy
             .map { it -> [ it[0].patient, it[1] ] } // meta.patient, ploidy
-    }
-
-    // ASCAT
-    // ##############################
-    if (tools_used.contains("all") || tools_used.contains("ascat")) {
-        if (!params.tumor_only) {
-            ascat_inputs = inputs.filter { it.ploidy.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
-            ascat_inputs_hets = hets_sites_for_merge
-                .join(ascat_inputs)
-                .map { it -> [ it[0], it[1] ] } // meta.patient, hets
-            ascat_inputs_cov = dryclean_tumor_cov_for_merge
-                .join(ascat_inputs)
-                .map { it -> [ it[0], it[1] ] } // meta.patient, cov
-
-            ascat_existing_outputs = inputs.map { it -> [it.meta, it.ploidy] }.filter { !it[1].isEmpty() }
-
-            ascat_input = ascat_inputs
-                .join(ascat_inputs_hets)
-                .join(ascat_inputs_cov)
-                .map { patient, meta, hets, cov ->
-                    [
-                        meta,
-                        hets,
-                        cov,
-                    ]
-                }
-
-            COV_ASCAT(ascat_input)
-
-            versions = versions.mix(COV_ASCAT.out.versions)
-            ploidy = Channel.empty()
-                .mix(COV_ASCAT.out.ploidy)
-                .mix(ascat_existing_outputs)
-
-            ploidy_for_merge = ploidy
-                .map { it -> [ it[0].patient, it[1] ] } // meta.patient, ploidy
-        }
     }
 
     // JaBbA

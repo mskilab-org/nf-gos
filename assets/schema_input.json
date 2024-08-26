@@ -185,6 +185,29 @@
                 "format": "file-path",
                 "exists": true
             },
+            "amber_dir": {
+                "errorMessage": "Amber directory must be a valid path",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\/$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
             "frag_cov": {
                 "errorMessage": "COV file cannot contain spaces and must have extension '.rds' or '.txt'",
                 "anyOf": [

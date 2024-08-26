@@ -1,21 +1,18 @@
 //
-// PURPLE (+AMBER and COBALT)
+// PURPLE (COBALT)
 //
 
-include { AMBER } from '../../../modules/local/amber/main'
 include { COBALT } from '../../../modules/local/cobalt/main'
 include { PURPLE } from '../../../modules/local/purple/main'
 include { EXTRACT_PURITYPLOIDY } from '../../../modules/local/purple/main'
 
-//AMBER
-genome_ver     = WorkflowNfcasereports.create_value_channel(params.genome_ver_amber)
-het_sites       = WorkflowNfcasereports.create_file_channel(params.het_sites_amber)
 //COBALT
 gc_profile = WorkflowNfcasereports.create_file_channel(params.gc_profile)
 diploid_bed = WorkflowNfcasereports.create_file_channel(params.diploid_bed)
 //PURPLE
 genome_fasta = WorkflowNfcasereports.create_file_channel(params.fasta)
 genome_fai = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
+genome_ver     = WorkflowNfcasereports.create_value_channel(params.genome_ver_amber)
 genome_dict = WorkflowNfcasereports.create_file_channel(params.dict)
 sage_known_hotspots_somatic = WorkflowNfcasereports.create_file_channel(params.somatic_hotspots)
 sage_known_hotspots_germline = WorkflowNfcasereports.create_file_channel(params.germline_hotspots)
@@ -26,6 +23,7 @@ workflow BAM_COV_PURPLE {
     // defining inputs
     take:
     bams // required: [meta, tbam, tbai, nbam, nbai]
+    amber_dir // required: [meta, amber_dir]
     tumor_sv // required: [meta, vcf, tbi]
     tumor_snv // required: [meta, vcf, tbi]
     normal_snv // optional [meta, vcf, tbi]
@@ -35,10 +33,7 @@ workflow BAM_COV_PURPLE {
     versions        = Channel.empty()
     ploidy          = Channel.empty()
 
-    BAM_AMBER(bams)
-
-    amber_dir        = Channel.empty()
-        .mix(BAM_AMBER.out.amber_dir)
+    amber_dir = amber_dir
         .map { meta, amber_dir -> [meta.patient, amber_dir] }
 
     COV_COBALT(bams)
@@ -109,29 +104,6 @@ workflow BAM_COV_PURPLE {
     versions
 }
 
-
-workflow BAM_AMBER {
-    take:
-    input // [meta, tbam, tbai, nbam, nbai]
-
-    main:
-    amber_dir        = Channel.empty()
-    versions          = Channel.empty()
-
-    AMBER(
-        input,
-        genome_ver,
-        het_sites,
-        []
-    )
-
-    amber_dir        = amber_dir.mix(AMBER.out.amber_dir)
-    versions         = versions.mix(AMBER.out.versions)
-
-    emit:
-    amber_dir
-    versions
-}
 
 workflow COV_COBALT {
     take:
