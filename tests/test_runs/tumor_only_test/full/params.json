@@ -5,7 +5,7 @@
     "fasta_fai": "/gpfs/commons/home/sdider/DB/GATK/human_g1k_v37_decoy.fasta.fai",
     "bwa": "/gpfs/commons/home/sdider/DB/GATK/bwa/",
     "outdir": "./results",
-    "tools": "hrdetect",
+    "tools": "purple",
     "pon_dryclean": "/gpfs/commons/home/tdey/data/dryclean/MONSTER_PON_RAW/MONSTER_PON_RAW_SORTED/fixed.detergent.rds",
     "field_dryclean": "reads",
     "genome": "GATK.GRCh37",

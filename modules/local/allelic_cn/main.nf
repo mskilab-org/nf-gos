@@ -8,7 +8,7 @@ process NON_INTEGER_BALANCE {
         'mskilab/jabba:latest' }"
 
     input:
-    tuple val(meta), path(jabba_rds), path(decomposed_cov), path(het_pileups_wgs)
+    tuple val(meta), path(jabba_gg), path(decomposed_cov), path(het_pileups_wgs)
     val(field)
     val(hets_thresh)
     path(mask)
@@ -49,7 +49,7 @@ process NON_INTEGER_BALANCE {
 
     Rscript \$RSCRIPT_PATH \\
         --id $id \\
-        --jab $jabba_rds \\
+        --jab $jabba_gg \\
         --cov $decomposed_cov \\
         --field $field \\
         --hets $het_pileups_wgs \\
@@ -97,7 +97,7 @@ process LP_PHASED_BALANCE {
         'mskilab/jabba:latest' }"
 
     input:
-    tuple val(meta), path(hets_gg), path(hets) // output from non_integer_balance, sites.txt from hetpileups
+    tuple val(meta), path(hets_gg, stageAs: "non_integer_balanced.gg.rds"), path(hets) // output from non_integer_balance, sites.txt from hetpileups
     val(lambda)
     val(cnloh)
     val(major)

@@ -357,6 +357,29 @@
                 "format": "file-path",
                 "exists": true
             },
+            "jabba_gg": {
+                "errorMessage": "jabba.simple.gg.rds file and must have extension '.rds'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.rds$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
             "ni_balanced_rds": {
                 "errorMessage": "balanced_gg.rds file and must have extension '.rds'",
                 "anyOf": [

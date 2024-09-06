@@ -90,17 +90,17 @@ tool_dependency_map = [
     "fragcounter": ["aligner"],
     "dryclean": ["fragcounter"],
     "cbs": ["dryclean"],
-    "jabba": ["gridss", "amber", "dryclean", "cbs", "purple"],
-    "non_integer_balance": ["amber", "dryclean", "jabba"],
-    "lp_phased_balance": ["non_integer_balance", "amber"],
-    "events": ["jabba", "non_integer_balance"],
-    "fusions": ["jabba", "non_integer_balance"],
     "sage": ["aligner"],
-    "purple": ["aligner", "gridss", "sage"],
+    "purple": ["aligner", "amber", "gridss", "sage"],
+    "jabba": ["gridss", "amber", "dryclean", "cbs", "purple"],
+    "non_integer_balance": ["jabba"],
+    "lp_phased_balance": ["non_integer_balance"],
+    "events": ["non_integer_balance"],
+    "fusions": ["non_integer_balance"],
     "snpeff": ["sage"],
     "snv_multiplicity": ["jabba", "snpeff"],
     "signatures": ["sage"],
-    "hrdetect": ["gridss", "amber", "jabba", "sage"]
+    "hrdetect": ["amber", "gridss", "jabba", "sage"]
 ]
 
 // Recursive function to collect all dependencies
@@ -283,6 +283,7 @@ inputs = ch_from_samplesheet.map {
     vcf,
     vcf_tbi,
     jabba_rds,
+    jabba_gg,
     ni_balanced_gg,
     lp_balanced_gg,
     events,
@@ -319,6 +320,7 @@ inputs = ch_from_samplesheet.map {
         vcf: vcf,
         vcf_tbi: vcf_tbi,
         jabba_rds: jabba_rds,
+        jabba_gg: jabba_gg,
         ni_balanced_gg: ni_balanced_gg,
         lp_balanced_gg: lp_balanced_gg,
         events: events,
@@ -759,9 +761,6 @@ workflow NFCASEREPORTS {
         // Gather used softwares versions
         versions = versions.mix(BAM_MERGE_INDEX_SAMTOOLS.out.versions)
 
-        // Gather used softwares versions
-        versions = versions.mix(FASTQ_ALIGN_BWAMEM_MEM2.out.versions)
-
         alignment_bams_final = BAM_MERGE_INDEX_SAMTOOLS.out.bam_bai.map({ meta, bam, bai -> [ meta.id, meta, bam, bai ] })
     }
 
@@ -940,40 +939,42 @@ workflow NFCASEREPORTS {
     // AMBER
     // ##############################
     if (tools_used.contains("all") || tools_used.contains("amber")) {
-        if (!params.tumor_only) {
-            bam_amber_inputs = inputs.filter { it.hets.isEmpty() && it.amber_dir.isEmpty() }.map { it -> [it.meta.id] }
-            bam_amber_calling = alignment_bams_final
-                .join(bam_amber_inputs)
-                .map{ it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
+        bam_amber_inputs = inputs.filter { it.hets.isEmpty() && it.amber_dir.isEmpty() }.map { it -> [it.meta.id] }
+        bam_amber_calling = alignment_bams_final
+            .join(bam_amber_inputs)
+            .map{ it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
 
-            amber_existing_outputs_hets = inputs
-                .map { it -> [it.meta, it.hets] }
-                .filter { !it[1].isEmpty() }
-                .branch{
-                    normal: it[0].status == 0
-                    tumor:  it[0].status == 1
-                }
-
-            amber_existing_outputs_amber_dirs = inputs
-                .map { it -> [it.meta, it.amber_dir] }
-                .filter { !it[1].isEmpty() }
-                .branch{
-                    normal: it[0].status == 0
-                    tumor:  it[0].status == 1
-                }
-
-            // getting the tumor and normal cram files separated
-            bam_amber_status = bam_amber_calling.branch{
+        amber_existing_outputs_hets = inputs
+            .map { it -> [it.meta, it.hets] }
+            .filter { !it[1].isEmpty() }
+            .branch{
                 normal: it[0].status == 0
                 tumor:  it[0].status == 1
             }
 
+        amber_existing_outputs_amber_dirs = inputs
+            .map { it -> [it.meta, it.amber_dir] }
+            .filter { !it[1].isEmpty() }
+            .branch{
+                normal: it[0].status == 0
+                tumor:  it[0].status == 1
+            }
+
+        // getting the tumor and normal cram files separated
+        bam_amber_status = bam_amber_calling.branch{
+            normal: it[0].status == 0
+            tumor:  it[0].status == 1
+        }
+
+        // All tumor samples
+        bam_amber_tumor_for_crossing = bam_amber_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta + [id: meta.sample], bam, bai ] }
+
+        if (params.tumor_only) {
+            // add empty arrays to stand-in for normals
+            bam_amber_pair = bam_amber_status.tumor.map{ meta, bam, bai -> [ meta + [tumor_id: meta.sample], bam, bai, [], [] ] }
+        } else {
             // All normal samples
             bam_amber_normal_for_crossing = bam_amber_status.normal.map{ meta, bam, bai -> [ meta.patient, meta + [id: meta.sample], bam, bai ] }
-
-            // All tumor samples
-            bam_amber_tumor_for_crossing = bam_amber_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta + [id: meta.sample], bam, bai ] }
-
             // Crossing the normal and tumor samples to create tumor and normal pairs
             bam_amber_pair = bam_amber_normal_for_crossing.cross(bam_amber_tumor_for_crossing)
                 .map { normal, tumor ->
@@ -984,27 +985,27 @@ workflow NFCASEREPORTS {
                     meta.sex        = normal[1].sex
                     meta.tumor_id   = tumor[1].sample
 
-                    [ meta, normal[2], normal[3], tumor[2], tumor[3] ]
+                    [ meta, tumor[2], tumor[3], normal[2], normal[3] ]
                 }
-
-
-            BAM_AMBER(bam_amber_pair)
-            versions = versions.mix(BAM_AMBER.out.versions)
-
-            amber_dir = Channel.empty()
-                .mix(BAM_AMBER.out.amber_dir)
-                .mix(amber_existing_outputs_amber_dirs)
-
-            amber_dir_for_merge = amber_dir
-                .map { it -> [ it[0].patient, it[1] ] } // meta.patient, amber_dir
-
-            sites_from_het_pileups_wgs = Channel.empty()
-                .mix(BAM_AMBER.out.sites)
-                .mix(amber_existing_outputs_hets)
-
-            hets_sites_for_merge = sites_from_het_pileups_wgs
-                .map { it -> [ it[0].patient, it[1] ] } // meta.patient, hets
         }
+
+
+        BAM_AMBER(bam_amber_pair)
+        versions = versions.mix(BAM_AMBER.out.versions)
+
+        amber_dir = Channel.empty()
+            .mix(BAM_AMBER.out.amber_dir)
+            .mix(amber_existing_outputs_amber_dirs)
+
+        amber_dir_for_merge = amber_dir
+            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, amber_dir
+
+        sites_from_het_pileups_wgs = Channel.empty()
+            .mix(BAM_AMBER.out.sites)
+            .mix(amber_existing_outputs_hets)
+
+        hets_sites_for_merge = sites_from_het_pileups_wgs
+            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, hets
     }
     // FRAGCOUNTER
     // ##############################
@@ -1108,9 +1109,11 @@ workflow NFCASEREPORTS {
             .join(cbs_inputs.tumor)
             .map{ it -> [ it[0].patient, it[0], it[1] ] } // meta.patient, meta, dryclean tumor cov
 
-        cbs_normal_input = dryclean_normal_cov
-            .join(cbs_inputs.normal)
-            .map{ it -> [ it[0].patient, it[0], it[1] ] } // meta.patient, meta, dryclean normal cov
+        if (!params.tumor_only) {
+            cbs_normal_input = dryclean_normal_cov
+                .join(cbs_inputs.normal)
+                .map{ it -> [ it[0].patient, it[0], it[1] ] } // meta.patient, meta, dryclean normal cov
+        }
 
         cbs_existing_seg = inputs
             .map { it -> [it.meta, it.seg] }
@@ -1233,6 +1236,7 @@ workflow NFCASEREPORTS {
         }
 
         if (params.tumor_only) {
+            filtered_somatic_vcf.view()
             BAM_SAGE_TUMOR_ONLY_FILTER(
                 filtered_somatic_vcf,
                 dbsnp_tbi,
@@ -1387,7 +1391,7 @@ workflow NFCASEREPORTS {
     // JaBbA
     // ##############################
     if (tools_used.contains("all") || tools_used.contains("jabba")) {
-        jabba_inputs = inputs.filter { it.jabba_rds.isEmpty() && it.meta.status == 1}.map { it -> [it.meta.patient, it.meta] }
+        jabba_inputs = inputs.filter { (it.jabba_gg.isEmpty() || it.jabba_rds.isEmpty()) && it.meta.status == 1}.map { it -> [it.meta.patient, it.meta] }
         jabba_inputs_sv = vcf_from_sv_calling_for_merge
             .join(jabba_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, vcf
@@ -1422,7 +1426,8 @@ workflow NFCASEREPORTS {
             .join(jabba_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, cbs_nseg
 
-        jabba_existing_outputs = inputs.map { it -> [it.meta, it.jabba_rds] }.filter { !it[1].isEmpty() }
+        jabba_rds_existing_outputs = inputs.map { it -> [it.meta, it.jabba_rds] }.filter { !it[1].isEmpty() }
+        jabba_gg_existing_outputs = inputs.map { it -> [it.meta, it.jabba_gg] }.filter { !it[1].isEmpty() }
 
         if (params.tumor_only) {
             jabba_inputs = jabba_inputs
@@ -1469,8 +1474,14 @@ workflow NFCASEREPORTS {
 
         jabba_rds = Channel.empty()
             .mix(JABBA.out.jabba_rds)
-            .mix(jabba_existing_outputs)
+            .mix(jabba_rds_existing_outputs)
         jabba_rds_for_merge = jabba_rds
+            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, jabba rds
+
+        jabba_gg = Channel.empty()
+            .mix(JABBA.out.jabba_gg)
+            .mix(jabba_gg_existing_outputs)
+        jabba_gg_for_merge = jabba_gg
             .map { it -> [ it[0].patient, it[1] ] } // meta.patient, jabba rds
         versions = versions.mix(JABBA.out.versions)
     }
@@ -1480,7 +1491,7 @@ workflow NFCASEREPORTS {
     if (tools_used.contains("all") || tools_used.contains("non_integer_balance")) {
         non_integer_balance_inputs = inputs.filter { it.ni_balanced_gg.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
 
-        non_integer_balance_inputs_jabba_rds = jabba_rds_for_merge
+        non_integer_balance_inputs_jabba_gg = jabba_gg_for_merge
             .join(non_integer_balance_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
 
@@ -1495,7 +1506,7 @@ workflow NFCASEREPORTS {
         non_integer_balance_existing_outputs = inputs.map { it -> [it.meta, it.ni_balanced_gg] }.filter { !it[1].isEmpty() }
 
         non_integer_balance_inputs = non_integer_balance_inputs
-            .join(non_integer_balance_inputs_jabba_rds)
+            .join(non_integer_balance_inputs_jabba_gg)
             .join(non_integer_balance_inputs_hets)
             .join(non_integer_balance_inputs_cov)
             .map{ patient, meta, rds, hets, cov -> [ meta, rds, cov, hets ] }
@@ -1539,7 +1550,7 @@ workflow NFCASEREPORTS {
     // ##############################
     if (tools_used.contains("all") || tools_used.contains("events")) {
         events_inputs = inputs.filter { it.events.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
-        events_input_jabba_rds = jabba_rds_for_merge
+        events_input_jabba_gg = jabba_gg_for_merge
             .join(events_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
         events_input_non_integer_balance = non_integer_balance_balanced_gg_for_merge
@@ -1549,7 +1560,7 @@ workflow NFCASEREPORTS {
         events_existing_outputs = inputs.map { it -> [it.meta, it.events] }.filter { !it[1].isEmpty() }
 
         events_input = events_inputs
-            .join(events_input_jabba_rds)
+            .join(events_input_jabba_gg)
             .join(events_input_non_integer_balance)
             .map{ patient, meta, rds, balanced_gg -> [ meta, rds, balanced_gg ] }
 
@@ -1565,7 +1576,7 @@ workflow NFCASEREPORTS {
     // ##############################
     if (tools_used.contains("all") || tools_used.contains("fusions")) {
         fusions_inputs = inputs.filter { it.fusions.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
-        fusions_input_jabba_rds = jabba_rds_for_merge
+        fusions_input_jabba_gg = jabba_gg_for_merge
             .join(fusions_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
         fusions_input_non_integer_balance = non_integer_balance_balanced_gg_for_merge
@@ -1575,7 +1586,7 @@ workflow NFCASEREPORTS {
         fusions_existing_outputs = inputs.map { it -> [it.meta, it.fusions] }.filter { !it[1].isEmpty() }
 
         fusions_input = fusions_inputs
-            .join(fusions_input_jabba_rds)
+            .join(fusions_input_jabba_gg)
             .join(fusions_input_non_integer_balance)
             .map{ patient, meta, rds, balanced_gg -> [ meta, rds, balanced_gg ] }
 
@@ -1598,7 +1609,7 @@ workflow NFCASEREPORTS {
             snv_multiplicity_inputs_germline_vcf = snv_germline_annotations_for_merge
                 .join(snv_multiplicity_inputs)
                 .map { it -> [ it[0], it[1] ] } // meta.patient, annotated germline snv vcf
-            snv_multiplicity_inputs_jabba_rds = jabba_rds_for_merge
+            snv_multiplicity_inputs_jabba_gg = jabba_gg_for_merge
                 .join(snv_multiplicity_inputs)
                 .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
 
@@ -1607,7 +1618,7 @@ workflow NFCASEREPORTS {
             input_snv_multiplicity = snv_multiplicity_inputs
                 .join(snv_multiplicity_inputs_somatic_vcf)
                 .join(snv_multiplicity_inputs_germline_vcf)
-                .join(snv_multiplicity_inputs_jabba_rds)
+                .join(snv_multiplicity_inputs_jabba_gg)
                 .map{
                     patient, meta, somatic_ann, germline_ann, ggraph ->
                     [ meta, somatic_ann, germline_ann, ggraph ]

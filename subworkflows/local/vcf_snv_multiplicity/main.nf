@@ -9,7 +9,7 @@ ref_fai                           = WorkflowNfcasereports.create_file_channel(pa
 workflow VCF_SNV_MULTIPLICITY {
     // defining inputs
     take:
-    input                                       // required: [meta, somatic_vcf, somatic_tbi, germline_vcf, germline_tbi, jabba_rds]
+    input                                       // required: [meta, somatic_vcf, somatic_tbi, germline_vcf, germline_tbi, jabba_gg]
 
     //Creating empty channels for output
     main:

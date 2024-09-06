@@ -8,7 +8,7 @@ process SNV_MULTIPLICITY {
         'mskilab/snv_multiplicity:0.0.3' }"
 
     input:
-    tuple val(meta), path(somatic_snv, stageAs: "somatic_snv.vcf"), path(germline_snv, stageAs: "germline_snv.vcf"), path(jabba_rds)
+    tuple val(meta), path(somatic_snv, stageAs: "somatic_snv.vcf"), path(germline_snv, stageAs: "germline_snv.vcf"), path(jabba_gg)
     path(ref)
     path(ref_fai)
 
@@ -34,7 +34,7 @@ process SNV_MULTIPLICITY {
         --somatic_snv ${somatic_snv} \\
         --germline_snv ${germline_snv} \\
         --fasta ${ref} \\
-        --jabba ${jabba_rds} \\
+        --jabba ${jabba_gg} \\
         --downsample_jar ${DOWNSAMPLE_JAR} \\
         --snpsift_jar ${SNPSIFT_JAR} \\
         --vcfeff_perl ${VCFEFF_PERL} \\

@@ -10,7 +10,7 @@ genome_version  = WorkflowNfcasereports.create_value_channel(params.ref_hrdetect
 workflow JUNC_SNV_GGRAPH_HRDETECT {
 
     take:
-    inputs  // [ meta, junction, hets, snv_somatic, snv_somatic_tbi, jabba_rds]
+    inputs  // [ meta, junction, hets, snv_somatic, snv_somatic_tbi, jabba_gg]
 
     main:
     versions            = Channel.empty()
