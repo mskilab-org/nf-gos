@@ -715,17 +715,19 @@ workflow NFCASEREPORTS {
 
         // STEP 1: MAPPING READS TO REFERENCE GENOME
         // reads will be sorted
-        reads_for_alignment = reads_for_alignment.map{ meta, reads ->
+        reads_for_alignment = reads_for_alignment
+            .map{ meta, reads ->
             // Update meta.id to meta.sample if no multiple lanes or splitted fastqs
-            if (meta.size * meta.num_lanes == 1) [ meta + [ id:meta.sample ], reads ]
+            if (meta.num_lanes == null || meta.size * meta.num_lanes == 1) [ meta + [ id:meta.sample ], reads ]
             else [ meta, reads ]
         }
 
         // GPU Alignment
         if (params.aligner == "fq2bam") {
             FASTQ_PARABRICKS_FQ2BAM(
-                input_fastq,
-                known_sites_indels
+                reads_for_alignment,
+                known_sites_indels,
+                known_sites_indels_tbi
             )
             // merge existing BAMs with newly mapped ones
             bam_mapped = alignment_existing_outputs.mix(FASTQ_PARABRICKS_FQ2BAM.out.bam)
@@ -900,7 +902,6 @@ workflow NFCASEREPORTS {
             }
         }
 
-        bam_sv_calling_pair.view()
         BAM_SVCALLING_GRIDSS(
             bam_sv_calling_pair,
             bwa
@@ -1236,7 +1237,6 @@ workflow NFCASEREPORTS {
         }
 
         if (params.tumor_only) {
-            filtered_somatic_vcf.view()
             BAM_SAGE_TUMOR_ONLY_FILTER(
                 filtered_somatic_vcf,
                 dbsnp_tbi,

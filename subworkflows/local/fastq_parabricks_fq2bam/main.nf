@@ -6,11 +6,14 @@ include { PARABRICKS_FQ2BAM            } from '../../../modules/local/fq2bam/mai
 
 fasta                               = WorkflowNfcasereports.create_file_channel(params.fasta)
 fasta_fai                           = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
+intervals                          = WorkflowNfcasereports.create_file_channel(params.intervals)
+low_memory                          = params.low_memory
 
 workflow FASTQ_PARABRICKS_FQ2BAM {
     take:
     reads // channel: [mandatory] meta, reads, intervals (intervals is optional)
     known_sites
+    known_sites_tbi
 
     main:
 
@@ -25,7 +28,10 @@ workflow FASTQ_PARABRICKS_FQ2BAM {
         reads,
         fasta,
         fasta_fai,
-        known_sites
+        intervals,
+        known_sites,
+        known_sites_tbi,
+        low_memory
     )
 
     bam = bam.mix(PARABRICKS_FQ2BAM.out.bam)
