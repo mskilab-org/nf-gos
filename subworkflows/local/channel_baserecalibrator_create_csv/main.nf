@@ -21,9 +21,9 @@ workflow CHANNEL_BASERECALIBRATOR_CREATE_CSV {
                 status  = meta.status
                 suffix_aligned = save_output_as_bam ? "bam" : "cram"
                 suffix_index   = save_output_as_bam ? "bam.bai" : "cram.crai"
-                cram = "${outdir}/Alignment/markduplicates/${sample}/${cram.baseName}.${suffix_aligned}"
-                crai = "${outdir}/Alignment/markduplicates/${sample}/${crai.baseName.minus(".cram")}.${suffix_index}"
-                table = "${outdir}/Alignment/recal_table/${sample}/${sample}.recal.table"
+                cram = "${outdir}/alignment/markduplicates/${sample}/${cram.baseName}.${suffix_aligned}"
+                crai = "${outdir}/alignment/markduplicates/${sample}/${crai.baseName.minus(".cram")}.${suffix_index}"
+                table = "${outdir}/alignment/recal_table/${sample}/${sample}.recal.table"
 
                 type = save_output_as_bam ? "bam" : "cram"
                 type_index = save_output_as_bam ? "bai" : "crai"
@@ -38,9 +38,9 @@ workflow CHANNEL_BASERECALIBRATOR_CREATE_CSV {
                 status  = meta.status
                 suffix_aligned = save_output_as_bam ? "bam" : "cram"
                 suffix_index   = save_output_as_bam ? "bam.bai" : "cram.crai"
-                cram = "${outdir}/Alignment/${sample}/Mapped/${cram.baseName}.${suffix_aligned}"
-                crai = "${outdir}/Alignment/${sample}/Mapped/${crai.baseName.minus(".cram")}.${suffix_index}"
-                table = "${outdir}/Alignment/${sample}/recal_table/${sample}.recal.table"
+                cram = "${outdir}/alignment/${sample}/Mapped/${cram.baseName}.${suffix_aligned}"
+                crai = "${outdir}/alignment/${sample}/Mapped/${crai.baseName.minus(".cram")}.${suffix_index}"
+                table = "${outdir}/alignment/${sample}/recal_table/${sample}.recal.table"
 
                 type = save_output_as_bam ? "bam" : "cram"
                 type_index = save_output_as_bam ? "bai" : "crai"

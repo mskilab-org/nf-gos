@@ -74,7 +74,7 @@
             "properties": {
                 "split_fastq": {
                     "type": "integer",
-                    "default": 50000000,
+                    "default": 0,
                     "fa_icon": "fas fa-clock",
                     "description": "Specify how many reads each split of a FastQ file contains. Set 0 to turn off splitting at all.",
                     "help_text": "Use the the tool FastP to split FASTQ file by number of reads. This parallelizes across fastq file shards speeding up mapping. "
@@ -190,14 +190,36 @@
             "properties": {
                 "aligner": {
                     "type": "string",
-                    "default": "bwa-mem",
+                    "default": "fq2bam",
                     "fa_icon": "fas fa-puzzle-piece",
                     "enum": [
+                        "fq2bam",
                         "bwa-mem",
                         "bwa-mem2"
                     ],
                     "description": "Specify aligner to be used to map reads to reference genome.",
                     "help_text": "Sarek will build missing indices automatically if not provided. Set `--bwa false` if indices should be (re-)built.\nIf DragMap is selected as aligner, it is recommended to skip baserecalibration with `--skip_tools baserecalibrator`. For more info see [here](https://gatk.broadinstitute.org/hc/en-us/articles/4407897446939--How-to-Run-germline-single-sample-short-variant-discovery-in-DRAGEN-mode)."
+                },
+                "fq2bam_low_memory": {
+                    "type": "boolean",
+                    "default": false,
+                    "fa_icon": "fas fa-memory",
+                    "description": "Run FastQ to BAM conversion in low memory mode.",
+                    "help_text": "If set, the FastQ to BAM conversion is run in low memory mode. This is useful for large FastQ files."
+                },
+                "fq2bam_markduplicates": {
+                    "type": "boolean",
+                    "default": true,
+                    "fa_icon": "fas fa-dna",
+                    "description": "Run MarkDuplicates on FastQ to BAM conversion.",
+                    "help_text": "If set, duplicates are marked in the FastQ to BAM conversion step. This is useful for UMI data."
+                },
+                "optical_duplicate_pixel_distance": {
+                    "type": "integer",
+                    "default": 2500,
+                    "fa_icon": "fas fa-wrench",
+                    "description": "Maximum offset between optical duplicates.",
+                    "help_text": "The maximum offset between optical duplicates in pixels. Corresponds to the Picard flag `--OPTICAL_DUPLICATE_PIXEL_DISTANCE`."
                 },
                 "save_mapped": {
                     "type": "boolean",

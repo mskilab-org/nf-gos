@@ -7,7 +7,9 @@ include { PARABRICKS_FQ2BAM            } from '../../../modules/local/fq2bam/mai
 fasta                               = WorkflowNfcasereports.create_file_channel(params.fasta)
 fasta_fai                           = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
 intervals                          = WorkflowNfcasereports.create_file_channel(params.intervals)
-low_memory                          = params.low_memory
+mark_duplicates                     = params.fq2bam_mark_duplicates
+low_memory                          = params.fq2bam_low_memory
+optical_duplicate_pixel_distance    = params.optical_duplicate_pixel_distance
 
 workflow FASTQ_PARABRICKS_FQ2BAM {
     take:
@@ -31,6 +33,8 @@ workflow FASTQ_PARABRICKS_FQ2BAM {
         intervals,
         known_sites,
         known_sites_tbi,
+        mark_duplicates,
+        optical_duplicate_pixel_distance,
         low_memory
     )
 

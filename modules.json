@@ -75,6 +75,11 @@
                         "git_sha": "cf8f9ace77aac01caa5c7cb92af5bbda7adb77bd",
                         "installed_by": ["modules"]
                     },
+                    "gatk4/estimatelibrarycomplexity": {
+                        "branch": "master",
+                        "git_sha": "06c8865e36741e05ad32ef70ab3fac127486af48",
+                        "installed_by": ["modules"]
+                    },
                     "gatk4/gatherbqsrreports": {
                         "branch": "master",
                         "git_sha": "cf8f9ace77aac01caa5c7cb92af5bbda7adb77bd",

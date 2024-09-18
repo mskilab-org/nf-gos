@@ -13,8 +13,8 @@ workflow CHANNEL_ALIGN_CREATE_CSV {
             sample  = meta.sample
             sex     = meta.sex
             status  = meta.status
-            bam   = "${params.outdir}/Alignment/Mapped/${sample}/${bam.name}"
-            bai   = "${params.outdir}/Alignment/Mapped/${sample}/${bai.name}"
+            bam   = "${params.outdir}/alignment/Mapped/${sample}/${bam.name}"
+            bai   = "${params.outdir}/alignment/Mapped/${sample}/${bai.name}"
 
             type = params.save_output_as_bam ? "bam" : "cram"
             type_index = params.save_output_as_bam ? "bai" : "crai"

@@ -18,8 +18,8 @@ workflow CHANNEL_MARKDUPLICATES_CREATE_CSV {
             status         = meta.status
             suffix_aligned = save_output_as_bam ? "bam" : "cram"
             suffix_index   = save_output_as_bam ? "bam.bai" : "cram.crai"
-            file   = "${outdir}/Alignment/${csv_subfolder}/${sample}/${file.baseName}.${suffix_aligned}"
-            index   = "${outdir}/Alignment/${csv_subfolder}/${sample}/${index.baseName.minus(".cram")}.${suffix_index}"
+            file   = "${outdir}/alignment/${csv_subfolder}/${sample}/${file.baseName}.${suffix_aligned}"
+            index   = "${outdir}/alignment/${csv_subfolder}/${sample}/${index.baseName.minus(".cram")}.${suffix_index}"
 
             type = save_output_as_bam ? "bam" : "cram"
             type_index = save_output_as_bam ? "bai" : "crai"

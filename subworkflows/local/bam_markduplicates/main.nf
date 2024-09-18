@@ -7,6 +7,8 @@
 include { CRAM_QC_MOSDEPTH_SAMTOOLS } from '../cram_qc_mosdepth_samtools/main'
 include { GATK4_MARKDUPLICATES      } from '../../../modules/nf-core/gatk4/markduplicates/main'
 
+optical_duplicate_pixel_distance = params.optical_duplicate_pixel_distance
+
 workflow BAM_MARKDUPLICATES {
     take:
     bam                    // channel: [mandatory] [ meta, bam ]
@@ -19,7 +21,7 @@ workflow BAM_MARKDUPLICATES {
     reports  = Channel.empty()
 
     // RUN MARKUPDUPLICATES
-    GATK4_MARKDUPLICATES(bam, fasta, fasta_fai)
+    GATK4_MARKDUPLICATES(bam, fasta, fasta_fai, optical_duplicate_pixel_distance)
 
     // Join with the crai file
     cram = GATK4_MARKDUPLICATES.out.cram.join(GATK4_MARKDUPLICATES.out.crai, failOnDuplicate: true, failOnMismatch: true)

@@ -11,6 +11,7 @@ process GATK4_MARKDUPLICATES {
     tuple val(meta), path(bam)
     path  fasta
     path  fasta_fai
+    val optical_duplicate_pixel_distance
 
     output:
     tuple val(meta), path("*cram"),     emit: cram,  optional: true
@@ -49,6 +50,7 @@ process GATK4_MARKDUPLICATES {
         --OUTPUT ${prefix_bam} \\
         --METRICS_FILE ${prefix}.metrics \\
         --TMP_DIR . \\
+        --OPTICAL_DUPLICATE_PIXEL_DISTANCE ${optical_duplicate_pixel_distance} \\
         ${reference} \\
         $args
 

@@ -12,6 +12,8 @@ process PARABRICKS_FQ2BAM {
     path interval_file
     path known_sites
     path known_sites_tbi
+    val mark_duplicates
+    val optical_duplicate_pixel_distance
     val low_memory
 
     output:
@@ -36,8 +38,20 @@ process PARABRICKS_FQ2BAM {
     def known_sites_command = known_sites ? known_sites.collect{"--knownSites $it"}.join(' ') : ""
     def known_sites_output = known_sites ? "--out-recal-file ${prefix}.table" : ""
     def interval_file_command = interval_file ? interval_file.collect{"--interval-file $it"}.join(' ') : ""
-    def mem_limit = task.memory.request*0.8 // 80% of requested memory to be safe
+    def mark_duplicates_output = mark_duplicates ? "--out-duplicate-metrics duplicate-metrics.txt" : ""
+    def optical_duplicate_pixel_distance_command = optical_duplicate_pixel_distance && mark_duplicates ? "--optical-duplicate-pixel-distance $optical_duplicate_pixel_distance" : ""
+    def qc_metrics_output = "--out-qc-metrics-dir qc_metrics"
+    def mem_limit = (task.memory.toGiga() * 0.40).toInteger()
     def low_memory_command = low_memory ? "--low-memory" : ""
+
+    known_sites.eachWithIndex { site, idx ->
+        def tbi_file = known_sites_tbi[idx]
+        """
+        realpath_dir=\$(dirname \$(readlink -f $site))
+        mv $tbi_file \$realpath_dir/
+        """
+    }
+
     """
     pbrun \\
         fq2bam \\
@@ -48,6 +62,9 @@ process PARABRICKS_FQ2BAM {
         $known_sites_command \\
         $known_sites_output \\
         $interval_file_command \\
+        $mark_duplicates_output \\
+        $optical_duplicate_pixel_distance_command \\
+        $qc_metrics_output \\
         --num-gpus $task.accelerator.request \\
         --memory-limit $mem_limit \\
         $low_memory_command \\

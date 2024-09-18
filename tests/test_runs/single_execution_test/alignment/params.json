@@ -5,7 +5,7 @@
     "bwa": "/gpfs/commons/home/sdider/DB/GATK/bwa/",
     "outdir": "./results",
     "tools": "aligner",
-    "low_memory": true,
+    "fq2bam_low_memory": true,
     "pon_dryclean": "/gpfs/commons/home/tdey/data/dryclean/MONSTER_PON_RAW/MONSTER_PON_RAW_SORTED/fixed.detergent.rds",
     "field_dryclean": "reads",
     "genome": "GATK.GRCh37",

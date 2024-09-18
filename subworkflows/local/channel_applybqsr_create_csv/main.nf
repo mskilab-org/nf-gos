@@ -13,8 +13,8 @@ workflow CHANNEL_APPLYBQSR_CREATE_CSV {
             sample  = meta.sample
             sex     = meta.sex
             status  = meta.status
-            file = "${params.outdir}/Alignment/recalibrated/${sample}/${file.name}"
-            index = "${params.outdir}/Alignment/recalibrated/${sample}/${index.name}"
+            file = "${params.outdir}/alignment/recalibrated/${sample}/${file.name}"
+            index = "${params.outdir}/alignment/recalibrated/${sample}/${index.name}"
 
             type = params.save_output_as_bam ? "bam" : "cram"
             type_index = params.save_output_as_bam ? "bai" : "crai"

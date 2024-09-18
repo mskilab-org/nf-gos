@@ -685,8 +685,10 @@ workflow NFCASEREPORTS {
         reads_for_fastp = input_fastq
 
         // Trimming and/or splitting
-        if (params.trim_fastq && params.split_fastq > 0) {
-            log.warn "You have mentioned trim_fastq to `$params.trim_fastq`, will do trimming"
+        if (params.trim_fastq || params.split_fastq > 0) {
+            if (params.trim_fastq) {
+                log.warn "You have mentioned trim_fastq to `$params.trim_fastq`, will do trimming"
+            }
             save_trimmed_fail = false
             save_merged = false
             FASTP(
@@ -700,6 +702,7 @@ workflow NFCASEREPORTS {
             reports = reports.mix(FASTP.out.html.collect{ meta, html -> html })
 
             if (params.split_fastq) {
+                log.warn "You have mentioned split_fastq to `$params.split_fastq`, will do splitting"
                 reads_for_alignment = FASTP.out.reads.map{ meta, reads ->
                     read_files = reads.sort(false) { a,b -> a.getName().tokenize('.')[0] <=> b.getName().tokenize('.')[0] }.collate(2)
                     [ meta + [ size:read_files.size() ], read_files ]
@@ -709,7 +712,7 @@ workflow NFCASEREPORTS {
             versions = versions.mix(FASTP.out.versions)
 
         } else {
-            println "Skipping trimming since trim_fastq is false"
+            println "Skipping fastp since trim_fastq and split_fastq are false"
             reads_for_alignment = reads_for_fastp
         }
 
@@ -768,7 +771,7 @@ workflow NFCASEREPORTS {
 
     // BAM Postprocessing
     // ##############################
-    if (tools_used.contains("all") || tools_used.contains("postprocessing")) {
+    if ((tools_used.contains("all") || tools_used.contains("postprocessing")) && params.aligner != "fq2bam") { // fq2bam does not need postprocessing
         cram_markduplicates_no_spark = Channel.empty()
 
         // STEP 2: markduplicates (+QC) + convert to CRAM
