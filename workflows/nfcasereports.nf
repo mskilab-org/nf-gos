@@ -1485,7 +1485,7 @@ workflow NFCASEREPORTS {
             .mix(JABBA.out.jabba_gg)
             .mix(jabba_gg_existing_outputs)
         jabba_gg_for_merge = jabba_gg
-            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, jabba rds
+            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, jabba.gg.rds
         versions = versions.mix(JABBA.out.versions)
     }
 

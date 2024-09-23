@@ -24,8 +24,6 @@ workflow BAM_SAGE {
     //Creating empty channels for output
     main:
     versions            = Channel.empty()
-    sage_somatic_vcf   = Channel.empty()
-    sage_pass_filtered_somatic_vcf    = Channel.empty()
     sage_germline_vcf   = Channel.empty()
 
     SAGE_SOMATIC(
@@ -41,12 +39,12 @@ workflow BAM_SAGE {
     )
 
     // initializing outputs from fragcounter
-    versions.mix(SAGE_SOMATIC.out.versions)
-    sage_somatic_vcf.mix(SAGE_SOMATIC.out.vcf)
+    versions        = SAGE_SOMATIC.out.versions
+    sage_somatic_vcf        = SAGE_SOMATIC.out.vcf
 
     SAGE_PASS_FILTER(sage_somatic_vcf)
 
-    sage_pass_filtered_somatic_vcf.mix(SAGE_PASS_FILTER.out.vcf)
+    sage_pass_filtered_somatic_vcf = SAGE_PASS_FILTER.out.vcf
 
     if (!params.tumor_only) {
         SAGE_GERMLINE(
@@ -78,7 +76,7 @@ gnomAD_snv_db                       = WorkflowNfcasereports.create_file_channel(
 gnomAD_snv_db_tbi                   = WorkflowNfcasereports.create_file_channel(params.gnomAD_snv_db_tbi)
 sage_germline_pon                   = WorkflowNfcasereports.create_file_channel(params.sage_germline_pon)
 sage_germline_pon_tbi               = WorkflowNfcasereports.create_file_channel(params.sage_germline_pon_tbi)
-mills_gold_indel                        = WorkflowNfcasereports.create_file_channel(params.known_indels)
+mills_gold_indel                    = WorkflowNfcasereports.create_file_channel(params.known_indels)
 
 workflow BAM_SAGE_TUMOR_ONLY_FILTER {
     // defining inputs

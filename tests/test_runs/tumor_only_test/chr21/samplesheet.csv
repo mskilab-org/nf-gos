@@ -1,2 +1,2 @@
-patient,sex,status,sample,bam,bai,ploidy
-JTS-1501,XX,1,JTS-1501_T,/gpfs/commons/groups/imielinski_lab/home/sdider/Projects/nf-casereports/tests/test_data/chr21_bams/JTS-1501-2-T_chr21.bam,/gpfs/commons/groups/imielinski_lab/home/sdider/Projects/nf-casereports/tests/test_data/chr21_bams/JTS-1501-2-T_chr21.bam.bai,1.98
+patient,sex,status,sample,bam,bai
+JTS-1501,XX,1,JTS-1501_T,/gpfs/commons/groups/imielinski_lab/home/sdider/Projects/nf-casereports/tests/test_data/chr21_bams/JTS-1501-2-T_chr21.bam,/gpfs/commons/groups/imielinski_lab/home/sdider/Projects/nf-casereports/tests/test_data/chr21_bams/JTS-1501-2-T_chr21.bam.bai

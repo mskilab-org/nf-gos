@@ -6,6 +6,7 @@
     "outdir": "./results",
     "tools": "aligner",
     "fq2bam_low_memory": true,
+    "split_fastq": 50000000,
     "pon_dryclean": "/gpfs/commons/home/tdey/data/dryclean/MONSTER_PON_RAW/MONSTER_PON_RAW_SORTED/fixed.detergent.rds",
     "field_dryclean": "reads",
     "genome": "GATK.GRCh37",

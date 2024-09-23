@@ -38,8 +38,7 @@ workflow BAM_COV_PURPLE {
 
     COV_COBALT(bams)
 
-    cobalt_dir        = Channel.empty()
-        .mix(COV_COBALT.out.cobalt_dir)
+    cobalt_dir = COV_COBALT.out.cobalt_dir
         .map { meta, cobalt_dir -> [meta.patient, cobalt_dir] }
 
     tumor_sv        = tumor_sv.map { meta, vcf, tbi -> [meta.patient, vcf, tbi] }
@@ -68,7 +67,6 @@ workflow BAM_COV_PURPLE {
             .map { patient, meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf, germ_snv_tbi ->
                 [meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf, germ_snv_tbi]
             }
-
     }
 
     PURPLE(

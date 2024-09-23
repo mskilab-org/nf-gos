@@ -1,2 +1,3 @@
 patient,sex,status,sample,bam,bai
-JTS-1501,XX,1,JTS-1501_T,/gpfs/commons/groups/imielinski_lab/projects/gGnome/Flow/MergeBams/20230202_tnbc_illumina/MergeBams/JTS-1501/aligned.bam,/gpfs/commons/groups/imielinski_lab/projects/gGnome/Flow/MergeBams/20230202_tnbc_illumina/MergeBams/JTS-1501/aligned.bam.bai
+JTS-1501,XX,1,JTS-1501_T,/gpfs/commons/groups/imielinski_lab/home/sdider/Projects/nf-casereports/tests/test_data/full_bams/JTS-1501/aligned.bam,/gpfs/commons/groups/imielinski_lab/home/sdider/Projects/nf-casereports/tests/test_data/full_bams/JTS-1501/aligned.bam.bai
+
