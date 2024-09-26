@@ -26,8 +26,9 @@ process SAGE_GERMLINE {
     task.ext.when == null || task.ext.when
     script:
     def args        = task.ext.args ?: ''
-    def reference_arg = meta.containsKey('normal_id') ? "-reference ${meta.normal_id}" : ''
-    def reference_bam_arg = normal_bam_wgs ? "-reference_bam ${normal_bam_wgs}" : ''
+    // inverting the normal/tumor for sage germline
+    def reference_arg = meta.containsKey('tumor_id') ? "-reference ${meta.tumor_id}" : ''
+    def reference_bam_arg = normal_bam_wgs ? "-reference_bam ${tumor_bam_wgs}" : ''
     """
 
     sage \\
@@ -35,8 +36,8 @@ process SAGE_GERMLINE {
         ${args} \\
         ${reference_arg} \\
         ${reference_bam_arg} \\
-        -tumor ${meta.tumor_id} \\
-        -tumor_bam ${tumor_bam_wgs} \\
+        -tumor ${meta.normal_id} \\
+        -tumor_bam ${normal_bam_wgs} \\
         -ref_genome ${ref} \\
         -ref_genome_version ${ref_genome_version} \\
         -hotspots ${somatic_hotspots} \\
