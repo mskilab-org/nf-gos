@@ -1235,6 +1235,7 @@ workflow NFCASEREPORTS {
             germline_vcf = Channel.empty()
                 .mix(BAM_SAGE.out.sage_germline_vcf)
                 .mix(snv_germline_existing_outputs)
+
             germline_vcf_for_merge = germline_vcf
                 .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, germline snv vcf, tbi
         }
@@ -1358,8 +1359,11 @@ workflow NFCASEREPORTS {
                     [ meta, tumor[2], tumor[3], normal[2], normal[3]]
             }
 
+            purple_tumor_normal_meta = bam_purple_pair
+                .map { it -> [ it[0].patient, it[0] ] } // meta.patient, meta
+
             // germline snvs
-            purple_inputs_snv_germline = purple_inputs_for_merge
+            purple_inputs_snv_germline = purple_tumor_normal_meta
                 .join(germline_vcf_for_merge)
                 .map { it -> [ it[1], it[2], it[3] ] } // meta, vcf, tbi
         }

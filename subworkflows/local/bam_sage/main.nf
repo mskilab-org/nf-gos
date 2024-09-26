@@ -24,7 +24,6 @@ workflow BAM_SAGE {
     //Creating empty channels for output
     main:
     versions            = Channel.empty()
-    sage_germline_vcf   = Channel.empty()
 
     SAGE_SOMATIC(
         inputs,
@@ -59,7 +58,7 @@ workflow BAM_SAGE {
             high_confidence_bed
         )
 
-        sage_germline_vcf.mix(SAGE_GERMLINE.out.vcf)
+        sage_germline_vcf = SAGE_GERMLINE.out.vcf
     }
 
     emit:
