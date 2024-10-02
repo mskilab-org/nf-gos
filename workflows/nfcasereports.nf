@@ -59,8 +59,10 @@ def toolParamMap = [
     "fusions"    : [
         params.gencode_fusions
     ],
-    "allelic_cn" : [
-        params.mask_non_integer_balance,
+    "non_integer_balance" : [
+        params.mask_non_integer_balance
+    ],
+    "lp_phased_balance" : [
         params.mask_lp_phased_balance
     ],
     "vep"        : [
@@ -744,21 +746,27 @@ workflow NFCASEREPORTS {
         }
 
 
-
         // Grouping the bams from the same samples not to stall the workflow
-        bam_mapped = bam_mapped.map{ meta, bam ->
+        bam_mapped = bam_mapped
+            .map { meta, bam ->
 
-            // Update meta.id to be meta.sample, ditching sample-lane that is not needed anymore
-            // Update meta.data_type
-            // Remove no longer necessary fields:
-            //   read_group: Now in the BAM header
-            //    num_lanes: only needed for mapping
-            //         size: only needed for mapping
+                // Update meta.id to be meta.sample, ditching sample-lane that is not needed anymore
+                // Update meta.data_type
+                // Remove no longer necessary fields:
+                //   read_group: Now in the BAM header
+                //    num_lanes: only needed for mapping
+                //         size: only needed for mapping
 
-            // Use groupKey to make sure that the correct group can advance as soon as it is complete
-            // and not stall the workflow until all reads from all channels are mapped
-            [ groupKey( meta - meta.subMap('num_lanes', 'read_group', 'size') + [ id:meta.sample ], (meta.num_lanes ?: 1) * (meta.size ?: 1)), bam ]
-        }.groupTuple()
+                // Ensure meta.size and meta.num_lanes are integers and handle null values
+                int numLanes = (meta.num_lanes != null && meta.num_lanes > 1 ? meta.num_lanes : 1) as int
+                int numSplits = (meta.size ?: 1) as int
+                int numReads = numLanes * numSplits
+
+                // Use groupKey to make sure that the correct group can advance as soon as it is complete
+                // and not stall the workflow until all reads from all channels are mapped
+                [ groupKey( meta - meta.subMap('num_lanes', 'read_group', 'size') + [ id:meta.sample ], numReads), bam ]
+            }
+        .groupTuple()
 
         // bams are merged (when multiple lanes from the same sample) and indexed
         BAM_MERGE_INDEX_SAMTOOLS(bam_mapped)

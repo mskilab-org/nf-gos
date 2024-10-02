@@ -5,7 +5,7 @@
     "bwa": "/gpfs/commons/home/sdider/DB/GATK/bwa/",
     "outdir": "./results",
     "pon_dryclean": "/gpfs/commons/home/tdey/data/dryclean/MONSTER_PON_RAW/MONSTER_PON_RAW_SORTED/fixed.detergent.rds",
-    "tools": "purple",
+    "tools": "lp_phased_balance",
     "field_dryclean": "reads",
     "genome": "GATK.GRCh37",
     "email": "shihabdider@gmail.com"

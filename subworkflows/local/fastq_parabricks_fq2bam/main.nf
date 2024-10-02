@@ -13,7 +13,7 @@ optical_duplicate_pixel_distance    = params.optical_duplicate_pixel_distance
 
 workflow FASTQ_PARABRICKS_FQ2BAM {
     take:
-    reads // channel: [mandatory] meta, reads, intervals (intervals is optional)
+    reads // channel: [mandatory] meta, reads
     known_sites
     known_sites_tbi
 
