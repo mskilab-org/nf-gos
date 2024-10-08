@@ -33,7 +33,7 @@ nextflow run "$pipeline_dir" \
     -c $nygc_config \
     -dump-channels \
     -params-file ./params.json \
-	-profile singularity	\
+	-profile singularity,chr21_test	\
 	-with-report "report_$(date +'%Y%m%d_%H%M%S').html"	\
 	-with-trace	\
 	-resume
