@@ -125,6 +125,16 @@
                         "git_sha": "3e52a04aa60e0cb5cea0487b9ae2fdd04f874027",
                         "installed_by": ["modules"]
                     },
+                    "picard/collectmultiplemetrics": {
+                        "branch": "master",
+                        "git_sha": "666652151335353eef2fcd58880bcef5bc2928e1",
+                        "installed_by": ["modules"]
+                    },
+                    "picard/collectwgsmetrics": {
+                        "branch": "master",
+                        "git_sha": "666652151335353eef2fcd58880bcef5bc2928e1",
+                        "installed_by": ["modules"]
+                    },
                     "samtools/collatefastq": {
                         "branch": "master",
                         "git_sha": "911696ea0b62df80e900ef244d7867d177971f73",

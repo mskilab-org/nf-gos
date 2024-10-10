@@ -87,6 +87,7 @@ tools_used = params.tools ? params.tools.split(',') : ["all"]
 
 tool_dependency_map = [
     "aligner": ["indexing"],
+    "bamqc": ["aligner"],
     "gridss": ["aligner"],
     "amber": ["aligner"],
     "fragcounter": ["aligner"],
@@ -131,7 +132,11 @@ if (params.tools) {
     tools_used = ["all"]
 }
 
-println "Tools that will be run: ${tools_used}"
+if (tools_used == ["all"]) {
+    println "Tools that will be run: ${tool_dependency_map.keySet()}"
+} else {
+    println "Tools that will be run: ${tools_used}"
+}
 
 if (!params.dbsnp && !params.known_indels) {
     if (!params.skip_tools || (params.skip_tools && !params.skip_tools.contains('baserecalibrator'))) {
@@ -496,6 +501,9 @@ include { BAM_MARKDUPLICATES } from '../subworkflows/local/bam_markduplicates/ma
 // QC on CRAM
 include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_NO_MD } from '../subworkflows/local/cram_qc_mosdepth_samtools/main'
 include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_RECAL } from '../subworkflows/local/cram_qc_mosdepth_samtools/main'
+
+// BAM Picard QC
+include { BAM_QC_PICARD } from '../subworkflows/local/bam_qc_picard/main'
 
 // Create recalibration tables
 include { BAM_BASERECALIBRATOR } from '../subworkflows/local/bam_baserecalibrator/main'
@@ -865,6 +873,19 @@ workflow NFCASEREPORTS {
         alignment_bams_final = Channel.empty()
             .mix(CRAM_TO_BAM_FINAL.out.alignment_index)
             .map{ meta, bam, bai -> [ meta.id, meta + [data_type: "bam"], bam, bai ] }
+    }
+
+    // Post-alignment QC
+    if (tools_used.contains("all") || tools_used.contains("bamqc")) {
+        bam_qc_inputs = inputs.map { it -> [it.meta.id] }
+        bam_qc_calling = alignment_bams_final
+            .join(bam_qc_inputs)
+            .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
+        BAM_QC_PICARD(bam_qc_calling)
+
+        // Gather QC
+        reports = reports.mix(BAM_QC_PICARD.out.reports.collect{ meta, report -> report })
+        versions = versions.mix(BAM_QC_PICARD.out.versions)
     }
 
     // SV Calling
