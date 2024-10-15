@@ -9,8 +9,6 @@ process SNV_MULTIPLICITY {
 
     input:
     tuple val(meta), path(somatic_snv, stageAs: "somatic_snv.vcf"), path(germline_snv, stageAs: "germline_snv.vcf"), path(jabba_gg)
-    path(ref)
-    path(ref_fai)
 
     output:
     tuple val(meta), path('*est_snv_cn_somatic.rds'), emit: snv_multiplicity_rds
@@ -22,10 +20,10 @@ process SNV_MULTIPLICITY {
     script:
     def args        = task.ext.args ?: ''
     def prefix      = task.ext.prefix ?: "${meta.id}"
+    def tumor_name  = meta.tumor_id ? : ""
+    def normal_name  = meta.normal_id ? : ""
     def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
-    def DOWNSAMPLE_JAR = "${baseDir}/bin/downsamplevcf.jar"
-    def SNPSIFT_JAR = "${baseDir}/bin/SnpSift.jar"
-    def VCFEFF_PERL = "${baseDir}/bin/vcfEffOnePerLine.pl"
+    def SCRIPTS_DIR = "${baseDir}/bin/"
 
     """
     export RSCRIPT_PATH=\$(echo "${baseDir}/bin/snv_multiplicity3.R")
@@ -33,11 +31,10 @@ process SNV_MULTIPLICITY {
     Rscript \$RSCRIPT_PATH \\
         --somatic_snv ${somatic_snv} \\
         --germline_snv ${germline_snv} \\
-        --fasta ${ref} \\
         --jabba ${jabba_gg} \\
-        --downsample_jar ${DOWNSAMPLE_JAR} \\
-        --snpsift_jar ${SNPSIFT_JAR} \\
-        --vcfeff_perl ${VCFEFF_PERL} \\
+        --snpeff_path ${SCRIPTS_DIR} \\
+        --tumor_name ${tumor_name} \\
+        --normal_name ${normal_name} \\
         --cores ${task.cpus} \\
 
     cat <<-END_VERSIONS > versions.yml

@@ -1623,20 +1623,54 @@ workflow NFCASEREPORTS {
     // SNV Multiplicity
     // ##############################
     if (tools_used.contains("all") || tools_used.contains("snv_multiplicity")) {
-        if (!params.tumor_only) {
-            snv_multiplicity_inputs = inputs.filter { it.snv_multiplicity.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
+        snv_multiplicity_inputs = inputs.filter { it.snv_multiplicity.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
 
-            snv_multiplicity_inputs_somatic_vcf = snv_somatic_annotations_for_merge
-                .join(snv_multiplicity_inputs)
-                .map { it -> [ it[0], it[1] ] } // meta.patient, annotated somatic snv vcf
+        snv_multiplicity_inputs_somatic_vcf = snv_somatic_annotations_for_merge
+            .join(snv_multiplicity_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, annotated somatic snv vcf
+        snv_multiplicity_inputs_jabba_gg = jabba_gg_for_merge
+            .join(snv_multiplicity_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
+
+        if (params.tumor_only) {
+            // tumor/sample id is required for snv multiplicity
+            snv_multiplicity_inputs_status = snv_multiplicity_inputs.branch{
+                tumor:  it[1].status == 1
+            }
+
+            // add empty arrays to stand-in for normals
+            snv_multiplicity_inputs = snv_multiplicity_inputs_status.tumor.map{ patient, meta -> [ patient, meta + [tumor_id: meta.sample] ] }
+            input_snv_multiplicity = snv_multiplicity_inputs
+                .join(snv_multiplicity_inputs_somatic_vcf)
+                .join(snv_multiplicity_inputs_jabba_gg)
+                .map{
+                    patient, meta, somatic_ann, germline_ann, ggraph ->
+                    [ meta, somatic_ann, [], ggraph ]
+                }
+        } else {
+            // getting the tumor and normal cram files separated
+            snv_multiplicity_inputs_status = snv_multiplicity_inputs.branch{
+                normal: it[1].status == 0
+                tumor:  it[1].status == 1
+            }
+
+            // Crossing the normal and tumor samples to create tumor and normal pairs
+            snv_multiplicity_inputs = snv_multiplicity_inputs.normal.cross(snv_multiplicity_inputs.tumor)
+                .map { normal, tumor ->
+                    def meta = [:]
+
+                    meta.id         = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
+                    meta.normal_id  = normal[1].sample
+                    meta.patient    = normal[0]
+                    meta.sex        = normal[1].sex
+                    meta.tumor_id   = tumor[1].sample
+
+                    [ patient, meta ]
+            }
+
             snv_multiplicity_inputs_germline_vcf = snv_germline_annotations_for_merge
                 .join(snv_multiplicity_inputs)
                 .map { it -> [ it[0], it[1] ] } // meta.patient, annotated germline snv vcf
-            snv_multiplicity_inputs_jabba_gg = jabba_gg_for_merge
-                .join(snv_multiplicity_inputs)
-                .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
-
-            snv_multiplicity_existing_outputs = inputs.map { it -> [it.meta, it.snv_multiplicity] }.filter { !it[1].isEmpty() }
 
             input_snv_multiplicity = snv_multiplicity_inputs
                 .join(snv_multiplicity_inputs_somatic_vcf)
@@ -1646,13 +1680,15 @@ workflow NFCASEREPORTS {
                     patient, meta, somatic_ann, germline_ann, ggraph ->
                     [ meta, somatic_ann, germline_ann, ggraph ]
                 }
-
-            VCF_SNV_MULTIPLICITY(input_snv_multiplicity)
-
-            snv_multiplicity = Channel.empty()
-                .mix(VCF_SNV_MULTIPLICITY.out.snv_multiplicity_rds)
-                .mix(snv_multiplicity_existing_outputs)
         }
+
+        snv_multiplicity_existing_outputs = inputs.map { it -> [it.meta, it.snv_multiplicity] }.filter { !it[1].isEmpty() }
+
+        VCF_SNV_MULTIPLICITY(input_snv_multiplicity)
+
+        snv_multiplicity = Channel.empty()
+            .mix(VCF_SNV_MULTIPLICITY.out.snv_multiplicity_rds)
+            .mix(snv_multiplicity_existing_outputs)
     }
 
     // Signatures
