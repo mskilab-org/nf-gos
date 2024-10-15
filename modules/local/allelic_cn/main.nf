@@ -28,7 +28,7 @@ process NON_INTEGER_BALANCE {
     val(pad)
 
     output:
-    tuple val(meta), path("balanced.gg.rds")                , emit: non_integer_balance_balanced_gg, optional: true
+    tuple val(meta), path("non_integer.balanced.gg.rds")                , emit: non_integer_balance_balanced_gg, optional: true
     tuple val(meta), path("hets.gg.rds")                    , emit: non_integer_balance_hets_gg, optional: true
     path "versions.yml"                                     , emit: versions
 
@@ -67,6 +67,8 @@ process NON_INTEGER_BALANCE {
         --gurobi $gurobi \\
         --fasta $fasta \\
         --pad $pad
+
+    mv balanced.gg.rds non_integer.balanced.gg.rds
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -116,7 +118,7 @@ process LP_PHASED_BALANCE {
     val(tilim)
 
     output:
-    tuple val(meta), path("balanced.gg.rds")                , emit: lp_phased_balance_balanced_gg, optional: true
+    tuple val(meta), path("lp_phased.balanced.gg.rds")                , emit: lp_phased_balance_balanced_gg, optional: true
     tuple val(meta), path("binstats.gg.rds")                , emit: lp_phased_balance_binstats_gg, optional: true
     tuple val(meta), path("unphased.gg.rds")                , emit: lp_phased_balance_unphased_allelic_gg, optional: true
     path "versions.yml"                                     , emit: versions
@@ -149,6 +151,8 @@ process LP_PHASED_BALANCE {
         --reward $reward \\
         --nodefileind $nodefileind \\
         --tilim $tilim
+
+    mv balanced.gg.rds lp_phased.balanced.gg.rds
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

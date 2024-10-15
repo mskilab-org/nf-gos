@@ -34,6 +34,10 @@ process SIGPROFILERASSIGNMENT {
     --genome ${genome} \\
     --cosmic-version ${cosmic_version} \\
 
+    # append sbs_ and indel_ to the output file names
+    mv sbs_results/Assignment_Solution/Activities/Assignment_Solution_Activities.txt sbs_results/Assignment_Solution/Activities/sbs_Assignment_Solution_Activities.txt
+    mv indel_results/Assignment_Solution/Activities/Assignment_Solution_Activities.txt indel_results/Assignment_Solution/Activities/indel_Assignment_Solution_Activities.txt
+
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         sigprofilerassignment: ${VERSION}

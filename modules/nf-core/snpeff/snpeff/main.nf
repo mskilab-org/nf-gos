@@ -79,7 +79,7 @@ process SNPEFF_VCF_TO_BCF {
     task.ext.when == null || task.ext.when
 
     script:
-    def prefix = task.ext.prefix ?: "${meta.id}"
+    def prefix = task.ext.prefix ?: "${meta.id}_${task.name}"
     """
     bcftools view ${vcf} -O b -o ${prefix}.ann.unsorted.bcf &&
     bcftools sort ${prefix}.ann.unsorted.bcf -O b -o ${prefix}.ann.bcf &&

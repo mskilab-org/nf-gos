@@ -76,22 +76,26 @@ process MAKE_HET_SITES {
     def baf_tsv = "${amber_dir}/${meta.tumor_id}.amber.baf.tsv.gz"
 
     """
-    echo "seqnames start end alt.count.t ref.count.t alt.count.n ref.count.n" > sites.txt
+    echo "seqnames start end alt.count.t ref.count.t alt.count.n ref.count.n alt.frac.t alt.frac.n" > sites.txt
     zcat ${baf_tsv} | awk 'NR>1 {
-        # Calculate alt.count.t using tumorModifiedBAF
-        alt_count_t = int(\$5 * \$4)  # \$4 is tumorModifiedBAF
+        chromosome=\$1
+        start = \$2
+        end = \$2
+        tumorBAF = \$3
+        tumorModifiedBAF = \$4
+        tumorDepth = \$5
+        normalBAF = \$6
+        normalModifiedBAF = \$7
+        normalDepth = \$8
 
-        # Calculate ref.count.t using tumorModifiedBAF
-        ref_count_t = int(\$5 * (1 - \$4))  # \$4 is tumorModifiedBAF
+        alt_count_t = int(tumorDepth * tumorModifiedBAF)
+        ref_count_t = int(tumorDepth * (1 - tumorModifiedBAF))
+        alt_count_n = int(normalDepth * normalBAF)
+        ref_count_n = int(normalDepth * (1 - normalBAF))
+        alt_frac_t = alt_count_t / (alt_count_t + ref_count_t)
+        alt_frac_n = alt_count_n / (alt_count_n + ref_count_n)
 
-        # Calculate alt.count.n using normalBAF
-        alt_count_n = int(\$8 * \$6)
-
-        # Calculate ref.count.n using normalBAF
-        ref_count_n = int(\$8 * (1 - \$6))
-
-        # Print the results
-        print \$1, \$2, \$2, alt_count_t, ref_count_t, alt_count_n, ref_count_n
+        print chromosome, start, end, alt_count_t, ref_count_t, alt_count_n, ref_count_n, alt_frac_t, alt_frac_n
     }' >> sites.txt
 
     cat <<-END_VERSIONS > versions.yml

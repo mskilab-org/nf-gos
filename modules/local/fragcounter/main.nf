@@ -71,7 +71,7 @@ process FRAGCOUNTER {
     "${task.process}":
         fragcounter: ${VERSION}
     END_VERSIONS
-    """    
+    """
 
 }
 

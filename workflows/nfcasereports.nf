@@ -277,9 +277,7 @@ inputs = ch_from_samplesheet.map {
     fastq_2,
     table,
     cram,
-    crai,
     bam,
-    bai,
     hets,
     amber_dir,
     frag_cov,
@@ -288,7 +286,6 @@ inputs = ch_from_samplesheet.map {
     seg,
     nseg,
     vcf,
-    vcf_tbi,
     jabba_rds,
     jabba_gg,
     ni_balanced_gg,
@@ -296,9 +293,7 @@ inputs = ch_from_samplesheet.map {
     events,
     fusions,
     snv_somatic_vcf,
-    snv_somatic_tbi,
     snv_germline_vcf,
-    snv_germline_tbi,
     variant_somatic_ann,
     variant_somatic_bcf,
     variant_germline_ann,
@@ -314,9 +309,9 @@ inputs = ch_from_samplesheet.map {
         fastq_2: fastq_2,
         table: table,
         cram: cram,
-        crai: crai,
+        crai: cram ? cram + '.crai' : [],
         bam: bam,
-        bai: bai,
+        bai: bam ? bam + '.bai': [],
         hets: hets,
         amber_dir: amber_dir,
         frag_cov: frag_cov,
@@ -325,7 +320,7 @@ inputs = ch_from_samplesheet.map {
         seg: seg,
         nseg: nseg,
         vcf: vcf,
-        vcf_tbi: vcf_tbi,
+        vcf_tbi: vcf ? vcf + '.tbi' : [],
         jabba_rds: jabba_rds,
         jabba_gg: jabba_gg,
         ni_balanced_gg: ni_balanced_gg,
@@ -333,9 +328,9 @@ inputs = ch_from_samplesheet.map {
         events: events,
         fusions: fusions,
         snv_somatic_vcf: snv_somatic_vcf,
-        snv_somatic_tbi: snv_somatic_tbi,
+        snv_somatic_tbi: snv_somatic_vcf ? snv_somatic_vcf + '.tbi' : [],
         snv_germline_vcf: snv_germline_vcf,
-        snv_germline_tbi: snv_germline_tbi,
+        snv_germline_tbi: snv_germline_vcf ? snv_germline_vcf + '.tbi' : [],
         variant_somatic_ann: variant_somatic_ann,
         variant_somatic_bcf: variant_somatic_bcf,
         variant_germline_ann: variant_germline_ann,
@@ -1586,9 +1581,6 @@ workflow NFCASEREPORTS {
     // ##############################
     if (tools_used.contains("all") || tools_used.contains("events")) {
         events_inputs = inputs.filter { it.events.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
-        events_input_jabba_gg = jabba_gg_for_merge
-            .join(events_inputs)
-            .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
         events_input_non_integer_balance = non_integer_balance_balanced_gg_for_merge
             .join(events_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, balanced_gg
@@ -1596,9 +1588,8 @@ workflow NFCASEREPORTS {
         events_existing_outputs = inputs.map { it -> [it.meta, it.events] }.filter { !it[1].isEmpty() }
 
         events_input = events_inputs
-            .join(events_input_jabba_gg)
             .join(events_input_non_integer_balance)
-            .map{ patient, meta, rds, balanced_gg -> [ meta, rds, balanced_gg ] }
+            .map{ patient, meta, balanced_gg -> [ meta, balanced_gg ] }
 
         EVENTS(events_input)
 
@@ -1612,9 +1603,6 @@ workflow NFCASEREPORTS {
     // ##############################
     if (tools_used.contains("all") || tools_used.contains("fusions")) {
         fusions_inputs = inputs.filter { it.fusions.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
-        fusions_input_jabba_gg = jabba_gg_for_merge
-            .join(fusions_inputs)
-            .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
         fusions_input_non_integer_balance = non_integer_balance_balanced_gg_for_merge
             .join(fusions_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, balanced_gg
@@ -1622,9 +1610,8 @@ workflow NFCASEREPORTS {
         fusions_existing_outputs = inputs.map { it -> [it.meta, it.fusions] }.filter { !it[1].isEmpty() }
 
         fusions_input = fusions_inputs
-            .join(fusions_input_jabba_gg)
             .join(fusions_input_non_integer_balance)
-            .map{ patient, meta, rds, balanced_gg -> [ meta, rds, balanced_gg ] }
+            .map{ patient, meta, balanced_gg -> [ meta, balanced_gg ] }
 
         FUSIONS(fusions_input)
         fusions = Channel.empty()

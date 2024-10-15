@@ -117,42 +117,12 @@
                 "format": "file-path",
                 "exists": true
             },
-            "crai": {
-                "errorMessage": "CRAM index file cannot contain spaces and must have extension '.crai'",
-                "anyOf": [
-                    {
-                        "type": "string",
-                        "pattern": "^\\S+\\.crai$"
-                    },
-                    {
-                        "type": "string",
-                        "maxLength": 0
-                    }
-                ],
-                "format": "file-path",
-                "exists": true
-            },
             "bam": {
                 "errorMessage": "BAM file cannot contain spaces and must have extension '.bam'",
                 "anyOf": [
                     {
                         "type": "string",
                         "pattern": "^\\S+\\.bam$"
-                    },
-                    {
-                        "type": "string",
-                        "maxLength": 0
-                    }
-                ],
-                "format": "file-path",
-                "exists": true
-            },
-            "bai": {
-                "errorMessage": "BAM index file cannot contain spaces and must have extension '.bai'",
-                "anyOf": [
-                    {
-                        "type": "string",
-                        "pattern": "^\\S+\\.bai$"
                     },
                     {
                         "type": "string",
@@ -311,31 +281,8 @@
                 "format": "file-path",
                 "exists": true
             },
-            "vcf2": {
-                "errorMessage": "VCF file for reads 2 cannot contain spaces and must have extension '.vcf' or '.vcf.gz'",
-                "anyOf": [
-                    {
-                        "type": "string",
-                        "pattern": "^\\S+\\.vcf(\\.gz)?$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^NA$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^/dev/null$"
-                    },
-                    {
-                        "type": "string",
-                        "maxLength": 0
-                    }
-                ],
-                "format": "file-path",
-                "exists": true
-            },
-            "jabba_rds": {
-                "errorMessage": "jabba.rds file and must have extension '.rds'",
+            "jabba_gg": {
+                "errorMessage": "jabba.simple.gg.rds file and must have extension '.rds'",
                 "anyOf": [
                     {
                         "type": "string",
@@ -357,8 +304,8 @@
                 "format": "file-path",
                 "exists": true
             },
-            "jabba_gg": {
-                "errorMessage": "jabba.simple.gg.rds file and must have extension '.rds'",
+            "jabba_rds": {
+                "errorMessage": "jabba.rds file and must have extension '.rds'",
                 "anyOf": [
                     {
                         "type": "string",
@@ -495,58 +442,12 @@
                 "format": "file-path",
                 "exists": true
             },
-            "snv_somatic_tbi": {
-                "errorMessage": "Sage somatic VCF tbi file cannot contain spaces and must have extension '.tbi' or '.gz.tbi'",
-                "anyOf": [
-                    {
-                        "type": "string",
-                        "pattern": "^\\S+\\.tbi(\\.gz.tbi)?$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^NA$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^/dev/null$"
-                    },
-                    {
-                        "type": "string",
-                        "maxLength": 0
-                    }
-                ],
-                "format": "file-path",
-                "exists": true
-            },
             "snv_germline_vcf": {
                 "errorMessage": "Sage germline VCF output file cannot contain spaces and must have extension '.vcf' or '.vcf.gz'",
                 "anyOf": [
                     {
                         "type": "string",
                         "pattern": "^\\S+\\.vcf(\\.gz)?$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^NA$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^/dev/null$"
-                    },
-                    {
-                        "type": "string",
-                        "maxLength": 0
-                    }
-                ],
-                "format": "file-path",
-                "exists": true
-            },
-            "snv_germline_tbi": {
-                "errorMessage": "Sage germline VCF tbi file cannot contain spaces and must have extension '.tbi' or '.gz.tbi'",
-                "anyOf": [
-                    {
-                        "type": "string",
-                        "pattern": "^\\S+\\.tbi(\\.gz.tbi)?$"
                     },
                     {
                         "type": "string",
