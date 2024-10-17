@@ -945,10 +945,10 @@ workflow NFCASEREPORTS {
 
             JUNCTION_FILTER(vcf_from_gridss_gridss)
 
+            pon_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.pon_filtered_sv_rds)
             final_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.final_filtered_sv_rds)
             final_filtered_sv_rds_for_merge = final_filtered_sv_rds
                 .map { it -> [ it[0].patient, it[1] ] } // meta.patient, rds
-            pon_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.pon_filtered_sv_rds)
         } else {
             //somatic filter for GRIDSS
             BAM_SVCALLING_GRIDSS_SOMATIC(vcf_from_gridss_gridss)
@@ -1137,10 +1137,25 @@ workflow NFCASEREPORTS {
             .join(cbs_inputs.tumor)
             .map{ it -> [ it[0].patient, it[0], it[1] ] } // meta.patient, meta, dryclean tumor cov
 
-        if (!params.tumor_only) {
+        if (params.tumor_only) {
+            cov_cbs = cbs_tumor_input.map { patient, meta, tumor_cov -> [ meta, tumor_cov, [] ] }
+        } else {
             cbs_normal_input = dryclean_normal_cov
                 .join(cbs_inputs.normal)
                 .map{ it -> [ it[0].patient, it[0], it[1] ] } // meta.patient, meta, dryclean normal cov
+
+            cov_cbs = cbs_tumor_input.cross(cbs_normal_input)
+                .map { tumor, normal ->
+                    def meta = [:]
+                        meta.id             = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
+                        meta.sample         = "${tumor[1].sample}".toString()
+                        meta.normal_id      = normal[1].sample
+                        meta.patient        = normal[0]
+                        meta.sex            = normal[1].sex
+                        meta.tumor_id       = tumor[1].sample
+
+                        [ meta, tumor[2], normal[2] ]
+                }
         }
 
         cbs_existing_seg = inputs
@@ -1151,18 +1166,6 @@ workflow NFCASEREPORTS {
             .map { it -> [it.meta, it.nseg] }
             .filter { !it[1].isEmpty() }
 
-        cov_cbs = cbs_tumor_input.cross(cbs_normal_input)
-            .map { tumor, normal ->
-                def meta = [:]
-                    meta.id             = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
-                    meta.sample         = "${tumor[1].sample}".toString()
-                    meta.normal_id      = normal[1].sample
-                    meta.patient        = normal[0]
-                    meta.sex            = normal[1].sex
-                    meta.tumor_id       = tumor[1].sample
-
-                    [ meta, tumor[2], normal[2] ]
-            }
 
         CBS(cov_cbs)
 
@@ -1427,14 +1430,15 @@ workflow NFCASEREPORTS {
             .join(jabba_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, vcf
 
-        jabba_inputs_unfiltered_sv = unfiltered_som_sv_for_merge
-            .join(jabba_inputs)
-            .map { it -> [ it[0], it[1] ] } // meta.patient, unfiltered_som_sv
 
         if (params.tumor_only) {
             jabba_inputs_junction_filtered_sv = final_filtered_sv_rds_for_merge
                 .join(jabba_inputs)
                 .map { it -> [ it[0], it[1] ] } // meta.patient, pon and gnomaD filtered sv (for tumor only)
+        } else {
+            jabba_inputs_unfiltered_sv = unfiltered_som_sv_for_merge
+                .join(jabba_inputs)
+                .map { it -> [ it[0], it[1] ] } // meta.patient, unfiltered_som_sv
         }
 
         jabba_inputs_hets = hets_sites_for_merge
@@ -1461,25 +1465,28 @@ workflow NFCASEREPORTS {
         jabba_gg_existing_outputs = inputs.map { it -> [it.meta, it.jabba_gg] }.filter { !it[1].isEmpty() }
 
         if (params.tumor_only) {
-            jabba_inputs = jabba_inputs
+            jabba_input = jabba_inputs
                 .join(jabba_inputs_cov)
+                .join(jabba_inputs_hets)
                 .join(jabba_inputs_ploidy)
+                .join(jabba_inputs_cbs_seg)
+                .join(jabba_inputs_cbs_nseg)
                 .join(jabba_inputs_junction_filtered_sv)
-                .map{ patient, meta, cov, ploidy, junction ->
+                .map{ patient, meta, cov, hets, ploidy, seg, nseg, junction ->
                     [
                         meta,
                         junction,
                         cov,
                         [],
-                        [],
+                        hets,
                         ploidy,
-                        [],
-                        []
+                        seg,
+                        nseg
                     ]
                 }
         } else {
             // join all previous outputs to be used as input for jabba
-            jabba_inputs = jabba_inputs
+            jabba_input = jabba_inputs
                 .join(jabba_inputs_cov)
                 .join(jabba_inputs_hets)
                 .join(jabba_inputs_ploidy)
@@ -1501,7 +1508,7 @@ workflow NFCASEREPORTS {
                 }
         }
 
-        JABBA(jabba_inputs)
+        JABBA(jabba_input)
 
         jabba_rds = Channel.empty()
             .mix(JABBA.out.jabba_rds)
@@ -1536,11 +1543,19 @@ workflow NFCASEREPORTS {
 
         non_integer_balance_existing_outputs = inputs.map { it -> [it.meta, it.ni_balanced_gg] }.filter { !it[1].isEmpty() }
 
-        non_integer_balance_inputs = non_integer_balance_inputs
-            .join(non_integer_balance_inputs_jabba_gg)
-            .join(non_integer_balance_inputs_hets)
-            .join(non_integer_balance_inputs_cov)
-            .map{ patient, meta, rds, hets, cov -> [ meta, rds, cov, hets ] }
+        if (params.tumor_only) {
+            non_integer_balance_inputs = non_integer_balance_inputs
+                .join(non_integer_balance_inputs_jabba_gg)
+                .join(non_integer_balance_inputs_cov)
+                .map{ patient, meta, rds, cov -> [ meta, rds, cov, [] ] }
+
+        } else {
+            non_integer_balance_inputs = non_integer_balance_inputs
+                .join(non_integer_balance_inputs_jabba_gg)
+                .join(non_integer_balance_inputs_hets)
+                .join(non_integer_balance_inputs_cov)
+                .map{ patient, meta, rds, hets, cov -> [ meta, rds, cov, hets ] }
+        }
 
         NON_INTEGER_BALANCE(non_integer_balance_inputs, bwa)
         versions = Channel.empty().mix(NON_INTEGER_BALANCE.out.versions)
@@ -1644,7 +1659,7 @@ workflow NFCASEREPORTS {
                 .join(snv_multiplicity_inputs_somatic_vcf)
                 .join(snv_multiplicity_inputs_jabba_gg)
                 .map{
-                    patient, meta, somatic_ann, germline_ann, ggraph ->
+                    patient, meta, somatic_ann, ggraph ->
                     [ meta, somatic_ann, [], ggraph ]
                 }
         } else {
@@ -1655,8 +1670,9 @@ workflow NFCASEREPORTS {
             }
 
             // Crossing the normal and tumor samples to create tumor and normal pairs
-            snv_multiplicity_inputs = snv_multiplicity_inputs.normal.cross(snv_multiplicity_inputs.tumor)
+            snv_multiplicity_inputs = snv_multiplicity_inputs_status.normal.cross(snv_multiplicity_inputs_status.tumor)
                 .map { normal, tumor ->
+                    def patient = normal[0]
                     def meta = [:]
 
                     meta.id         = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
@@ -1721,7 +1737,7 @@ workflow NFCASEREPORTS {
 
     // HRDetect
     // ##############################
-    if (tools_used.contains("all") || tools_used.contains("hrdetect")) {
+    if ((tools_used.contains("all") || tools_used.contains("hrdetect")) && !params.tumor_only) {
         hrdetect_inputs = inputs
             .filter { it.hrdetect.isEmpty() }
             .map { it -> [it.meta.patient, it.meta] }

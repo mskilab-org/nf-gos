@@ -8,14 +8,14 @@ process JUNCTION_FILTER {
         'mskilab/hrdetect:0.0.4' }"
 
     input:
-    tuple val(meta), path(filtered_sv_vcf)
+    tuple val(meta), path(filtered_sv_vcf), path(filtered_sv_vcf_tbi)
     path(junction_pon)
     path(gnomAD_sv_db)
     val(padding)
 
     output:
-    tuple val(meta), path("somatic.filtered.gnoMAD.sv.rds")                , emit: final_filtered_sv_rds,      optional:true
-    tuple val(meta), path("somatic.filtered.sv.rds")                       , emit: pon_filtered_sv_rds,        optional: false
+    tuple val(meta), path("somatic.filtered.gnoMAD.sv.rds")                , emit: pon_filtered_sv_rds,      optional:true
+    tuple val(meta), path("somatic.filtered.sv.rds")                       , emit: final_filtered_sv_rds,        optional: false
     path "versions.yml"                                                    , emit: versions,                   optional:false
 
     when:

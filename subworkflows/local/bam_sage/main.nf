@@ -23,6 +23,7 @@ workflow BAM_SAGE {
 
     //Creating empty channels for output
     main:
+    sage_germline_vcf = Channel.empty()
     versions            = Channel.empty()
 
     SAGE_SOMATIC(

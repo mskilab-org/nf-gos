@@ -26,13 +26,14 @@ process CBS {
     script:
     def args        = task.ext.args ?: ''
     def prefix      = task.ext.prefix ?: "${meta.id}"
+    def normal_cov = normal_dryclean_cov ?: "NULL"
     def VERSION     = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
     """
-    export RSCRIPT_PATH=\$(echo "${baseDir}/bin/cbsFH.R")
+    export RSCRIPT_PATH=\$(echo "${baseDir}/bin/cbsFH_ZC.R")
     Rscript \$RSCRIPT_PATH \\
         -t ${tumor_dryclean_cov} \
-        -n ${normal_dryclean_cov} \
+        -n ${normal_cov} \
         --cnsignif ${cnsignif} \
         -m ${meta.id} \
         -f ${field}

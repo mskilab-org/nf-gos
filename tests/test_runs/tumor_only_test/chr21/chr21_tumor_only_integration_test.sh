@@ -31,7 +31,7 @@ nygc_config=/gpfs/commons/home/sdider/Projects/nf-casereports/tests/test_runs/ny
 # -resume: always tries to resume if possible, otherwise will start from beginning
 # -c nygc_config: include this flag/parameter if you want to run via slurm
 nextflow run "$pipeline_dir" \
-    -c "$pipeline_dir/tests/nextflow_chr21_test.config" \
+    -c "$pipeline_dir/nextflow.config" \
     -c $nygc_config \
     -dump-channels trace,trace2 \
     -params-file ./params.json \

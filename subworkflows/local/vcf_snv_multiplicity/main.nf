@@ -4,8 +4,6 @@
 
 include { SNV_MULTIPLICITY } from '../../../modules/local/snv_multiplicity/main.nf'
 
-ref                               = WorkflowNfcasereports.create_file_channel(params.fasta)
-ref_fai                           = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
 workflow VCF_SNV_MULTIPLICITY {
     // defining inputs
     take:
@@ -17,9 +15,7 @@ workflow VCF_SNV_MULTIPLICITY {
     snv_multiplicity_rds	= Channel.empty()
 
     SNV_MULTIPLICITY(
-        input,
-        ref,
-        ref_fai
+        input
     )
 
     // initializing outputs from snv_multiplicity

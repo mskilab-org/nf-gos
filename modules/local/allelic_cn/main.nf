@@ -40,6 +40,8 @@ process NON_INTEGER_BALANCE {
     def prefix      = task.ext.prefix ?: "${meta.id}"
     def id          = "${meta.sample}"
     def bwa = bwa_index ? "ln -nfs \$(readlink -f ${bwa_index})/* \$(dirname \$(readlink -f $fasta))/" : ""
+    def hets_flag = het_pileups_wgs ? "--hets ${het_pileups_wgs}" : ""
+    def hets_thres_flag = het_pileups_wgs ? "--hets_thresh ${hets_thresh}" : ""
     def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
     """
@@ -52,8 +54,8 @@ process NON_INTEGER_BALANCE {
         --jab $jabba_gg \\
         --cov $decomposed_cov \\
         --field $field \\
-        --hets $het_pileups_wgs \\
-        --hets_thresh $hets_thresh \\
+        ${hets_flag} \\
+        ${hets_thres_flag} \\
         --mask $mask \\
         --overwrite $overwrite \\
         --lambda $lambda \\

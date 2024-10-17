@@ -20,22 +20,21 @@ process SNV_MULTIPLICITY {
     script:
     def args        = task.ext.args ?: ''
     def prefix      = task.ext.prefix ?: "${meta.id}"
-    def tumor_name  = meta.tumor_id ? : ""
-    def normal_name  = meta.normal_id ? : ""
+    def germline_flag = germline_snv ? "--germline_snv ${germline_snv}" : "--germline_snv /dev/null"
+    def normal_flag = meta.normal_id ? "--normal_name ${meta.normal_id}" : ""
     def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
-    def SCRIPTS_DIR = "${baseDir}/bin/"
+    def SCRIPTS_DIR = "${baseDir}/bin/snpEff/"
 
     """
     export RSCRIPT_PATH=\$(echo "${baseDir}/bin/snv_multiplicity3.R")
 
     Rscript \$RSCRIPT_PATH \\
         --somatic_snv ${somatic_snv} \\
-        --germline_snv ${germline_snv} \\
+        ${germline_flag} \\
         --jabba ${jabba_gg} \\
         --snpeff_path ${SCRIPTS_DIR} \\
-        --tumor_name ${tumor_name} \\
-        --normal_name ${normal_name} \\
-        --cores ${task.cpus} \\
+        --tumor_name ${meta.tumor_id} \\
+        ${normal_flag}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

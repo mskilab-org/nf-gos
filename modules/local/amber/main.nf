@@ -74,28 +74,40 @@ process MAKE_HET_SITES {
     script:
     def args = task.ext.args ?: ''
     def baf_tsv = "${amber_dir}/${meta.tumor_id}.amber.baf.tsv.gz"
+    def is_tumor_only = params.tumor_only ?: false
 
     """
-    echo "seqnames start end alt.count.t ref.count.t alt.count.n ref.count.n alt.frac.t alt.frac.n" > sites.txt
-    zcat ${baf_tsv} | awk 'NR>1 {
+    if [ "$is_tumor_only" = true ]; then
+        echo "seqnames start end alt.count.t ref.count.t alt.frac.t" > sites.txt
+    else
+        echo "seqnames start end alt.count.t ref.count.t alt.count.n ref.count.n alt.frac.t alt.frac.n" > sites.txt
+    fi
+
+    zcat "$baf_tsv" | awk -v is_tumor_only="$is_tumor_only" 'NR>1 {
         chromosome=\$1
         start = \$2
         end = \$2
         tumorBAF = \$3
         tumorModifiedBAF = \$4
         tumorDepth = \$5
-        normalBAF = \$6
-        normalModifiedBAF = \$7
-        normalDepth = \$8
 
         alt_count_t = int(tumorDepth * tumorModifiedBAF)
         ref_count_t = int(tumorDepth * (1 - tumorModifiedBAF))
-        alt_count_n = int(normalDepth * normalBAF)
-        ref_count_n = int(normalDepth * (1 - normalBAF))
         alt_frac_t = alt_count_t / (alt_count_t + ref_count_t)
-        alt_frac_n = alt_count_n / (alt_count_n + ref_count_n)
 
-        print chromosome, start, end, alt_count_t, ref_count_t, alt_count_n, ref_count_n, alt_frac_t, alt_frac_n
+        if (is_tumor_only != "true") {
+            normalBAF = \$6
+            normalModifiedBAF = \$7
+            normalDepth = \$8
+
+            alt_count_n = int(normalDepth * normalBAF)
+            ref_count_n = int(normalDepth * (1 - normalBAF))
+            alt_frac_n = alt_count_n / (alt_count_n + ref_count_n)
+
+            print chromosome, start, end, alt_count_t, ref_count_t, alt_count_n, ref_count_n, alt_frac_t, alt_frac_n
+        } else {
+            print chromosome, start, end, alt_count_t, ref_count_t, alt_frac_t
+        }
     }' >> sites.txt
 
     cat <<-END_VERSIONS > versions.yml

@@ -218,10 +218,15 @@ workflow COV_JUNC_JABBA {
     j_supp = inputs_map.map { sample ->
         [sample.meta, sample.j_supp]
     }
-    COERCE_SEQNAMES_UNFIL_SOM_SV(j_supp)
-    chr_coerced_j_supp = COERCE_SEQNAMES_UNFIL_SOM_SV.out.file
-    chr_coerced_j_supp = chr_coerced_j_supp.map { meta, j_supp ->
-        [meta.patient, j_supp]
+
+    if (!params.tumor_only) {
+        COERCE_SEQNAMES_UNFIL_SOM_SV(j_supp)
+        chr_coerced_j_supp = COERCE_SEQNAMES_UNFIL_SOM_SV.out.file
+        chr_coerced_j_supp = chr_coerced_j_supp.map { meta, j_supp ->
+            [meta.patient, j_supp]
+        }
+    } else {
+        chr_coerced_j_supp = j_supp.map { meta, j_supp -> [meta.patient, j_supp] }
     }
 
     het_pileups_wgs = inputs_map.map { sample ->

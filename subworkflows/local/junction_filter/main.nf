@@ -10,7 +10,7 @@ padding                             = WorkflowNfcasereports.create_value_channel
 
 workflow SV_JUNCTION_FILTER {
     take:
-    input                  //format: [meta, filtered_sv_vcf]
+    input                  //format: [meta, filtered_sv_vcf, tbi]
 
     main:
     versions                = Channel.empty()
