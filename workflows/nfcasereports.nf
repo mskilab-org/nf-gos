@@ -498,7 +498,7 @@ include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_NO_MD } from '../subworkflows/loc
 include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_RECAL } from '../subworkflows/local/cram_qc_mosdepth_samtools/main'
 
 // BAM Picard QC
-include { BAM_QC_PICARD } from '../subworkflows/local/bam_qc_picard/main'
+include { BAM_QC } from '../subworkflows/local/bam_qc/main'
 
 // Create recalibration tables
 include { BAM_BASERECALIBRATOR } from '../subworkflows/local/bam_baserecalibrator/main'
@@ -876,11 +876,14 @@ workflow NFCASEREPORTS {
         bam_qc_calling = alignment_bams_final
             .join(bam_qc_inputs)
             .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
-        BAM_QC_PICARD(bam_qc_calling)
+
+        // omit meta since it is not used in the BAM_QC
+        dict_path = dict.map{ meta, dict -> dict }
+        BAM_QC(bam_qc_calling, dict_path)
 
         // Gather QC
-        reports = reports.mix(BAM_QC_PICARD.out.reports.collect{ meta, report -> report })
-        versions = versions.mix(BAM_QC_PICARD.out.versions)
+        reports = reports.mix(BAM_QC.out.reports.collect{ meta, report -> report })
+        versions = versions.mix(BAM_QC.out.versions)
     }
 
     // SV Calling
