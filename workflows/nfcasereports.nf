@@ -1621,20 +1621,31 @@ workflow NFCASEREPORTS {
     // ##############################
     if (tools_used.contains("all") || tools_used.contains("fusions")) {
         fusions_inputs = inputs.filter { it.fusions.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
-        fusions_input_non_integer_balance = non_integer_balance_balanced_gg_for_merge
-            .join(fusions_inputs)
-            .map { it -> [ it[0], it[1] ] } // meta.patient, balanced_gg
+
+        if (tools_used.contains("non_integer_balance")) {
+            fusions_input_non_integer_balance = non_integer_balance_balanced_gg_for_merge
+                .join(fusions_inputs)
+                .map { it -> [ it[0], it[1] ] } // meta.patient, balanced_gg
+            fusions_input = fusions_inputs
+                .join(fusions_input_non_integer_balance)
+                .map{ patient, meta, balanced_gg -> [ meta, balanced_gg, [], [] ] }
+        } else {
+            fusions_input_sv = vcf_from_sv_calling_for_merge
+                .join(fusions_inputs)
+                .map { it -> [ it[0], it[1], it[2] ] } // meta.patient, vcf, vcf_tbi
+            fusions_input = fusions_inputs
+                .join(fusions_input_sv)
+                .map{ patient, meta, sv, sv_tbi -> [ meta, [], sv, sv_tbi ] }
+        }
 
         fusions_existing_outputs = inputs.map { it -> [it.meta, it.fusions] }.filter { !it[1].isEmpty() }
-
-        fusions_input = fusions_inputs
-            .join(fusions_input_non_integer_balance)
-            .map{ patient, meta, balanced_gg -> [ meta, balanced_gg ] }
 
         FUSIONS(fusions_input)
         fusions = Channel.empty()
             .mix(FUSIONS.out.fusions_output)
             .mix(fusions_existing_outputs)
+        altedge_annotations = Channel.empty()
+            .mix(FUSIONS.out.altedge_annotations)
         versions = Channel.empty().mix(FUSIONS.out.versions)
     }
 

@@ -9,11 +9,12 @@ process FUSIONS {
         'mskilab/events:latest' }"
 
     input:
-    tuple val(meta), path(gGraph)
+    tuple val(meta), path(gGraph), path(sv_vcf), path(sv_vcf_tbi)
     path(gencode)
 
     output:
     tuple val(meta), path("*fusions.rds") , emit: fusions_output
+    tuple val(meta), path("*altedge.annotations.tsv") , emit: altedge_annotations
     path "versions.yml"                   , emit: versions
 
     when:
@@ -23,6 +24,7 @@ process FUSIONS {
     def args        = task.ext.args ?: ''
     def prefix      = task.ext.prefix ?: "${meta.id}"
     def id          = "${meta.sample}"
+    def junctions_flag = sv_vcf ? "--junctions ${sv_vcf}" : "--junctions ${gGraph}"
     def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
     """
@@ -31,7 +33,7 @@ process FUSIONS {
 
     Rscript \$RSCRIPT_PATH \\
 	--id $id \\
-	--gGraph $gGraph \\
+    ${junctions_flag} \\
 	--gencode $gencode \\
     --cores ${task.cpus}
 
