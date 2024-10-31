@@ -11,7 +11,7 @@ process AMBER {
     tuple val(meta), path(tumor_bam), path(tumor_bai), path(normal_bam), path(normal_bai)
     val genome_ver
     path heterozygous_sites
-    path target_region_bed
+    tuple val(meta2), path(target_region_bed)
 
     output:
     tuple val(meta), path('amber/'), emit: amber_dir

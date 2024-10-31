@@ -362,7 +362,7 @@ inputs = inputs
             ch_items.meta   = ch_items.meta + [id: "${ch_items.meta.sample}-${ch_items.meta.lane}".toString()]
             def CN         = params.seq_center ? "CN:${params.seq_center}\\t" : ''
 
-            def flowcell   = flowcellLaneFromFastq(fastq_1)
+            def flowcell   = flowcellLaneFromFastq(ch_items.fastq_1)
             // Don't use a random element for ID, it breaks resuming
             def read_group = "\"@RG\\tID:${flowcell}.${ch_items.meta.sample}.${ch_items.meta.lane}\\t${CN}PU:${ch_items.meta.lane}\\tSM:${ch_items.meta.patient}_${ch_items.meta.sample}\\tLB:${ch_items.meta.sample}\\tDS:${params.fasta}\\tPL:${params.seq_platform}\""
 
@@ -872,13 +872,13 @@ workflow NFCASEREPORTS {
 
     // Post-alignment QC
     if (tools_used.contains("all") || tools_used.contains("bamqc")) {
-        bam_qc_inputs = inputs.map { it -> [it.meta.id] }
-        bam_qc_calling = alignment_bams_final
-            .join(bam_qc_inputs)
-            .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
+        bam_qc_inputs = inputs.map { it -> [it.meta.sample] }
+        bam_qc_calling = bam_qc_inputs
+            .join(alignment_bams_final)
+            .map { id, meta, bam, bai -> [ meta, bam, bai ] }
 
         // omit meta since it is not used in the BAM_QC
-        dict_path = dict.map{ meta, dict -> dict }
+        dict_path = dict.map{ meta, dict -> [dict] }
         BAM_QC(bam_qc_calling, dict_path)
 
         // Gather QC
@@ -891,7 +891,7 @@ workflow NFCASEREPORTS {
     if (tools_used.contains("all") || tools_used.contains("gridss")) {
 
         // Filter out bams for which SV calling has already been done
-        bam_sv_inputs = inputs.filter { it.vcf.isEmpty() }.map { it -> [it.meta.id] }
+        bam_sv_inputs = inputs.filter { it.vcf.isEmpty() }.map { it -> [it.meta.sample] }
         bam_sv_calling = alignment_bams_final
             .join(bam_sv_inputs)
             .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
@@ -970,7 +970,8 @@ workflow NFCASEREPORTS {
     // AMBER
     // ##############################
     if (tools_used.contains("all") || tools_used.contains("amber")) {
-        bam_amber_inputs = inputs.filter { it.hets.isEmpty() && it.amber_dir.isEmpty() }.map { it -> [it.meta.id] }
+        bam_amber_inputs = inputs.filter { it.hets.isEmpty() && it.amber_dir.isEmpty() }.map { it -> [it.meta.sample] }
+    alignment_bams_final = alignment_bams_final
         bam_amber_calling = alignment_bams_final
             .join(bam_amber_inputs)
             .map{ it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
@@ -998,14 +999,14 @@ workflow NFCASEREPORTS {
         }
 
         // All tumor samples
-        bam_amber_tumor_for_crossing = bam_amber_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta + [id: meta.sample], bam, bai ] }
+        bam_amber_tumor_for_crossing = bam_amber_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
 
         if (params.tumor_only) {
             // add empty arrays to stand-in for normals
             bam_amber_pair = bam_amber_status.tumor.map{ meta, bam, bai -> [ meta + [tumor_id: meta.sample], bam, bai, [], [] ] }
         } else {
             // All normal samples
-            bam_amber_normal_for_crossing = bam_amber_status.normal.map{ meta, bam, bai -> [ meta.patient, meta + [id: meta.sample], bam, bai ] }
+            bam_amber_normal_for_crossing = bam_amber_status.normal.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
             // Crossing the normal and tumor samples to create tumor and normal pairs
             bam_amber_pair = bam_amber_normal_for_crossing.cross(bam_amber_tumor_for_crossing)
                 .map { normal, tumor ->
@@ -1041,7 +1042,7 @@ workflow NFCASEREPORTS {
     // FRAGCOUNTER
     // ##############################
     if (tools_used.contains("all") || tools_used.contains("fragcounter")) {
-        bam_fragcounter_inputs = inputs.filter { it.frag_cov.isEmpty() }.map { it -> [it.meta.id] }
+        bam_fragcounter_inputs = inputs.filter { it.frag_cov.isEmpty() }.map { it -> [it.meta.sample] }
         bam_fragcounter_calling = alignment_bams_final
             .join(bam_fragcounter_inputs)
             .map{ it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
@@ -1194,11 +1195,11 @@ workflow NFCASEREPORTS {
         if (params.tumor_only) {
             bam_snv_inputs = inputs
                 .filter { it.snv_somatic_vcf.isEmpty() }
-                .map { it -> [it.meta.id] }
+                .map { it -> [it.meta.sample] }
         } else {
             bam_snv_inputs = inputs
                 .filter { it.snv_somatic_vcf.isEmpty() || it.snv_germline_vcf.isEmpty() }
-                .map { it -> [it.meta.id] }
+                .map { it -> [it.meta.sample] }
         }
 
         bam_snv_calling = alignment_bams_final
@@ -1350,7 +1351,7 @@ workflow NFCASEREPORTS {
     // ##############################
     if (tools_used.contains("all") || tools_used.contains("purple")) {
         // this channel is for merging with alignment_bams_final
-        purple_inputs = inputs.filter { it.ploidy.isEmpty() }.map { it -> [it.meta.id] }
+        purple_inputs = inputs.filter { it.ploidy.isEmpty() }.map { it -> [it.meta.sample] }
         // need a channel with patient and meta for merging with rest
         purple_inputs_for_merge = inputs.filter { it.ploidy.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
 

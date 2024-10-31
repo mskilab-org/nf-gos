@@ -6,8 +6,16 @@ include { AMBER } from '../../../modules/local/amber/main'
 include { MAKE_HET_SITES } from '../../../modules/local/amber/main'
 
 //AMBER
-genome_ver = WorkflowNfcasereports.create_value_channel(params.genome_ver_amber)
-het_sites = WorkflowNfcasereports.create_file_channel(params.het_sites_amber)
+genome_ver  = WorkflowNfcasereports.create_value_channel(params.genome_ver_amber)
+het_sites   = WorkflowNfcasereports.create_file_channel(params.het_sites_amber)
+if (params.target_bed_amber != null) {
+    target_bed_input = Channel.fromPath(params.target_bed_amber)
+                        .map{ it -> [ [id: 'target_bed'], it ] }
+} else {
+    target_bed_input = Channel.value([id: 'target_bed'])
+                        .map{ meta -> [ meta, [] ] }
+}
+
 
 workflow BAM_AMBER {
     take:
@@ -22,7 +30,7 @@ workflow BAM_AMBER {
         input,
         genome_ver,
         het_sites,
-        []
+        target_bed_input // [meta, target_bed]
     )
 
     amber_dir = amber_dir.mix(AMBER.out.amber_dir)
