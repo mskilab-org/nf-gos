@@ -368,6 +368,14 @@ inputs = inputs
 
             ch_items.meta           = ch_items.meta - ch_items.meta.subMap('lane') + [num_lanes: num_lanes.toInteger(), read_group: read_group.toString(), size: 1]
 
+        } else if (ch_items.fastq_2) {
+            ch_items.meta   = ch_items.meta + [id: ch_items.meta.sample.toString()]
+            def CN         = params.seq_center ? "CN:${params.seq_center}\\t" : ''
+
+            def flowcell   = flowcellLaneFromFastq(ch_items.fastq_1)
+            def read_group = "\"@RG\\tID:${flowcell}.${ch_items.meta.sample}\\t${CN}PU:${ch_items.meta.sample}\\tSM:${ch_items.meta.patient}_${ch_items.meta.sample}\\tLB:${ch_items.meta.sample}\\tDS:${params.fasta}\\tPL:${params.seq_platform}\""
+
+            ch_items.meta = ch_items.meta + [num_lanes: num_lanes.toInteger(), read_group: read_group.toString(), size: 1]
         } else if (ch_items.meta.lane && ch_items.bam) {
             ch_items.meta   = ch_items.meta + [id: "${ch_items.meta.sample}-${ch_items.meta.lane}".toString()]
             def CN          = params.seq_center ? "CN:${params.seq_center}\\t" : ''
