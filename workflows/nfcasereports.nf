@@ -368,6 +368,14 @@ inputs = inputs
 
             ch_items.meta           = ch_items.meta - ch_items.meta.subMap('lane') + [num_lanes: num_lanes.toInteger(), read_group: read_group.toString(), size: 1]
 
+        } else if (ch_items.fastq_2) {
+            ch_items.meta   = ch_items.meta + [id: ch_items.meta.sample.toString()]
+            def CN         = params.seq_center ? "CN:${params.seq_center}\\t" : ''
+
+            def flowcell   = flowcellLaneFromFastq(ch_items.fastq_1)
+            def read_group = "\"@RG\\tID:${flowcell}.${ch_items.meta.sample}\\t${CN}PU:${ch_items.meta.sample}\\tSM:${ch_items.meta.patient}_${ch_items.meta.sample}\\tLB:${ch_items.meta.sample}\\tDS:${params.fasta}\\tPL:${params.seq_platform}\""
+
+            ch_items.meta = ch_items.meta + [num_lanes: num_lanes.toInteger(), read_group: read_group.toString(), size: 1]
         } else if (ch_items.meta.lane && ch_items.bam) {
             ch_items.meta   = ch_items.meta + [id: "${ch_items.meta.sample}-${ch_items.meta.lane}".toString()]
             def CN          = params.seq_center ? "CN:${params.seq_center}\\t" : ''
@@ -1066,6 +1074,8 @@ workflow NFCASEREPORTS {
             normal_frag_cov = Channel.empty()
                 .mix(NORMAL_FRAGCOUNTER.out.fragcounter_cov)
                 .mix(fragcounter_existing_outputs.normal)
+
+            normal_frag_cov_for_merge = normal_frag_cov.map { meta, frag_cov -> [ meta.sample, meta, frag_cov ] }
         }
 
         TUMOR_FRAGCOUNTER(bam_fragcounter_status.tumor)
@@ -1073,6 +1083,8 @@ workflow NFCASEREPORTS {
         tumor_frag_cov = Channel.empty()
             .mix(TUMOR_FRAGCOUNTER.out.fragcounter_cov)
             .mix(fragcounter_existing_outputs.tumor)
+
+        tumor_frag_cov_for_merge = tumor_frag_cov.map { meta, frag_cov -> [ meta.sample, meta, frag_cov ] }
 
         // Only need one versions because its just one program (fragcounter)
         versions = versions.mix(TUMOR_FRAGCOUNTER.out.versions)
@@ -1083,15 +1095,15 @@ workflow NFCASEREPORTS {
     if (tools_used.contains("all") || tools_used.contains("dryclean")) {
         cov_dryclean_inputs = inputs
             .filter { it.dryclean_cov.isEmpty() }
-            .map { it -> [it.meta] }
+            .map { it -> [it.meta.sample, it.meta] }
             .branch{
-                normal: it[0].status == 0
-                tumor:  it[0].status == 1
+                normal: it[1].status == 0
+                tumor:  it[1].status == 1
             }
 
-        cov_dryclean_tumor_input = tumor_frag_cov
+        cov_dryclean_tumor_input = tumor_frag_cov_for_merge
             .join(cov_dryclean_inputs.tumor)
-            .map{ it -> [ it[0], it[1] ] } // meta, frag_cov
+            .map{ it -> [ it[1], it[2] ] } // meta, frag_cov
 
         dryclean_existing_outputs = inputs
             .map { it -> [it.meta, it.dryclean_cov] }
@@ -1114,15 +1126,18 @@ workflow NFCASEREPORTS {
         versions = versions.mix(TUMOR_DRYCLEAN.out.versions)
 
         if (!params.tumor_only) {
-            cov_dryclean_normal_input = normal_frag_cov
+            cov_dryclean_normal_input = normal_frag_cov_for_merge
                 .join(cov_dryclean_inputs.normal)
-                .map{ it -> [ it[0], it[1] ] } // meta, frag_cov
+                .map{ it -> [ it[1], it[2] ] } // meta, frag_cov
 
             NORMAL_DRYCLEAN(cov_dryclean_normal_input)
 
             dryclean_normal_cov = Channel.empty()
                 .mix(NORMAL_DRYCLEAN.out.dryclean_cov)
                 .mix(dryclean_existing_outputs.normal)
+
+            dryclean_normal_cov_for_merge = dryclean_normal_cov
+                .map { it -> [ it[0].patient, it[1] ] } // meta.patient, dryclean_cov
         }
     }
 
@@ -1131,22 +1146,22 @@ workflow NFCASEREPORTS {
     if (tools_used.contains("all") || tools_used.contains("cbs")) {
         cbs_inputs = inputs
             .filter { it.seg.isEmpty() || it.nseg.isEmpty() }
-            .map { it -> [it.meta] }
+            .map { it -> [it.meta.patient, it.meta] }
             .branch{
-                normal: it[0].status == 0
-                tumor:  it[0].status == 1
+                normal: it[1].status == 0
+                tumor:  it[1].status == 1
             }
 
-        cbs_tumor_input = dryclean_tumor_cov
-            .join(cbs_inputs.tumor)
-            .map{ it -> [ it[0].patient, it[0], it[1] ] } // meta.patient, meta, dryclean tumor cov
+        cbs_tumor_input = cbs_inputs.tumor
+            .join(dryclean_tumor_cov_for_merge)
+            .map{ it -> [ it[0], it[1], it[2] ] } // meta.patient, meta, dryclean tumor cov
 
         if (params.tumor_only) {
             cov_cbs = cbs_tumor_input.map { patient, meta, tumor_cov -> [ meta, tumor_cov, [] ] }
         } else {
-            cbs_normal_input = dryclean_normal_cov
-                .join(cbs_inputs.normal)
-                .map{ it -> [ it[0].patient, it[0], it[1] ] } // meta.patient, meta, dryclean normal cov
+            cbs_normal_input = cbs_inputs.normal
+                .join(dryclean_normal_cov_for_merge)
+                .map{ it -> [ it[0], it[1], it[2] ] } // meta.patient, meta, dryclean normal cov
 
             cov_cbs = cbs_tumor_input.cross(cbs_normal_input)
                 .map { tumor, normal ->
@@ -1623,7 +1638,7 @@ workflow NFCASEREPORTS {
     if (tools_used.contains("all") || tools_used.contains("fusions")) {
         fusions_inputs = inputs.filter { it.fusions.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
 
-        if (tools_used.contains("non_integer_balance")) {
+        if (tools_used.contains("non_integer_balance") || tools_used.contains("all")) {
             fusions_input_non_integer_balance = non_integer_balance_balanced_gg_for_merge
                 .join(fusions_inputs)
                 .map { it -> [ it[0], it[1] ] } // meta.patient, balanced_gg
