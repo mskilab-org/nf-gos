@@ -3,8 +3,12 @@ process NON_INTEGER_BALANCE {
     tag "$meta.id"
     label 'process_medium'
 
+    // container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    //     '/gpfs/commons/groups/imielinski_lab/home/sdider/Projects/nf-jabba/tests/test_runs/work/singularity/jabba_cplex_latest.sif':
+    //     'mskilab/jabba:latest' }"
+
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        '/gpfs/commons/groups/imielinski_lab/home/sdider/Projects/nf-jabba/tests/test_runs/work/singularity/jabba_cplex_latest.sif':
+        'docker://mskilab/jabba:latest':
         'mskilab/jabba:latest' }"
 
     input:
@@ -96,8 +100,12 @@ process LP_PHASED_BALANCE {
     tag "$meta.id"
     label 'process_medium'
 
+    // container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    //     '/gpfs/commons/groups/imielinski_lab/home/sdider/Projects/nf-jabba/tests/test_runs/work/singularity/jabba_cplex_latest.sif':
+    //     'mskilab/jabba:latest' }"
+
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        '/gpfs/commons/groups/imielinski_lab/home/sdider/Projects/nf-jabba/tests/test_runs/work/singularity/jabba_cplex_latest.sif':
+        'docker://mskilab/jabba:latest':
         'mskilab/jabba:latest' }"
 
     input:
