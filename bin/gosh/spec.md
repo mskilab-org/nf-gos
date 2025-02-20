@@ -121,9 +121,10 @@ A CLI for the nf-gOS pipeline
 - ai parsing of nextflow (gosh debug eye [.nextflow.log])
   - [x] copy some real error .nextflow.log files for testing (create a test dir)
   - write the ai_helper.py (use personal api key for now)
-    - parser for extracting error messages from nextflow.log
-    - prompt for interpreting the error message
-    - prompt for advising the user on how to fix the error
-    - base method for sending the query/prompt to the ai
+    - [x] parser for extracting error messages from nextflow.log
+    - [x] base method for sending the query/prompt to the ai
+    - [x] prompt for interpreting the error message
+    - [x] prompt for advising the user on how to fix the error
+    - method to chain the prompts into a single response
     - send the ai response to debug
   - pretty printing the response (via click?) in debug
