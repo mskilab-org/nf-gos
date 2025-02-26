@@ -7,17 +7,17 @@ A CLI for the nf-gOS pipeline
 ### Run
 - Sensible mode-specific defaults for parameters (heme, tumor-only, paired)
   - these should be relegated to profiles (likewise for the hpc) in nf-gOS
-    which are then passed to the --profile parameter
+    which are then passed to the --profile parameter via run command
+    - Set up common parameters in profile
+       - CPLEX
+       - HPC config
+       - Dependent files (PON, reference, etc.)
 - Resume/overwrite from a process (by deleting the working directories)
 - Resource sequestering
 - Auto-resume on OOM
 - More informative email notifications
-- Exposure of common parameters
-   - CPLEX
-   - HPC config
-   - Dependent files (PON, reference, etc.)
-- Stream samplesheet from remote
 - Help with samplesheet construction
+- Stream samplesheet from remote
 
 ### Debug
 
@@ -118,13 +118,30 @@ A CLI for the nf-gOS pipeline
 
 ### Tasks
 
-- ai parsing of nextflow (gosh debug eye [.nextflow.log])
-  - [x] copy some real error .nextflow.log files for testing (create a test dir)
-  - write the ai_helper.py (use personal api key for now)
-    - [x] parser for extracting error messages from nextflow.log
-    - [x] base method for sending the query/prompt to the ai
-    - [x] prompt for interpreting the error message
-    - [x] prompt for advising the user on how to fix the error
-    - method to chain the prompts into a single response
-    - send the ai response to debug
-  - pretty printing the response (via click?) in debug
+- Run command
+  - set up profiles/configs
+    - hpc
+      - nyu
+      - nygc
+      - cplex
+    - alignment
+      - gpu vs. cpu
+      - split fastq
+    - heme
+    - tumor-only
+    - paired (default)
+  - predict correct set of profiles using env information and mode
+  - Resume/overwrite from a process (by deleting the working directories)
+  - Auto-resume on OOM
+- Debug command
+  - Working directory by sample ID(s) x process(es)
+  - Run information (resource usage, run parameters)
+  - [x] ai parsing of nextflow (gosh debug eye [.nextflow.log])
+    - [x] copy some real error .nextflow.log files for testing (create a test dir)
+    - [x] write the ai_helper.py (use personal api key for now)
+      - [x] parser for extracting error messages from nextflow.log
+      - [x] base method for sending the query/prompt to the ai
+      - [x] prompt for interpreting the error message
+      - [x] prompt for advising the user on how to fix the error
+      - [x] method to chain the prompts into a single response
+      - [x] send the ai response to debug
