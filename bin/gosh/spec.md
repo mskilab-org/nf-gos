@@ -119,23 +119,23 @@ A CLI for the nf-gOS pipeline
 ### Tasks
 
 - Run command
-  - set up profiles/configs
-    - hpc
+  - [x] set up profiles/configs
+    - [x] hpc
       - nyu
       - nygc
       - cplex
-    - alignment
+    - [x] alignment
       - gpu vs. cpu
-      - split fastq
-    - heme
-    - tumor-only
-    - paired (default)
-  - predict correct set of profiles using env information and mode
-  - Resume/overwrite from a process (by deleting the working directories)
-  - Auto-resume on OOM
+  - [ ] predict correct set of profiles input params using env information and mode
+      - echo $HOSTNAME to get the host -> -profile nyu/nygc if recognized
+      - check if normals are in the samplesheet to determine mode (tumor-only vs. paired)
+  - [ ] Resume/overwrite from a process (by deleting the working directories)
+  - [ ] Auto-resume on OOM
+      - [ ] detect if all results are present, auto-resume if not
+      - [ ] detect if the run was interrupted by user, don't auto-resume in this case
 - Debug command
-  - Working directory by sample ID(s) x process(es)
-  - Run information (resource usage, run parameters)
+  - [ ] Working directory by sample ID(s) x process(es)
+  - [ ] Run information (resource usage, run parameters)
   - [x] ai parsing of nextflow (gosh debug eye [.nextflow.log])
     - [x] copy some real error .nextflow.log files for testing (create a test dir)
     - [x] write the ai_helper.py (use personal api key for now)
