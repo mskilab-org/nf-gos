@@ -1,4 +1,6 @@
 import re
+import os
+import json
 from typing import List
 from openai import OpenAI
 
@@ -25,6 +27,27 @@ ERROR_ADVISOR_PROMPT = """You are a bioinformatics workflow expert specializing 
 3. If relevant, explain any pipeline-specific considerations
 4. If needed, recommend configuration changes or system requirements
 Keep suggestions actionable and direct. Focus on practical solutions rather than theoretical explanations."""
+
+# Read the help context from 'help_context.txt' in the script's directory
+script_dir = os.path.dirname(os.path.abspath(__file__))
+help_context_path = os.path.join(script_dir, 'help_context.txt')
+with open(help_context_path, 'r') as f:
+    HELP_CONTEXT = f.read()
+
+HELP_PROMPT = f"""You are a bioinformatics workflow expert specializing in the nf-gOS pipeline, the gOSh CLI, and Nextflow bioinformatics pipelines.
+
+Here is some information about the nf-gOS pipeline to help you answer user questions:
+{HELP_CONTEXT}
+
+If the user has provided a 'params.json' file and it is relevant to their question, include guidance on how to use it. If the question involves adding new parameters return the full updated params.json file with the new parameters in the following format:
+
+```json
+[params.json content here]
+```
+
+Make sure the contents are valid json (e.g do not include comments).
+
+Provide clear and concise answers focused on practical guidance."""
 
 def extract_error_messages(log_content: str) -> str:
     """
@@ -110,7 +133,7 @@ def query_ai(query: str, system_prompt: str = "You are a helpful assistant.") ->
     try:
         client = OpenAI()
         completion = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": query}
@@ -152,3 +175,53 @@ def get_error_analysis_and_solution(error_messages: str) -> str:
 
     except Exception as e:
         raise Exception(f"Failed to complete error analysis chain: {str(e)}")
+
+def extract_new_params(response: str) -> dict:
+    """
+    Extracts the 'params.json' content from the AI assistant's response and returns it as a dictionary.
+
+    Args:
+        response (str): The AI assistant's response text.
+
+    Returns:
+        dict: The parsed JSON content as a Python dictionary.
+
+    Raises:
+        ValueError: If the 'params.json' block is not found or if the JSON is invalid.
+    """
+    # Define the regular expression pattern
+    pattern = r'```json\s*(.*?)\s*```'
+    match = re.search(pattern, response, re.DOTALL)
+    if not match:
+        raise ValueError("No 'params.json' code block found in the response.")
+
+    json_str = match.group(1).strip()
+
+    try:
+        params_dict = json.loads(json_str)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON content in 'params.json' code block: {str(e)}")
+
+    return params_dict
+
+def answer_help_question(question: str) -> str:
+    """
+    Answer user questions about the nf-gOS pipeline, the gOSh CLI, and Nextflow bioinformatics pipelines.
+    If a 'params.json' file exists in the current directory, append its contents to the question.
+
+    Args:
+        question (str): The user's inputted question.
+
+    Returns:
+        str: The AI's response to the question.
+    """
+    # Check if 'params.json' exists in the directory in which the command is run
+    if os.path.exists('params.json'):
+        with open('params.json', 'r') as f:
+            params_content = f.read()
+        question += f"\n\nHere is the content of 'params.json':\n{params_content}"
+
+    # Use the AI to answer the question using the HELP_PROMPT
+    response = query_ai(question, system_prompt=HELP_PROMPT)
+
+    return response
