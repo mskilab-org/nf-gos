@@ -14,7 +14,7 @@ def create_params_file():
     input_status = "found!" if input_exists else "not found!"
 
     # Prompt for input
-    input_prompt = f"Enter input file path [{default_input} ({input_status})]: "
+    input_prompt = f"Enter input file path [{default_input} ({input_status})] (Press Enter to use default): "
     input_path = input(input_prompt).strip()
     if not input_path:
         if input_exists:
@@ -32,22 +32,21 @@ def create_params_file():
     outdir_status = "found!" if outdir_exists else "not found!"
 
     # Prompt for outdir
-    outdir_prompt = f"Enter output directory [{default_outdir} ({outdir_status})]: "
+    outdir_prompt = f"Enter output directory [default: {default_outdir} ({outdir_status})] (Press Enter to use default): "
     outdir = input(outdir_prompt).strip() or default_outdir
 
     # Prompt for tools
     tools_list = "[ aligner, bamqc, gridss, amber, fragcounter, dryclean, cbs, sage, purple, jabba, non_integer_balance, lp_phased_balance, events, fusions, snpeff, snv_multiplicity, signatures, hrdetect ]"
     tools_prompt = (
-        f"Enter tools to use (comma-separated) or leave blank for default [{default_tools}]:\n"
         f"Available tools: {tools_list}\n"
         "Hint: You can pick any combination of tools, or leave it as 'all' which is recommended.\n"
+            f"Enter tools to use (comma-separated) [default: {default_tools}] (Press Enter to use default): "
     )
     tools = input(tools_prompt).strip() or default_tools
 
     # Prompt for genome
     genome_prompt = (
-        f"Enter genome [{default_genome}]: (options: hg19, hg38)\n"
-        "Hint: Choose 'hg19' or 'hg38'.\n"
+        f"Enter genome [default: {default_genome}] (options: hg19, hg38) (Press Enter to use default): "
     )
     genome_input = input(genome_prompt).strip() or default_genome
     genome_map = {'hg19': 'GATK.GRCh37', 'hg38': 'GATK.GRCh38'}
@@ -57,8 +56,8 @@ def create_params_file():
         genome = genome_map[default_genome]
 
     # Prompt for email
-    email_prompt = f"Enter email address [{default_email}]: "
-    email = input(email_prompt).strip() or default_email
+    email_prompt = f"Enter email address [{default_email}] (Press Enter to skip): "
+    email = input(email_prompt).strip() or ""
 
     # Create params dictionary
     params = {

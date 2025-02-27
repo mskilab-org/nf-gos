@@ -5,7 +5,8 @@ setup(
     version='0.1.0',
     description='gOSh - gOS sHell: A CLI tool for the nf-gOS pipeline',
     author='Shihab Dider',
-    packages=find_packages(),
+    packages=find_packages(where='.'),
+    package_dir={'': '.'},
     include_package_data=True,
     install_requires=[
         'Click',

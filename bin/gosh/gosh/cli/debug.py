@@ -2,7 +2,7 @@
 
 import os
 import click
-from utils.ai_helper import extract_error_messages, get_error_analysis_and_solution
+from ..utils.ai_helper import extract_error_messages, get_error_analysis_and_solution
 
 @click.group(name='debug')
 def debug_cli():

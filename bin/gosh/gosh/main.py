@@ -1,6 +1,6 @@
 import click
-from cli.run import run_cli
-from cli.debug import debug_cli
+from .cli.run import run_cli
+from .cli.debug import debug_cli
 
 @click.group()
 def cli():

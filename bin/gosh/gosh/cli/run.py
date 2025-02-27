@@ -1,8 +1,8 @@
 import os
 import click
-from core.nextflow import NextflowRunner
-from core.config import Config
-from core.params_wizard import create_params_file
+from ..core.nextflow import NextflowRunner
+from ..core.config import Config
+from ..core.params_wizard import create_params_file
 
 @click.group(name='run')
 def run_cli():
@@ -46,17 +46,17 @@ def pipeline(pipeline_dir, params_file, profile, resume):
     # Initialize runner
     runner = NextflowRunner()
 
-    # Build command arguments
-    args = [
-        pipeline_dir,
-        '-params-file', params_file,
-        '-profile', profile,
-        '-with-report', f"report_{runner.get_timestamp()}.html",
-        '-with-trace'
-    ]
+    # Build the command string
+    command = (
+        f"module load nextflow && {runner.cmd} run {pipeline_dir} "
+        f"-params-file {params_file} "
+        f"-profile {profile} "
+        f"-with-report report_{runner.get_timestamp()}.html "
+        f"-with-trace"
+    )
 
     if resume:
-        args.append('-resume')
+        command += " -resume"
 
-    # Execute pipeline
-    runner.run(args)
+    # Execute the command using the updated runner
+    runner.run(command)
