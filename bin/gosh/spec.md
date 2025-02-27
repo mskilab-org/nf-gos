@@ -14,7 +14,9 @@ A CLI for the nf-gOS pipeline
        - Dependent files (PON, reference, etc.)
 - Resume/overwrite from a process (by deleting the working directories)
 - Resource sequestering
-- Auto-resume on OOM
+- [ ] Auto-resume on OOM
+    - [ ] detect if all expected results are present, auto-resume if not
+    - [ ] detect if the run was interrupted by user, don't auto-resume in this case
 - More informative email notifications
 - Help with samplesheet construction
 - Stream samplesheet from remote
@@ -126,13 +128,10 @@ A CLI for the nf-gOS pipeline
       - cplex
     - [x] alignment
       - gpu vs. cpu
-  - [ ] predict correct set of profiles input params using env information and mode
-      - echo $HOSTNAME to get the host -> -profile nyu/nygc if recognized
-      - check if normals are in the samplesheet to determine mode (tumor-only vs. paired)
+  - [x] predict correct set of profiles input params using env information and mode
+      - [x] echo $HOSTNAME to get the host -> -profile nyu/nygc if recognized
+      - [x] check if normals are in the samplesheet to determine mode (tumor-only vs. paired)
   - [ ] Resume/overwrite from a process (by deleting the working directories)
-  - [ ] Auto-resume on OOM
-      - [ ] detect if all results are present, auto-resume if not
-      - [ ] detect if the run was interrupted by user, don't auto-resume in this case
 - Debug command
   - [ ] Working directory by sample ID(s) x process(es)
   - [ ] Run information (resource usage, run parameters)

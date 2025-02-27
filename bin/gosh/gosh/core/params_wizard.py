@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+from .samplesheet import check_if_tumor_only
 
 def create_params_file():
     default_input = "./samplesheet.csv"
@@ -26,6 +27,15 @@ def create_params_file():
         if not os.path.exists(input_path):
             print(f"Error: The provided input file '{input_path}' does not exist.")
             sys.exit(1)
+
+    # Determine if tumor-only mode should be enabled
+    try:
+        is_tumor_only = check_if_tumor_only(input_path)
+        mode = "No normals found. Running in tumor-only mode." if is_tumor_only else "Running in paired tumor-normal mode."
+        print(mode)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"Error checking samplesheet: {e}")
+        sys.exit(1)
 
     # Check if default outdir exists
     outdir_exists = os.path.exists(default_outdir)
@@ -65,7 +75,8 @@ def create_params_file():
         "outdir": outdir,
         "tools": tools,
         "genome": genome,
-        "email": email
+        "email": email,
+        "tumor_only": is_tumor_only
     }
 
     # Write to params.json
