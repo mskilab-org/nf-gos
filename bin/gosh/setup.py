@@ -8,6 +8,7 @@ setup(
     packages=find_packages(where='.'),
     package_dir={'': '.'},
     include_package_data=True,
+    package_data={'gosh': ['utils/*.txt']},
     install_requires=[
         'Click',
         'openai',

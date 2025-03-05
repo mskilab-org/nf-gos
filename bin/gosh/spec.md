@@ -44,15 +44,6 @@ A CLI for the nf-gOS pipeline
 
 ### Architecture
 
- 1 Approach: Mixed OOP & Functional
-
- • Use OOP for core components that maintain state or represent complex entities (e.g., a
-   NextflowRunner class, SampleSheet class)
- • Use functional approach for utilities and pure operations (e.g., log parsing, validation functions)
-
- 2 Program Structure
-
-
  gosh/
  ├── cli/
  │   ├── run.py      # Run command group
@@ -70,42 +61,6 @@ A CLI for the nf-gOS pipeline
  │   ├── ai_helper.py   # AI log parsing
  │   ├── email.py       # Email notifications
  ├── main.py        # CLI entry point
-
-
-### Prompts
-- [ ] Working directory by sample ID(s) x process(es)
-
-feature: create a script `nextflow_log.py` that will serve as a wrapper on the `nextflow log` command
-
-- put this script in `gosh/core/nextflow_log.py`
-- there should be a general method to run `nextflow log` command (with passed arguments)
-- that general method should be used in other methods which do specific things:
-  1. get a list of all run names (`nextflow log -q`)
-  2. get a list of all entries across all runs that contain a certain string in the name
-    - to do this you will have to first get all run names and then iterate over them using the command: `nextflow log -f {list_of_all_fields} -F 'name ~= /.*{string}.*/' {run_name}`
-    - then append the results to a list
-  3. a method that uses #2 to get a list of entries across all runs that contain a any of the sample names passed to it (in a list) in the name
-  4. a method that uses #2 to get a list of entries across all runs that contain a any of the process names passed to it (in a list) in the name
-
-list of all fields:
-```
-  attempt complete container cpus disk duration env error_action exit hash
-hostname inv_ctxt log memory module name native_id pcpu peak_rss peak_vmem pmem
-process queue rchar read_bytes realtime rss scratch script start status stderr
-stdout submit syscr syscw tag task_id time vmem vol_ctxt wchar workdir
-write_bytes
-```
-
-- [o] ai ask command for asking questions
-feature: add some new methods and prompts to the ai_helper.py for handling help related questions
-
-- add a system prompt for answering questions about the nf-gOS pipeline, the gOSh CLI, and nextflow bioinformatics pipelines
-  - it will include the contents of a `help_context.txt` file that includes some information about the pipeline and the CLI
-  - it will include a section detailing how to use the `params.json` file if it has been appended to the question and is relevant to the user's question
-- add a method that uses this prompt to answer user questions
-  - the method will take a user inputted question as string input
-  - it will look for a `params.json` file in the current directory, if it exists, it will append it to the question
-
 
 ### Tasks
 
