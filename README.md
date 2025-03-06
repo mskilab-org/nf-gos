@@ -8,7 +8,7 @@
 
 ## Introduction
 
-**mskilab-org/nf-casereports** is a bioinformatics pipeline from [`mskilab-org`](https://www.mskilab.org/) for running [`JaBbA`](https://github.com/mskilab-org/JaBbA/), our algorithm for MIP based joint inference of copy number and rearrangement state in cancer whole genome sequence data. This pipeline runs all the pre-requisite tools (among others) and generates the necessary inputs for running JaBbA and loading into [case-reports](https://github.com/mskilab-org/case-report), our clinical front-end. It is designed to take paired tumor-normal samples or tumor-only samples as input.
+**mskilab-org/nf-casereports** is a bioinformatics pipeline from [`mskilab-org`](https://www.mskilab.org/) for running [`JaBbA`](https://github.com/mskilab-org/JaBbA/), our algorithm for MIP based joint inference of copy number and rearrangement state in cancer whole genome sequence data. This pipeline runs all the pre-requisite tools (among others) and generates the necessary inputs for running JaBbA and loading into [gOS](https://github.com/mskilab-org/gOS), our clinical front-end. It is designed to take paired tumor-normal samples or tumor-only samples as input.
 
 ## Workflow Summary:
 1. Align to Reference Genome (currently supports `BWA-MEM`, `BWA-MEM2`, and GPU accelerated `fq2bam`).
@@ -53,7 +53,6 @@ consider them as separate samples belonging to the same patient and output the
 results accordingly.
 
 Specify the desired output root directory using the `--outdir` flag.
-The outputs will be organized first by `tool` and then `sample`.
 
 The input samplesheet should look like this:
 
@@ -71,7 +70,6 @@ nextflow run mskilab-org/nf-jabba \
    -profile <docker|singularity|institute> \
    --input samplesheet.csv \
    --outdir <OUTDIR> \
-   --tools <all|aligner,bamqc,gridss,amber,fragcounter,dryclean,cbs,sage,purple,jabba,non_integer_balance,lp_phased_balance,events,fusions,snpeff,snv_multiplicity,signatures,hrdetect> \
    --genome <GATK.GRCh37/GATK.GRCh38>
 ```
 > **Warning:**
@@ -79,13 +77,12 @@ nextflow run mskilab-org/nf-jabba \
 > provided by the `-c` Nextflow option can be used to provide any configuration _**except for parameters**_;
 > see [docs](https://nf-co.re/usage/configuration#custom-configuration-files).
 
-
 ### Discussion of expected fields in input file and expected inputs for each `--step`
 
 A typical sample sheet can populate with all or some of the column names as
 shown below. The pipeline will use the information provided in the samplesheet
-and the tools specified in the run to parsimoniously run the steps of the
-pipeline to generate all remaining outputs.
+to parsimoniously run the steps of the pipeline to generate all remaining
+outputs.
 
 **N.B You do not need to supply all the columns in the table below. The table represents all the possible inputs that can be passed. If you are starting from BAMs just pass `bam` and `bai` columns. If you are starting from FASTQs, pass `fastq1` (and `fastq2` for paired reads). If you have already generated other outputs, you may pass them as well to prevent the pipeline from running tools for which you already have outputs.**
 
