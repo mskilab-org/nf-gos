@@ -153,7 +153,7 @@ boolean changed
 do {
     changed = false
     tool_input_output_map.each { tool, io ->
-        if (!selected_tools.contains(tool) && !skip_tools.contains(tool) {
+        if (!selected_tools.contains(tool) && !skip_tools.contains(tool)) {
             def inputsRequired = io.inputs
             def inputsPresent = inputsRequired.every { available_inputs.contains(it) }
             def outputsNeeded = io.outputs.any { !available_inputs.contains(it) }
