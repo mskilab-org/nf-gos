@@ -83,60 +83,92 @@ def toolParamMap = [
     ],
 ]
 
-tools_used = params.tools ? params.tools.split(',') : ["all"]
-
-tool_dependency_map = [
-    "aligner": ["indexing"],
-    "bamqc": ["aligner"],
-    "gridss": ["aligner"],
-    "amber": ["aligner"],
-    "fragcounter": ["aligner"],
-    "dryclean": ["fragcounter"],
-    "cbs": ["dryclean"],
-    "sage": ["aligner"],
-    "purple": ["aligner", "amber", "gridss", "sage"],
-    "jabba": ["gridss", "amber", "dryclean", "cbs", "purple"],
-    "non_integer_balance": ["jabba"],
-    "lp_phased_balance": ["non_integer_balance"],
-    "events": ["non_integer_balance"],
-    "fusions": ["non_integer_balance"],
-    "snpeff": ["sage"],
-    "snv_multiplicity": ["jabba", "snpeff"],
-    "signatures": ["sage"],
-    "hrdetect": ["amber", "gridss", "jabba", "sage"]
+tool_input_output_map = [
+    "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
+    "bamqc": [ inputs: ['bam'], outputs: [] ],
+    "gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
+    "amber": [ inputs: ['bam'], outputs: ['hets', 'amber_dir'] ],
+    "fragcounter": [ inputs: ['bam'], outputs: ['frag_cov'] ],
+    "dryclean": [ inputs: ['frag_cov'], outputs: ['dryclean_cov'] ],
+    "cbs": [ inputs: ['dryclean_cov'], outputs: ['seg', 'nseg'] ],
+    "sage": [ inputs: ['bam'], outputs: ['snv_somatic_vcf', 'snv_germline_vcf'] ],
+    "purple": [ inputs: ['bam', 'amber_dir', 'vcf', 'snv_somatic_vcf'], outputs: ['ploidy'] ],
+    "jabba": [ inputs: ['vcf', 'hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
+    "non_integer_balance": [ inputs: ['jabba_gg'], outputs: ['ni_balanced_gg'] ],
+    "lp_phased_balance": [ inputs: ['ni_balanced_gg'], outputs: ['lp_balanced_gg'] ],
+    "events": [ inputs: ['ni_balanced_gg'], outputs: ['events'] ],
+    "fusions": [ inputs: ['ni_balanced_gg'], outputs: ['fusions'] ],
+    "snpeff": [ inputs: ['snv_somatic_vcf'], outputs: ['variant_somatic_ann', 'variant_somatic_bcf'] ],
+    "snv_multiplicity": [ inputs: ['jabba_gg', 'variant_somatic_ann'], outputs: ['snv_multiplicity'] ],
+    "signatures": [ inputs: ['snv_somatic_vcf'], outputs: ['sbs_signatures', 'indel_signatures', 'signatures_matrix'] ],
+    "hrdetect": [ inputs: ['hets', 'vcf', 'jabba_gg', 'snv_somatic_vcf'], outputs: ['hrdetect'] ]
 ]
 
-// Recursive function to collect all dependencies
-def collectDependencies(tool, collected = []) {
-    def dependencies = tool_dependency_map[tool]
-    if (dependencies) {
-        dependencies.each { dep ->
-            if (!collected.contains(dep)) {
-                collected << dep
-                collectDependencies(dep, collected)
+def samplesheetToList(String filePath) {
+    def sampleList = []
+    def lines = new File(filePath).readLines()
+
+    if (lines.isEmpty()) {
+        return sampleList // Return an empty list if the file is empty
+    }
+
+    // Assume the first line contains the headers
+    def headers = lines[0].split(',')
+
+    // Process each subsequent line as a data row
+    lines.drop(1).each { line ->
+        def values = line.split(',')
+        def rowMap = [:]
+
+        headers.eachWithIndex { header, index ->
+            if (index < values.size()) {
+                rowMap[header] = values[index]
+            } else {
+                rowMap[header] = null // Handle missing values
+            }
+        }
+
+        sampleList.add(rowMap)
+    }
+
+    return sampleList
+}
+
+def sampleList = samplesheetToList(params.input)
+def available_inputs = new HashSet()
+sampleList.each { input_map ->
+    input_map.each { key, value ->
+        if (value && !(value instanceof Collection && value.empty)) {
+            available_inputs.add(key)
+        }
+    }
+}
+
+println "Provided inputs: ${available_inputs}"
+
+// Iteratively select tools based on available inputs
+def skip_tools = params.skip_tools ? params.skip_tools.split(',') : []
+def selected_tools = []
+boolean changed
+do {
+    changed = false
+    tool_input_output_map.each { tool, io ->
+        if (!selected_tools.contains(tool) && !skip_tools.contains(tool) {
+            def inputsRequired = io.inputs
+            def inputsPresent = inputsRequired.every { available_inputs.contains(it) }
+            def outputsNeeded = io.outputs.any { !available_inputs.contains(it) }
+            if (inputsPresent && outputsNeeded) {
+                selected_tools.add(tool)
+                available_inputs.addAll(io.outputs)
+                changed = true
             }
         }
     }
-    return collected
-}
+} while (changed)
 
-// Populate tools_used by recursively adding dependencies from tool_dependency_map
-if (params.tools) {
-    tools_used = params.tools.split(',').toList()
-    def all_dependencies = []
-    tools_used.each { tool ->
-        all_dependencies.addAll(collectDependencies(tool))
-    }
-    tools_used.addAll(all_dependencies.unique())
-} else {
-    tools_used = ["all"]
-}
+tools_used = selected_tools
 
-if (tools_used == ["all"]) {
-    println "Tools that will be run: ${tool_dependency_map.keySet()}"
-} else {
-    println "Tools that will be run: ${tools_used}"
-}
+println "Tools that will be run based on your inputs: ${tools_used}"
 
 if (!params.dbsnp && !params.known_indels) {
     if (!params.skip_tools || (params.skip_tools && !params.skip_tools.contains('baserecalibrator'))) {
@@ -150,13 +182,6 @@ if (!params.dbsnp && !params.known_indels) {
 if ((params.download_cache) && (params.snpeff_cache || params.vep_cache)) {
     error("Please specify either `--download_cache` or `--snpeff_cache`, `--vep_cache`.")
 }
-
-toolParamMap.each { tool, toolParams ->
-    if (tools_used.contains("all") || tools_used.contains(tool)) {
-        checkPathParamList.addAll(toolParams)
-    }
-}
-
 
 // Initialise the workflow
 WorkflowNfcasereports.initialise(params, log)
@@ -209,6 +234,29 @@ if (!awsCliInstalled) {
 
 println "Checking if parameter paths exist..."
 int numThreads = 16 // Specify the number of threads to use in the pool
+
+// Function to expand brace-enclosed parts of a path
+def expandBraces(String path) {
+    def regex = /\{([^}]+)\}/
+    def matcher = path =~ regex
+    if (!matcher) {
+        return [path] // No braces to expand
+    }
+
+    def expandedPaths = [path]
+    matcher.each { match ->
+        def options = match[1].split(',')
+        def newPaths = []
+        expandedPaths.each { expandedPath ->
+            options.each { option ->
+                newPaths << expandedPath.replaceFirst(regex, option)
+            }
+        }
+        expandedPaths = newPaths
+    }
+    return expandedPaths
+}
+
 GParsPool.withPool(numThreads) {
     checkPathParamList.eachParallel { param ->
         if (param == null) {
@@ -216,25 +264,28 @@ GParsPool.withPool(numThreads) {
             return
         }
 
-        if (param.startsWith("s3://")) {
-            if (awsCliInstalled) {
-                def expandedPaths = expandS3Paths(param)
-                expandedPaths.each { expandedPath ->
-                    if (checkS3PathExists(expandedPath)) {
-                        println "Path exists: ${expandedPath}"
-                    } else {
-                        println "Path does not exist: ${expandedPath}"
+        def expandedPaths = expandBraces(param)
+        expandedPaths.each { expandedPath ->
+            if (expandedPath.startsWith("s3://")) {
+                if (awsCliInstalled) {
+                    def s3ExpandedPaths = expandS3Paths(expandedPath)
+                    s3ExpandedPaths.each { s3Path ->
+                        if (checkS3PathExists(s3Path)) {
+                            println "Path exists: ${s3Path}"
+                        } else {
+                            println "Path does not exist: ${s3Path}"
+                        }
                     }
+                } else {
+                    println "Skipping S3 path check for: ${expandedPath}"
                 }
             } else {
-                println "Skipping S3 path check for: ${param}"
-            }
-        } else {
-            def file = new File(param)
-            if (file.exists()) {
-                println "Path exists: ${param}"
-            } else {
-                println "Path does not exist: ${param}"
+                def file = new File(expandedPath)
+                if (file.exists()) {
+                    println "Path exists: ${expandedPath}"
+                } else {
+                    println "Path does not exist: ${expandedPath}"
+                }
             }
         }
     }
@@ -616,77 +667,85 @@ workflow NFCASEREPORTS {
         versions = versions.mix(PREPARE_CACHE.out.versions)
     }
 
-    // Build indices if needed
+    // Always build indices
     // ##############################
-    if (tools_used.contains("all") || tools_used.contains("indexing")) {
-        PREPARE_GENOME()
+    PREPARE_GENOME()
 
-        // Gather built indices or get them from the params
-        // Built from the fasta file:
-        dict       = params.dict        ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect()
-                                        : PREPARE_GENOME.out.dict
-        fasta_fai  = WorkflowNfcasereports.create_file_channel(params.fasta_fai, PREPARE_GENOME.out.fasta_fai)
-        bwa        = WorkflowNfcasereports.create_file_channel(params.bwa, PREPARE_GENOME.out.bwa)
-        bwamem2    = WorkflowNfcasereports.create_file_channel(params.bwamem2, PREPARE_GENOME.out.bwamem2)
+    // Gather built indices or get them from the params
+    // Built from the fasta file:
+    dict       = params.dict        ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect()
+                                    : PREPARE_GENOME.out.dict
+    fasta_fai  = WorkflowNfcasereports.create_file_channel(params.fasta_fai, PREPARE_GENOME.out.fasta_fai)
+    bwa        = WorkflowNfcasereports.create_file_channel(params.bwa, PREPARE_GENOME.out.bwa)
+    bwamem2    = WorkflowNfcasereports.create_file_channel(params.bwamem2, PREPARE_GENOME.out.bwamem2)
 
-        // Gather index for mapping given the chosen aligner
-        index_alignment = (params.aligner == "bwa-mem") ? bwa :
-            params.aligner == "bwa-mem2" ? bwamem2 : null
+    // Gather index for mapping given the chosen aligner
+    index_alignment = (params.aligner == "bwa-mem") ? bwa :
+        params.aligner == "bwa-mem2" ? bwamem2 : null
 
-        // TODO: add a params for msisensorpro_scan
-        msisensorpro_scan      = PREPARE_GENOME.out.msisensorpro_scan
+    // TODO: add a params for msisensorpro_scan
+    msisensorpro_scan      = PREPARE_GENOME.out.msisensorpro_scan
 
-        dbsnp_tbi              = WorkflowNfcasereports.create_index_channel(params.dbsnp, params.dbsnp_tbi, PREPARE_GENOME.out.dbsnp_tbi)
-        //do not change to Channel.value([]), the check for its existence then fails for Getpileupsumamries
-        germline_resource_tbi  = params.germline_resource ? params.germline_resource_tbi ? Channel.fromPath(params.germline_resource_tbi).collect() : PREPARE_GENOME.out.germline_resource_tbi : []
-        known_indels_tbi       = WorkflowNfcasereports.create_index_channel(params.known_indels, params.known_indels_tbi, PREPARE_GENOME.out.known_indels_tbi)
-        known_snps_tbi         = WorkflowNfcasereports.create_index_channel(params.known_snps, params.known_snps_tbi, PREPARE_GENOME.out.known_snps_tbi)
-        pon_tbi                = WorkflowNfcasereports.create_index_channel(params.pon, params.pon_tbi, PREPARE_GENOME.out.pon_tbi)
+    dbsnp_tbi              = WorkflowNfcasereports.create_index_channel(params.dbsnp, params.dbsnp_tbi, PREPARE_GENOME.out.dbsnp_tbi)
+    //do not change to Channel.value([]), the check for its existence then fails for Getpileupsumamries
+    germline_resource_tbi  = params.germline_resource ? params.germline_resource_tbi ? Channel.fromPath(params.germline_resource_tbi).collect() : PREPARE_GENOME.out.germline_resource_tbi : []
+    known_indels_tbi       = WorkflowNfcasereports.create_index_channel(params.known_indels, params.known_indels_tbi, PREPARE_GENOME.out.known_indels_tbi)
+    known_snps_tbi         = WorkflowNfcasereports.create_index_channel(params.known_snps, params.known_snps_tbi, PREPARE_GENOME.out.known_snps_tbi)
+    pon_tbi                = WorkflowNfcasereports.create_index_channel(params.pon, params.pon_tbi, PREPARE_GENOME.out.pon_tbi)
 
-        // known_sites is made by grouping both the dbsnp and the known snps/indels resources
-        // Which can either or both be optional
-        known_sites_indels     = dbsnp.concat(known_indels).collect()
-        known_sites_indels_tbi = dbsnp_tbi.concat(known_indels_tbi).collect()
+    // known_sites is made by grouping both the dbsnp and the known snps/indels resources
+    // Which can either or both be optional
+    known_sites_indels     = dbsnp.concat(known_indels).collect()
+    known_sites_indels_tbi = dbsnp_tbi.concat(known_indels_tbi).collect()
 
-        known_sites_snps       = dbsnp.concat(known_snps).collect()
-        known_sites_snps_tbi   = dbsnp_tbi.concat(known_snps_tbi).collect()
+    known_sites_snps       = dbsnp.concat(known_snps).collect()
+    known_sites_snps_tbi   = dbsnp_tbi.concat(known_snps_tbi).collect()
 
-        // Build intervals if needed
-        PREPARE_INTERVALS(fasta_fai, params.intervals, params.no_intervals)
+    // Build intervals if needed
+    PREPARE_INTERVALS(fasta_fai, params.intervals, params.no_intervals)
 
-        // Intervals for speed up preprocessing/variant calling by spread/gather
-        // [interval.bed] all intervals in one file
-        intervals_bed_combined         = WorkflowNfcasereports.create_file_channel(params.no_intervals, PREPARE_INTERVALS.out.intervals_bed_combined)
-        intervals_bed_gz_tbi_combined  = WorkflowNfcasereports.create_file_channel(params.no_intervals, PREPARE_INTERVALS.out.intervals_bed_gz_tbi_combined)
+    // Intervals for speed up preprocessing/variant calling by spread/gather
+    // [interval.bed] all intervals in one file
+    intervals_bed_combined         = WorkflowNfcasereports.create_file_channel(params.no_intervals, PREPARE_INTERVALS.out.intervals_bed_combined)
+    intervals_bed_gz_tbi_combined  = WorkflowNfcasereports.create_file_channel(params.no_intervals, PREPARE_INTERVALS.out.intervals_bed_gz_tbi_combined)
 
-        // For QC during preprocessing, we don't need any intervals (MOSDEPTH doesn't take them for WGS)
-        intervals_for_preprocessing = params.wes ?
-            intervals_bed_combined.map{it -> [ [ id:it.baseName ], it ]}.collect() :
-            Channel.value([ [ id:'null' ], [] ])
+    // For QC during preprocessing, we don't need any intervals (MOSDEPTH doesn't take them for WGS)
+    intervals_for_preprocessing = params.wes ?
+        intervals_bed_combined.map{it -> [ [ id:it.baseName ], it ]}.collect() :
+        Channel.value([ [ id:'null' ], [] ])
 
-        intervals            = PREPARE_INTERVALS.out.intervals_bed        // [ interval, num_intervals ] multiple interval.bed files, divided by useful intervals for scatter/gather
-        intervals_bed_gz_tbi = PREPARE_INTERVALS.out.intervals_bed_gz_tbi // [ interval_bed, tbi, num_intervals ] multiple interval.bed.gz/.tbi files, divided by useful intervals for scatter/gather
+    intervals            = PREPARE_INTERVALS.out.intervals_bed        // [ interval, num_intervals ] multiple interval.bed files, divided by useful intervals for scatter/gather
+    intervals_bed_gz_tbi = PREPARE_INTERVALS.out.intervals_bed_gz_tbi // [ interval_bed, tbi, num_intervals ] multiple interval.bed.gz/.tbi files, divided by useful intervals for scatter/gather
 
-        intervals_and_num_intervals = intervals.map{ interval, num_intervals ->
-            if ( num_intervals < 1 ) [ [], num_intervals ]
-            else [ interval, num_intervals ]
-        }
-
-        intervals_bed_gz_tbi_and_num_intervals = intervals_bed_gz_tbi.map{ intervals, num_intervals ->
-            if ( num_intervals < 1 ) [ [], [], num_intervals ]
-            else [ intervals[0], intervals[1], num_intervals ]
-        }
-
-        // Gather used softwares versions
-        versions = versions.mix(PREPARE_GENOME.out.versions)
-        versions = versions.mix(PREPARE_INTERVALS.out.versions)
+    intervals_and_num_intervals = intervals.map{ interval, num_intervals ->
+        if ( num_intervals < 1 ) [ [], num_intervals ]
+        else [ interval, num_intervals ]
     }
+
+    intervals_bed_gz_tbi_and_num_intervals = intervals_bed_gz_tbi.map{ intervals, num_intervals ->
+        if ( num_intervals < 1 ) [ [], [], num_intervals ]
+        else [ intervals[0], intervals[1], num_intervals ]
+    }
+
+    // Gather used softwares versions
+    versions = versions.mix(PREPARE_GENOME.out.versions)
+    versions = versions.mix(PREPARE_INTERVALS.out.versions)
 
     // Alignment
     // ##############################
+
+    alignment_bams_final = inputs
+        .map { it -> [it.meta, it.bam, it.bai] }
+        .filter { !it[1].isEmpty() }
+        .map { it -> [it[0].id, it[0], it[1], it[2]] }
+
     if (tools_used.contains("all") || tools_used.contains("aligner")) {
         input_fastq = inputs.filter { it.bam.isEmpty() }.map { it -> [it.meta, [it.fastq_1, it.fastq_2]] }
         alignment_existing_outputs = inputs.map { it -> [it.meta, it.bam] }.filter { !it[1].isEmpty() }
+
+        inputs.view { log.info "Input samples: ${it.meta} is empty? ${it.bam.isEmpty()}" }
+        // input_fastq.view { log.info "Input FASTQ files: $it" }
+        // alignment_existing_outputs.view { log.info "Alignment existing outputs: $it" }
 
         // QC
         FASTQC(input_fastq)
@@ -896,6 +955,22 @@ workflow NFCASEREPORTS {
 
     // SV Calling
     // ##############################
+
+    final_filtered_sv_rds_for_merge = inputs
+        .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
+        .filter { !it[1].isEmpty() && !it[2].isEmpty() }
+        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
+
+    vcf_from_sv_calling_for_merge = inputs
+        .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
+        .filter { !it[1].isEmpty() && !it[2].isEmpty() }
+        .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
+
+    unfiltered_som_sv_for_merge = inputs
+        .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
+        .filter { !it[1].isEmpty() && !it[2].isEmpty() }
+        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
+
     if (tools_used.contains("all") || tools_used.contains("gridss")) {
 
         // Filter out bams for which SV calling has already been done
@@ -975,14 +1050,24 @@ workflow NFCASEREPORTS {
         }
     }
 
+    amber_dir_for_merge = inputs
+        .map { it -> [it.meta, it.amber_dir] }
+        .filter { !it[1].isEmpty() }
+        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, amber_dir
+
+    hets_sites_for_merge = inputs
+        .map { it -> [it.meta, it.hets] }
+        .filter { !it[1].isEmpty() }
+        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, hets
+
     // AMBER
     // ##############################
     if (tools_used.contains("all") || tools_used.contains("amber")) {
         bam_amber_inputs = inputs.filter { it.hets.isEmpty() && it.amber_dir.isEmpty() }.map { it -> [it.meta.sample] }
-    alignment_bams_final = alignment_bams_final
-        bam_amber_calling = alignment_bams_final
-            .join(bam_amber_inputs)
-            .map{ it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
+        alignment_bams_final = alignment_bams_final
+            bam_amber_calling = alignment_bams_final
+                .join(bam_amber_inputs)
+                .map{ it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
 
         amber_existing_outputs_hets = inputs
             .map { it -> [it.meta, it.hets] }
@@ -1047,8 +1132,30 @@ workflow NFCASEREPORTS {
         hets_sites_for_merge = sites_from_het_pileups_wgs
             .map { it -> [ it[0].patient, it[1] ] } // meta.patient, hets
     }
+
     // FRAGCOUNTER
     // ##############################
+
+    tumor_frag_cov_for_merge = inputs
+        .map { it -> [it.meta, it.frag_cov] }
+        .filter { !it[1].isEmpty() }
+        .branch{
+            normal: it[0].status == 0
+            tumor:  it[0].status == 1
+        }
+        .tumor
+        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, frag_cov
+
+    normal_frag_cov_for_merge = inputs
+        .map { it -> [it.meta, it.frag_cov] }
+        .filter { !it[1].isEmpty() }
+        .branch{
+            normal: it[0].status == 0
+            tumor:  it[0].status == 1
+        }
+        .normal
+        .map { meta, frag_cov -> [ meta.sample, meta, frag_cov ] }
+
     if (tools_used.contains("all") || tools_used.contains("fragcounter")) {
         bam_fragcounter_inputs = inputs.filter { it.frag_cov.isEmpty() }.map { it -> [it.meta.sample] }
         bam_fragcounter_calling = alignment_bams_final
@@ -1092,6 +1199,27 @@ workflow NFCASEREPORTS {
 
     // Dryclean
     // ##############################
+
+    dryclean_tumor_cov_for_merge = inputs
+        .map { it -> [it.meta, it.dryclean_cov] }
+        .filter { !it[1].isEmpty() }
+        .branch{
+            normal: it[0].status == 0
+            tumor:  it[0].status == 1
+        }
+        .tumor
+        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, dryclean_cov
+
+    dryclean_normal_cov_for_merge = inputs
+        .map { it -> [it.meta, it.dryclean_cov] }
+        .filter { !it[1].isEmpty() }
+        .branch{
+            normal: it[0].status == 0
+            tumor:  it[0].status == 1
+        }
+        .normal
+        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, dryclean_cov
+
     if (tools_used.contains("all") || tools_used.contains("dryclean")) {
         cov_dryclean_inputs = inputs
             .filter { it.dryclean_cov.isEmpty() }
@@ -1143,6 +1271,17 @@ workflow NFCASEREPORTS {
 
     // CBS
     // ##############################
+
+    cbs_seg_for_merge = inputs
+        .map { it -> [it.meta, it.seg] }
+        .filter { !it[1].isEmpty() }
+        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, cbs_seg
+
+    cbs_nseg_for_merge = inputs
+        .map { it -> [it.meta, it.nseg] }
+        .filter { !it[1].isEmpty() }
+        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, cbs_nseg
+
     if (tools_used.contains("all") || tools_used.contains("cbs")) {
         cbs_inputs = inputs
             .filter { it.seg.isEmpty() || it.nseg.isEmpty() }
@@ -1205,6 +1344,17 @@ workflow NFCASEREPORTS {
 
     // SNV Calling
     // ##############################
+
+    filtered_somatic_vcf_for_merge = inputs
+        .map { it -> [it.meta, it.snv_somatic_vcf, it.snv_somatic_tbi] }
+        .filter { !it[1].isEmpty() && !it[2].isEmpty()}
+        .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, filtered somatic snv vcf, tbi
+
+    germline_vcf_for_merge = inputs
+        .map { it -> [it.meta, it.snv_germline_vcf, it.snv_germline_tbi] }
+        .filter { !it[1].isEmpty() && !it[2].isEmpty()}
+        .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, germline snv vcf, tbi
+
     if (tools_used.contains("all") || tools_used.contains("sage")) {
         // Filter out bams for which SNV calling has already been done
         if (params.tumor_only) {
@@ -1302,6 +1452,18 @@ workflow NFCASEREPORTS {
 
     // Variant Annotation
     // ##############################
+
+
+    snv_somatic_annotations_for_merge = inputs
+        .map { it -> [it.meta, it.variant_somatic_ann] }
+        .filter { !it[1].isEmpty() }
+        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, annotated somatic snv vcf
+
+    snv_germline_annotations_for_merge = inputs
+        .map { it -> [it.meta, it.variant_somatic_bcf] }
+        .filter { !it[1].isEmpty() }
+        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, annotated germline snv vcf
+
     if (tools_used.contains("all") || tools_used.contains("snpeff")) {
         variant_somatic_ann_inputs = inputs
             .filter { it.variant_somatic_ann.isEmpty() || it.variant_somatic_bcf.isEmpty() }
@@ -1364,6 +1526,12 @@ workflow NFCASEREPORTS {
 
     // PURPLE
     // ##############################
+
+    ploidy_for_merge = inputs
+        .map { it -> [it.meta, it.ploidy] }
+        .filter { !it[1].isEmpty() }
+        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, ploidy
+
     if (tools_used.contains("all") || tools_used.contains("purple")) {
         // this channel is for merging with alignment_bams_final
         purple_inputs = inputs.filter { it.ploidy.isEmpty() }.map { it -> [it.meta.sample] }
@@ -1443,6 +1611,17 @@ workflow NFCASEREPORTS {
 
     // JaBbA
     // ##############################
+
+    jabba_rds_for_merge = inputs
+        .map { it -> [it.meta, it.jabba_rds] }
+        .filter { !it[1].isEmpty() }
+        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, jabba rds
+
+    jabba_gg_for_merge = inputs
+        .map { it -> [it.meta, it.jabba_gg] }
+        .filter { !it[1].isEmpty() }
+        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, jabba.gg.rds
+
     if (tools_used.contains("all") || tools_used.contains("jabba")) {
         jabba_inputs = inputs.filter { (it.jabba_gg.isEmpty() || it.jabba_rds.isEmpty()) && it.meta.status == 1}.map { it -> [it.meta.patient, it.meta] }
         jabba_inputs_sv = vcf_from_sv_calling_for_merge
@@ -1545,6 +1724,12 @@ workflow NFCASEREPORTS {
 
     // Non-integer balance
     // ##############################
+
+    non_integer_balance_balanced_gg_for_merge = inputs
+        .map { it -> [it.meta, it.ni_balanced_gg] }
+        .filter { !it[1].isEmpty() }
+        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, non integer balanced ggraph
+
     if (tools_used.contains("all") || tools_used.contains("non_integer_balance")) {
         non_integer_balance_inputs = inputs.filter { it.ni_balanced_gg.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
 
@@ -1588,6 +1773,7 @@ workflow NFCASEREPORTS {
 
     // LP Phased Balance
     // ##############################
+
     if (tools_used.contains("all") || tools_used.contains("lp_phased_balance")) {
         lp_phased_balance_inputs = inputs.filter { it.lp_balanced_gg.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
         lp_phased_balance_inputs_ni_balanced_gg = non_integer_balance_balanced_gg_for_merge
