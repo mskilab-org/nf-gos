@@ -22,6 +22,7 @@ def get_environment_defaults():
     }
 
     mapping = {
+        'a40-': nyu_defaults,
         'cn-': nyu_defaults,
         'gn-': nyu_defaults,
         'bigpurple': nyu_defaults,
@@ -38,7 +39,7 @@ def get_environment_defaults():
 
 def load_required_modules(env_defaults):
     """Load required modules if commands are not available."""
-    required_commands = ['nextflow', 'aws']
+    required_commands = ['nextflow', 'aws', 'singularity']
     modules_to_load = []
     load_modules_command = ""
 
@@ -58,6 +59,13 @@ def load_required_modules(env_defaults):
         print("'aws' command not found. Loading module 'aws-cli'.")
     else:
         print("'aws' command is already available.")
+
+    # Check for 'singularity' command
+    if shutil.which('singularity') is None:
+        modules_to_load.append('singularity')
+        print("'singularity' command not found. Loading module 'singularity'.")
+    else:
+        print("'singularity' command is already available.")
 
     # Load required modules using 'modulecmd'
     for module in modules_to_load:

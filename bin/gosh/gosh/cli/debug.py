@@ -2,6 +2,9 @@
 
 import os
 import click
+import csv
+import sys
+
 from ..utils.ai_helper import extract_error_messages, get_error_analysis_and_solution
 from ..core.nextflow_log import (
     get_all_entries,
@@ -94,10 +97,6 @@ def log(sample_names, process_names, output):
 
         # Remove duplicate entries if both sample and process names overlap
         unique_entries = [dict(t) for t in {tuple(d.items()) for d in entries}]
-
-        # Convert entries to CSV format
-        import csv
-        import sys
 
         if output:
             with open(output, 'w', newline='') as csvfile:
