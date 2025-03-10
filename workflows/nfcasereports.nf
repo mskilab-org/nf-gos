@@ -1144,7 +1144,7 @@ workflow NFCASEREPORTS {
             tumor:  it[0].status == 1
         }
         .tumor
-        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, frag_cov
+        .map { meta, frag_cov -> [ meta.sample, meta, frag_cov ] }
 
     normal_frag_cov_for_merge = inputs
         .map { it -> [it.meta, it.frag_cov] }
