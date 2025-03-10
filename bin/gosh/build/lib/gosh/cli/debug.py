@@ -1,13 +1,6 @@
 #!/usr/bin/env python3
 
-import os
 import click
-from ..utils.ai_helper import extract_error_messages, get_error_analysis_and_solution
-from ..core.nextflow_log import (
-    get_all_entries,
-    get_entries_with_sample_names,
-    get_entries_with_process_names
-)
 
 @click.group(name='debug')
 def debug_cli():
@@ -18,6 +11,8 @@ def debug_cli():
 @click.argument('log_file', type=click.Path(exists=True), required=False)
 def eye(log_file):
     """Analyze Nextflow log file using AI assistance."""
+    import os
+    from ..utils.ai_helper import extract_error_messages, get_error_analysis_and_solution
     try:
         # If no log file specified, look for .nextflow.log in current directory
         if not log_file:
@@ -56,6 +51,11 @@ def eye(log_file):
 @click.option('-o', '--output', type=click.Path(), help='Output file to save the results as CSV.')
 def log(sample_names, process_names, output):
     """Retrieve Nextflow log entries based on samples or processes."""
+    from ..core.nextflow_log import (
+        get_all_entries,
+        get_entries_with_sample_names,
+        get_entries_with_process_names
+    )
     try:
         entries_sample = []
         entries_process = []

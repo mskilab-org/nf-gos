@@ -1,7 +1,4 @@
-import subprocess
 import logging
-import shutil
-from ..core.module_loader import get_environment_defaults, load_required_modules
 
 logging.basicConfig(level=logging.WARNING)
 
@@ -16,6 +13,7 @@ logging.basicConfig(level=logging.WARNING)
 FIELD_NAMES = [ 'name', 'process', 'workdir', 'status', 'cpus', 'pcpu', 'memory', 'pmem' ]
 
 def run_nextflow_log(args):
+    import subprocess
     command = ['nextflow', 'log'] + args
 
     result = subprocess.run(
@@ -30,6 +28,8 @@ def run_nextflow_log(args):
     return result.stdout
 
 def get_all_run_names():
+    import shutil
+    from ..core.module_loader import get_environment_defaults
     env_defaults = get_environment_defaults()
     if shutil.which('nextflow') is None:
         nextflow_module = env_defaults.get('nextflow_module', 'nextflow')

@@ -1,6 +1,6 @@
+from os import makedirs, path
+from subprocess import run, CalledProcessError
 import click
-import os
-import subprocess
 
 @click.group()
 def skilift_cli():
@@ -14,11 +14,11 @@ def skilift_cli():
 @click.option('-c', '--cores', type=int, default=1, help='Number of cores to use.')
 def run(results_dir, cohort_type, gos_dir, cores):
     """Run the skilift command with specified options."""
-    if not os.path.isdir(results_dir):
+    if not path.isdir(results_dir):
         click.echo(f"Error: The directory '{results_dir}' does not exist.")
         return
 
-    os.makedirs(os.path.expanduser(gos_dir), exist_ok=True)
+    makedirs(expanduser(gos_dir), exist_ok=True)
 
     r_code = f'''
     devtools::load_all("~/git/skilift")
@@ -28,6 +28,6 @@ def run(results_dir, cohort_type, gos_dir, cores):
     '''
 
     try:
-        subprocess.run(['Rscript', '-e', r_code], check=True)
-    except subprocess.CalledProcessError as e:
+        run(['Rscript', '-e', r_code], check=True)
+    except CalledProcessError as e:
         click.echo(f"Error executing R script: {e}")

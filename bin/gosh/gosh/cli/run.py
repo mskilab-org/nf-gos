@@ -1,14 +1,7 @@
-import os
+from os import makedirs, path
+from shutil import rmtree
+from sys import exit
 import click
-import socket
-import shutil
-import subprocess
-import sys
-from ..core.nextflow import NextflowRunner
-from ..core.config import Config
-from ..core.params_wizard import create_params_file
-from ..core.nextflow_log import get_entries_with_process_names, get_entries_with_sample_names
-from ..core.module_loader import get_environment_defaults, load_required_modules
 
 @click.group(name='run')
 def run_cli():
@@ -32,6 +25,10 @@ def run_cli():
 @click.option('-s', '--samples',
               help='Comma-separated list of sample IDs to rerun')
 def pipeline(pipeline_dir, params_file, profile, resume, processes, samples):
+    from ..core.nextflow import NextflowRunner
+    from ..core.params_wizard import create_params_file
+    from ..core.nextflow_log import get_entries_with_process_names, get_entries_with_sample_names
+    from ..core.module_loader import get_environment_defaults, load_required_modules
 
     # Retrieve environment defaults
     env_defaults = get_environment_defaults()
@@ -45,14 +42,14 @@ def pipeline(pipeline_dir, params_file, profile, resume, processes, samples):
         profile = f"{profile},{env_defaults['profile']}"
 
     # Create hg19 directory (required for fragcounter)
-    os.makedirs('hg19', exist_ok=True)
+    makedirs('hg19', exist_ok=True)
 
     # Check if params_file is provided and exists
-    if not os.path.isfile(params_file):
+    if not path.isfile(params_file):
         print(f"Parameters file '{params_file}' not found.")
         # Check if default params.json exists
         default_params = './params.json'
-        if not os.path.isfile(default_params):
+        if not path.isfile(default_params):
             print("No params.json file found. Launching wizard to create one...")
             # Call the wizard to create params.json
             create_params_file()
@@ -127,17 +124,17 @@ def pipeline(pipeline_dir, params_file, profile, resume, processes, samples):
                 confirm_again = input("Are you sure? This will cause the pipeline to rerun from these steps. (yes/no): ").strip().lower()
                 if confirm_again == 'yes':
                     for workdir in workdirs_to_delete:
-                        shutil.rmtree(workdir)
+                        rmtree(workdir)
                     print("Directories deleted.")
                 else:
                     print("Run cancelled.")
-                    sys.exit(0)
+                    exit(0)
             else:
                 print("Run cancelled.")
-                sys.exit(0)
+                exit(0)
         else:
             print("No matching work directories found to delete.")
-            sys.exit(0)
+            exit(0)
 
     load_modules_command = load_required_modules(env_defaults)
 

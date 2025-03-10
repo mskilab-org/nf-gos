@@ -1,16 +1,9 @@
 #!/usr/bin/env python3
 
-import os
+from os.path import exists
+from csv import DictWriter
+from sys import stdout
 import click
-import csv
-import sys
-
-from ..utils.ai_helper import extract_error_messages, get_error_analysis_and_solution
-from ..core.nextflow_log import (
-    get_all_entries,
-    get_entries_with_sample_names,
-    get_entries_with_process_names
-)
 
 @click.group(name='debug')
 def debug_cli():
@@ -25,7 +18,7 @@ def eye(log_file):
         # If no log file specified, look for .nextflow.log in current directory
         if not log_file:
             default_log = '.nextflow.log'
-            if os.path.exists(default_log):
+            if exists(default_log):
                 log_file = default_log
             else:
                 click.secho("Error: No .nextflow.log file found in current directory.", fg='red')
@@ -36,6 +29,7 @@ def eye(log_file):
         with open(log_file, 'r') as f:
             log_content = f.read()
 
+        from ..utils.ai_helper import extract_error_messages, get_error_analysis_and_solution
         # Extract error messages
         error_messages = extract_error_messages(log_content)
 
@@ -59,6 +53,13 @@ def eye(log_file):
 @click.option('-o', '--output', type=click.Path(), help='Output file to save the results as CSV.')
 def log(sample_names, process_names, output):
     """Retrieve Nextflow log entries based on samples or processes."""
+
+    from ..core.nextflow_log import (
+        get_all_entries,
+        get_entries_with_sample_names,
+        get_entries_with_process_names
+    )
+
     try:
         entries_sample = []
         entries_process = []
@@ -100,12 +101,12 @@ def log(sample_names, process_names, output):
 
         if output:
             with open(output, 'w', newline='') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=unique_entries[0].keys())
+                writer = DictWriter(csvfile, fieldnames=unique_entries[0].keys())
                 writer.writeheader()
                 writer.writerows(unique_entries)
             click.secho(f"Results saved to {output}", fg='green')
         else:
-            writer = csv.DictWriter(sys.stdout, fieldnames=unique_entries[0].keys())
+            writer = DictWriter(stdout, fieldnames=unique_entries[0].keys())
             writer.writeheader()
             writer.writerows(unique_entries)
 
