@@ -1,6 +1,6 @@
 ## Introduction
 
-**mskilab-org/nf-casereports** is a bioinformatics pipeline from [`mskilab-org`](https://www.mskilab.org/) for running [`JaBbA`](https://github.com/mskilab-org/JaBbA/), our algorithm for MIP based joint inference of copy number and rearrangement state in cancer whole genome sequence data. This pipeline runs all the pre-requisite tools (among others) and generates the necessary inputs for running JaBbA and loading into [case-reports](https://github.com/mskilab-org/case-report), our clinical front-end. It is designed to take paired tumor-normal samples or tumor-only samples as input.
+**mskilab-org/nf-gOS** is a bioinformatics pipeline from [`mskilab-org`](https://www.mskilab.org/) for running [`JaBbA`](https://github.com/mskilab-org/JaBbA/), our algorithm for MIP based joint inference of copy number and rearrangement state in cancer whole genome sequence data. This pipeline runs all the pre-requisite tools (among others) and generates the necessary inputs for running JaBbA and loading into [case-reports](https://github.com/mskilab-org/case-report), our clinical front-end. It is designed to take paired tumor-normal samples or tumor-only samples as input.
 
 ## Workflow Summary:
 1. Align to Reference Genome (currently supports `BWA-MEM`, `BWA-MEM2`, and GPU accelerated `fq2bam`).
@@ -18,7 +18,7 @@
 14. Call SNVs and indels (using [`SAGE`](https://github.com/hartwigmedical/hmftools/blob/master/sage/README.md))
 15. Annotate variants (using [`Snpeff`](https://pcingola.github.io/SnpEff/))
 16. Assign mutational signatures (using [`SigProfiler`](https://github.com/AlexandrovLab/SigProfilerAssignment/))
-17. Detect HRD (Homologous Recombination Deficiency) (using [`HRDetect`](https://github.com/Nik-Zainal-Group/signature.tools.lib))
+17. Detect HRD (Homologous Recombination Deficiency) (using [`HRDetect`](https://github.com/Nik-Zainal-Group/signature.tools.lib) and our [`OnenessTwoness`](https://github.com/mskilab-org/onenesstwoness) classifier)
 
 
 ## Usage
@@ -35,7 +35,7 @@ path** for inputs inside the samplesheet rather than relative paths.*
 For paired tumor-normal samples, use the same `patient` ID, but different
 `sample` names. Indicate their respective tumor/normal `status`, where **1** in
 the `status` field indicates a tumor sample, and **0** indicates a normal
-sample. You may pass multiple `sample` IDs per patient, `nf-casereports` will
+sample. You may pass multiple `sample` IDs per patient, `nf-gOS` will
 consider them as separate samples belonging to the same patient and output the
 results accordingly.
 
@@ -172,7 +172,7 @@ Values:
 
 	// fragCounter options
 	midpoint_frag              = "TRUE"                           // If TRUE only count midpoint if FALSE then count bin footprint of every fragment interval: Default=TRUE
-	windowsize_frag            = 1000                            // Window / bin size : Default=200 (but dryclean uses 1000 binsize)
+	windowsize_frag            = 1000                            // Window / bin size : Default= 200 in program but dryclean uses 1000 binsize, hence set to 1000
 	minmapq_frag               = 60                              // Minimal map quality : Default = 1
 	paired_frag                = "TRUE"                           // Is the dataset paired : Default = TRUE
 	exome_frag                 = "FALSE"	                        // Use exons as bins instead of fixed window : Default = FALSE
@@ -203,32 +203,32 @@ Values:
     name_cbs                            = "tumor"
 
 	// JaBbA options
-    blacklist_junctions_jabba = "NULL"
-    geno_jabba = "FALSE"
-    indel_jabba = "exclude"
-    tfield_jabba = "tier"
-    iter_jabba = 2
-    rescue_window_jabba = 10000
-    rescue_all_jabba = "TRUE"
-    nudgebalanced_jabba = "TRUE"
-    edgenudge_jabba = 0.1
-    strict_jabba = "FALSE"
-    allin_jabba = "FALSE"
-    field_jabba = "foreground"
-    maxna_jabba = 0.9
-    ploidy_jabba = "NA"
-    purity_jabba = "NA"
-    pp_method_jabba = "ppgrid"
-    cnsignif_jabba = 0.00001
-    slack_jabba = 20
-    linear_jabba = "FALSE"
-    tilim_jabba = 7200
-    epgap_jabba = 0.000001
-    fix_thres_jabba = -1
-    lp_jabba = "TRUE"
-    ism_jabba = "TRUE"
-    filter_loose_jabba = "FALSE"
-    gurobi_jabba = "FALSE"
+    blacklist_junctions_jabba = "NULL" // Rearrangement junctions to be excluded from consideration
+    geno_jabba = "FALSE" // Whether the junction has genotype information
+    indel_jabba = "exclude" // Decision to 'exclude' or 'include' small isolated INDEL-like events
+    tfield_jabba = "tier" // Tier confidence meta data field in ra
+    iter_jabba = 2 // Number of extra re-iterations allowed to rescue lower confidence junctions
+    rescue_window_jabba = 10000 // Window size in bp to look for lower confidence junctions
+    rescue_all_jabba = "TRUE" // If TRUE, will put all tiers in the first round of iteration
+    nudgebalanced_jabba = "TRUE" // Whether to add a small incentive for chains of quasi-reciprocal junctions
+    edgenudge_jabba = 0.1 // Hyper-parameter of how much to nudge or reward aberrant junction incorporation
+    strict_jabba = "FALSE" // If TRUE, will only include junctions that exactly overlap segments
+    allin_jabba = "FALSE" // If TRUE, will put all tiers in the first round of iteration
+    field_jabba = "foreground" // Name of the metadata column of coverage that contains the data
+    maxna_jabba = 0.9 // Any node with more NA than this fraction will be ignored
+    ploidy_jabba = "NA" // Ploidy guess, can be a length 2 range
+    purity_jabba = "NA" // Purity guess, can be a length 2 range
+    pp_method_jabba = "ppgrid" // Method to infer purity and ploidy if not both given
+    cnsignif_jabba = 0.00001 // Alpha value for CBS
+    slack_jabba = 20 // Slack penalty to apply per loose end
+    linear_jabba = "FALSE" // If TRUE, will use L1 loose end penalty
+    tilim_jabba = 7200 // Time limit for JaBbA MIP
+    epgap_jabba = 0.000001 // Threshold for calling convergence
+    fix_thres_jabba = -1 // Not explicitly defined in the help text
+    lp_jabba = "TRUE" // Run as LP (linear program instead of quadratic program)
+    ism_jabba = "TRUE" // Include infinite sites constraints
+    filter_loose_jabba = "FALSE" // Not explicitly defined in the help text
+    gurobi_jabba = "FALSE" // Use Gurobi for MIP optimization instead of CPLEX
     verbose_jabba = "TRUE"
 
     // Allelic CN (Non-Integer Balance)

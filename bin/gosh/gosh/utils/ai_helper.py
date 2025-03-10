@@ -130,10 +130,22 @@ def query_ai(query: str, system_prompt: str = "You are a helpful assistant.") ->
     if not query or query == "":
         raise ValueError("Query cannot be empty.")
 
+    model = "gpt-4o-mini"
+    model_version = f"{model}/v1.0.0"
+    nyu_endpoint = f"https://kong-api.prod1.nyumc.org/{model_version}"
+    nyu_api_key = os.environ.get("GOSH_OPENAI_API_KEY")
+
+    if not nyu_api_key:
+        raise ValueError("OpenAI API key is missing. Please set the GOSH_OPENAI_API_KEY environment variable to your OpenAI API key.")
+
     try:
-        client = OpenAI()
+        client = OpenAI(
+            base_url=nyu_endpoint,
+            api_key=nyu_api_key,
+            default_headers={"api-key": nyu_api_key}
+        )
         completion = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": query}
