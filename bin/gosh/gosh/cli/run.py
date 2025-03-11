@@ -120,9 +120,9 @@ def pipeline(pipeline_dir, params_file, profile, resume, processes, samples):
                 print(f"{names_str}, {workdir}")
 
             confirm = input("Do you want to delete these directories? (yes/no): ").strip().lower()
-            if confirm == 'yes':
+            if confirm == 'yes' or confirm == 'y':
                 confirm_again = input("Are you sure? This will cause the pipeline to rerun from these steps. (yes/no): ").strip().lower()
-                if confirm_again == 'yes':
+                if confirm_again == 'yes' or confirm_again == 'y':
                     for workdir in workdirs_to_delete:
                         rmtree(workdir)
                     print("Directories deleted.")
