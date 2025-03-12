@@ -1953,7 +1953,7 @@ workflow NFCASEREPORTS {
 
     // HRDetect
     // ##############################
-    if ((tools_used.contains("all") || tools_used.contains("hrdetect")) && !params.tumor_only) {
+    if ((tools_used.contains("all") || tools_used.contains("hrdetect"))) {
         hrdetect_inputs = inputs
             .filter { it.hrdetect.isEmpty() }
             .map { it -> [it.meta.patient, it.meta] }
