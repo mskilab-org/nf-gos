@@ -12,8 +12,8 @@ def skilift_cli():
 @click.option('-t', '--cohort_type', type=click.Choice(['paired', 'tumor_only', 'heme']), default='paired', help='Type of the cohort.')
 @click.option('-o', '--gos_dir', type=click.Path(), required=True, help='Path to gos_dir.')
 @click.option('-c', '--cores', type=int, default=1, help='Number of cores to use.')
-def run(results_dir, cohort_type, gos_dir, cores):
-    """Run the skilift command with specified options."""
+def up(results_dir, cohort_type, gos_dir, cores):
+    """Lift raw data into gOS compatible formats using Skilift."""
     if not path.isdir(results_dir):
         click.echo(f"Error: The directory '{results_dir}' does not exist.")
         return
