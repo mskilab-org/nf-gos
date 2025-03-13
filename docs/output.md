@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This document describes the output produced by the pipeline. 
+This document describes the output produced by the pipeline.
 
 The directories listed below will be created in the results directory after the pipeline has finished. All paths are relative to the top-level results directory.
 
@@ -66,7 +66,7 @@ work/
 
 #### Trim adapters
 
-[FastP](https://github.com/OpenGene/fastp) supports global trimming, which means it trims all reads in the front or the tail. This function is useful since sometimes you want to drop some cycles of a sequencing run. In the current implementation in Sarek
+[FastP](https://github.com/OpenGene/fastp) supports global trimming, which means it trims all reads in the front or the tail. This function is useful since sometimes you want to drop some cycles of a sequencing run. In the current implementation
 `--detect_adapter_for_pe` is set by default which enables auto-detection of adapter sequences. For more information on how to fine-tune adapter trimming, take a look into the parameter docs.
 
 The resulting files are intermediate and by default not kept in the final files delivered to users. Set `--save_trimmed` to enable publishing of the files in:
@@ -144,7 +144,7 @@ The resulting CRAM files are delivered to the users.
 
 ### Base Quality Score Recalibration
 
-During Base Quality Score Recalibration, systematic errors in the base quality scores are corrected by applying machine learning to detect and correct for them. This is important for evaluating the correct call of a variant during the variant discovery process. However, this is not needed for all combinations of tools in Sarek. Notably, this should be turned off when having UMI tagged reads or using DragMap (see [here](https://gatk.broadinstitute.org/hc/en-us/articles/4407897446939--How-to-Run-germline-single-sample-short-variant-discovery-in-DRAGEN-mode)) as mapper.
+During Base Quality Score Recalibration, systematic errors in the base quality scores are corrected by applying machine learning to detect and correct for them. This is important for evaluating the correct call of a variant during the variant discovery process. However, this is not needed for all combinations of tools. Notably, this should be turned off when having UMI tagged reads or using DragMap (see [here](https://gatk.broadinstitute.org/hc/en-us/articles/4407897446939--How-to-Run-germline-single-sample-short-variant-discovery-in-DRAGEN-mode)) as mapper.
 
 For further reading and documentation see the [technical documentation by GATK](https://gatk.broadinstitute.org/hc/en-us/articles/360035890531-Base-Quality-Score-Recalibration-BQSR-).
 
@@ -158,7 +158,7 @@ For further reading and documentation see the [technical documentation by GATK](
 
 </details>
 
-### GATK ApplyBQSR 
+### GATK ApplyBQSR
 
 [GATK ApplyBQSR](https://gatk.broadinstitute.org/hc/en-us/articles/5358826654875-ApplyBQSR) recalibrates the base qualities of the input reads based on the recalibration table produced by the [GATK BaseRecalibrator](#gatk-baserecalibrator) tool.
 
@@ -192,7 +192,7 @@ The goal of fragCounter is to correct Whole genome or targeted sequencing data f
 The GC bias curve is determined by loess regression of read count by GC and mappability scores. For reference, check [info](https://github.com/mskilab-org/fragCounter)
 
 ## Dryclean
-Dryclean is a robust principal component analysis (rPCA) based method. It uses a panel of normal (PON) samples to learn the landscape of both biological and technical noise in read depth data. Dryclean then uses this landscape to significantly reduce noise and artifacts in the signal for tumor samples. The input to the algorithm is a GenomicsRanges object containing read depth. 
+Dryclean is a robust principal component analysis (rPCA) based method. It uses a panel of normal (PON) samples to learn the landscape of both biological and technical noise in read depth data. Dryclean then uses this landscape to significantly reduce noise and artifacts in the signal for tumor samples. The input to the algorithm is a GenomicsRanges object containing read depth.
 For reference, check [info](https://github.com/mskilab-org/dryclean)
 
 ## CBS
