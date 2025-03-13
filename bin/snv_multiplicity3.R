@@ -42,7 +42,7 @@
             library(rtracklayer)
             library(khtools)
             library(skidb)
-            devtools::load_all("/gpfs/commons/home/jrafailov/git/SNVplicity.dev")
+            devtools::load_all("/gpfs/data/imielinskilab/home/rafaij01/git/multiplicity-dev")
         })
     })
 
