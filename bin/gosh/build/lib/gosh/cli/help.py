@@ -1,7 +1,5 @@
+from json import dump
 import click
-from gosh.utils.ai_helper import answer_help_question, extract_new_params
-import json
-import os
 
 @click.group()
 def help_cli():
@@ -12,6 +10,7 @@ def help_cli():
 @click.argument('query', type=str)
 def ask(query):
     """Ask gosh a question about the nf-gOS pipeline"""
+    from gosh.utils.ai_helper import answer_help_question, extract_new_params
     try:
         response = answer_help_question(query)
         click.echo("𓅃: " + response)
@@ -21,7 +20,7 @@ def ask(query):
             # Ask the user if they want to overwrite existing params.json
             if click.confirm("A new 'params.json' was provided in the response. Do you want to overwrite your existing 'params.json' with the new one?"):
                 with open('params.json', 'w') as f:
-                    json.dump(new_params, f, indent=4)
+                    dump(new_params, f, indent=4)
                 click.echo("params.json has been updated.")
         except ValueError:
             # No new params.json provided; skip

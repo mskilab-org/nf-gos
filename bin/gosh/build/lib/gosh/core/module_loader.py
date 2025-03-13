@@ -1,13 +1,13 @@
 import socket
 import shutil
-
-_loaded_modules_command = None
+import os
 
 def get_environment_defaults():
     nyu_defaults = {
         'pipeline-dir': "/gpfs/data/imielinskilab/projects/nf-casereports",
         'profile': "nyu",
-        'nextflow_module': "nextflow/23.04.4"
+        'nextflow_module': "nextflow/23.04.4",
+        'JAVA_HOME': '/gpfs/share/apps/jdk/17u028'
     }
     mapping = {
         'fn-': nyu_defaults,
@@ -27,10 +27,6 @@ def get_environment_defaults():
     return {}
 
 def load_required_modules(env_defaults):
-    global _loaded_modules_command
-    if _loaded_modules_command is not None:
-        return _loaded_modules_command
-
     required_commands = ['nextflow', 'aws', 'singularity']
     modules_to_load = []
     load_modules_command = ""
@@ -59,9 +55,15 @@ def load_required_modules(env_defaults):
     else:
         print("'singularity' command is already available.")
 
+    # Check if JAVA_HOME is set to correct path
+    if 'JAVA_HOME' not in os.environ or os.environ['JAVA_HOME'] != env_defaults['JAVA_HOME']:
+        print(f"Setting JAVA_HOME to {env_defaults['JAVA_HOME']}")
+        os.environ['JAVA_HOME'] = env_defaults['JAVA_HOME']
+    else:
+        print(f"JAVA_HOME is already set to {env_defaults['JAVA_HOME']}")
+
     # Build the load modules command string
     for module in modules_to_load:
         load_modules_command += f"module load {module} && "
 
-    _loaded_modules_command = load_modules_command
     return load_modules_command

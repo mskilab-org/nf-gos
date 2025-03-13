@@ -1,77 +1,12 @@
-import os
+from os import makedirs, path
+from shutil import rmtree
+from sys import exit
 import click
-import socket
-import shutil
-import subprocess
-import sys
-from ..core.nextflow import NextflowRunner
-from ..core.config import Config
-from ..core.params_wizard import create_params_file
-from ..core.nextflow_log import get_entries_with_process_names, get_entries_with_sample_names
 
 @click.group(name='run')
 def run_cli():
     """Run pipeline commands"""
     pass
-
-def get_environment_defaults():
-    nyu_defaults = {
-        'pipeline-dir': "/gpfs/data/imielinskilab/projects/nf-casereports",
-        'profile': "nyu",
-        'nextflow_module': "nextflow/23.04.4"
-    }
-
-    mapping = {
-        'a40-': nyu_defaults,
-        'cn-': nyu_defaults,
-        'gn-': nyu_defaults,
-        'bigpurple': nyu_defaults,
-    }
-
-    hostname = socket.gethostname()
-
-    for prefix, defaults in mapping.items():
-        if hostname.startswith(prefix):
-            print(f"Detected environment: {hostname}")
-            print(f"Using defaults for {hostname}")
-            return defaults
-    return {}
-
-def load_required_modules(env_defaults):
-    """Load required modules if commands are not available."""
-    required_commands = ['nextflow', 'aws', 'singularity']
-    modules_to_load = []
-    load_modules_command = ""
-
-    # Check for 'nextflow' command
-    if shutil.which('nextflow') is None:
-        nextflow_module = env_defaults.get('nextflow_module', 'nextflow')
-        if not nextflow_module:
-            nextflow_module = 'nextflow'
-        modules_to_load.append(nextflow_module)
-        print(f"'nextflow' command not found. Loading module '{nextflow_module}'.")
-    else:
-        print("'nextflow' command is already available.")
-
-    # Check for 'aws' command
-    if shutil.which('aws') is None:
-        modules_to_load.append('aws-cli')
-        print("'aws' command not found. Loading module 'aws-cli'.")
-    else:
-        print("'aws' command is already available.")
-
-    # Check for 'singularity' command
-    if shutil.which('singularity') is None:
-        modules_to_load.append('singularity')
-        print("'singularity' command not found. Loading module 'singularity'.")
-    else:
-        print("'singularity' command is already available.")
-
-    # Load required modules using 'modulecmd'
-    for module in modules_to_load:
-        load_modules_command += f"module load {module} && "
-
-    return load_modules_command
 
 @run_cli.command()
 @click.option('--pipeline-dir',
@@ -90,7 +25,10 @@ def load_required_modules(env_defaults):
 @click.option('-s', '--samples',
               help='Comma-separated list of sample IDs to rerun')
 def pipeline(pipeline_dir, params_file, profile, resume, processes, samples):
-    """Run the nextflow pipeline with specified parameters"""
+    from ..core.nextflow import NextflowRunner
+    from ..core.params_wizard import create_params_file
+    from ..core.nextflow_log import get_entries_with_process_names, get_entries_with_sample_names
+    from ..core.module_loader import get_environment_defaults, load_required_modules
 
     # Retrieve environment defaults
     env_defaults = get_environment_defaults()
@@ -104,14 +42,14 @@ def pipeline(pipeline_dir, params_file, profile, resume, processes, samples):
         profile = f"{profile},{env_defaults['profile']}"
 
     # Create hg19 directory (required for fragcounter)
-    os.makedirs('hg19', exist_ok=True)
+    makedirs('hg19', exist_ok=True)
 
     # Check if params_file is provided and exists
-    if not os.path.isfile(params_file):
+    if not path.isfile(params_file):
         print(f"Parameters file '{params_file}' not found.")
         # Check if default params.json exists
         default_params = './params.json'
-        if not os.path.isfile(default_params):
+        if not path.isfile(default_params):
             print("No params.json file found. Launching wizard to create one...")
             # Call the wizard to create params.json
             create_params_file()
@@ -182,21 +120,21 @@ def pipeline(pipeline_dir, params_file, profile, resume, processes, samples):
                 print(f"{names_str}, {workdir}")
 
             confirm = input("Do you want to delete these directories? (yes/no): ").strip().lower()
-            if confirm == 'yes':
+            if confirm == 'yes' or confirm == 'y':
                 confirm_again = input("Are you sure? This will cause the pipeline to rerun from these steps. (yes/no): ").strip().lower()
-                if confirm_again == 'yes':
+                if confirm_again == 'yes' or confirm_again == 'y':
                     for workdir in workdirs_to_delete:
-                        shutil.rmtree(workdir)
+                        rmtree(workdir)
                     print("Directories deleted.")
                 else:
                     print("Run cancelled.")
-                    sys.exit(0)
+                    exit(0)
             else:
                 print("Run cancelled.")
-                sys.exit(0)
+                exit(0)
         else:
             print("No matching work directories found to delete.")
-            sys.exit(0)
+            exit(0)
 
     load_modules_command = load_required_modules(env_defaults)
 
