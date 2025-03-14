@@ -3,7 +3,7 @@ import sys
 import json
 from .samplesheet import check_if_tumor_only
 
-def create_params_file():
+def create_params_file(preset="default"):
     default_input = "./samplesheet.csv"
     default_outdir = "./results/"
     default_tools = "all"
@@ -45,14 +45,27 @@ def create_params_file():
     outdir_prompt = f"Enter output directory [default: {default_outdir} ({outdir_status})] (Press Enter to use default): "
     outdir = input(outdir_prompt).strip() or default_outdir
 
-    # Prompt for tools
-    tools_list = "[ aligner, bamqc, gridss, amber, fragcounter, dryclean, cbs, sage, purple, jabba, non_integer_balance, lp_phased_balance, events, fusions, snpeff, snv_multiplicity, signatures, hrdetect ]"
-    tools_prompt = (
-        f"Available tools: {tools_list}\n"
-        "Hint: You can pick any combination of tools, or leave it as 'all' which is recommended.\n"
-            f"Enter tools to use (comma-separated) [default: {default_tools}] (Press Enter to use default): "
-    )
-    tools = input(tools_prompt).strip() or default_tools
+    # New preset based configuration.
+    presets = {
+        "default": "",
+        "jabba": "sage,snpeff,snv_multiplicity,signatures,hrdetect",
+        "hrd": "non_integer_balance,lp_phased_balance,events,fusions"
+    }
+    if preset != "default":
+        print(f"Preset automatically set to '{preset}'")
+        preset_used = preset
+    else:
+        preset_prompt = (
+            "Available presets:\n"
+            " - default (recommended): runs all tools; aligner, bamqc, gridss, amber, fragcounter, dryclean, cbs, sage, purple, jabba, non_integer_balance, lp_phased_balance, events, fusions, snpeff, snv_multiplicity, signatures, hrdetect \n"
+            " - jabba: runs all tools necessary for JaBbA outputs (skips tools: sage, snpeff, snv_multiplicity, signatures, hrdetect)\n"
+            " - hrd: runs HR deficiency pipeline (skips tools: non_integer_balance, lp_phased_balance, events, fusions)\n"
+            "Enter preset option (options: default, jabba, hrd): "
+        )
+        preset_used = input(preset_prompt).strip().lower() or "default"
+        if preset_used not in presets:
+            print(f"Warning: Invalid preset '{preset_used}'. Using default.")
+            preset_used = "default"
 
     # Prompt for genome
     genome_prompt = (
@@ -73,11 +86,12 @@ def create_params_file():
     params = {
         "input": input_path,
         "outdir": outdir,
-        "tools": tools,
         "genome": genome,
         "email": email,
         "tumor_only": is_tumor_only
     }
+    if preset_used != "default":
+        params["skip_tools"] = presets[preset_used]
 
     # Write to params.json
     with open("params.json", "w") as f:

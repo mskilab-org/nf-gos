@@ -62,11 +62,19 @@ TCXX49,XX,0,TCXX49_N,lane_1,/path/to/fastq_1.fq.gz,/path/to/fastq_2.gz
 ```
 
 Each row represents a pair of fastq files (paired end) for a single sample (in
-this case a normal sample, status: 0). After the input file is ready, you can
-run the pipeline using:
+this case a normal sample, status: 0).
+
+After the input file is ready, you can run the pipeline using our `gOSh` CLI.
 
 ```bash
-nextflow run mskilab-org/nf-jabba \
+pip install bin/gosh # install gosh
+gosh run pipeline
+```
+
+You can also run the pipeline directly using the following command:
+
+```bash
+nextflow run mskilab-org/nf-casereports \
    -profile <docker|singularity|institute> \
    --input samplesheet.csv \
    --outdir <OUTDIR> \
@@ -76,6 +84,23 @@ nextflow run mskilab-org/nf-jabba \
 > Please provide pipeline parameters via the CLI or Nextflow [`-params-file`](https://www.nextflow.io/blog/2020/cli-docs-release.html) option. Custom config files including those
 > provided by the `-c` Nextflow option can be used to provide any configuration _**except for parameters**_;
 > see [docs](https://nf-co.re/usage/configuration#custom-configuration-files).
+
+#### JaBbA Pipeline
+
+If you want to run only the JaBbA pipeline, you can use the following command:
+
+```bash
+gosh run pipeline --preset jabba
+```
+
+#### HR Deficiency (HRD) Pipeline
+
+If you want to run only the HRD pipeline, you can use the following command:
+
+```bash
+gosh run pipeline --preset hrd
+```
+
 
 ### Discussion of expected fields in input file and expected inputs for each `--step`
 

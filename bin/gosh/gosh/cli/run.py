@@ -24,11 +24,27 @@ def run_cli():
               help='Comma-separated list of process names to rerun')
 @click.option('-s', '--samples',
               help='Comma-separated list of sample IDs to rerun')
-def pipeline(pipeline_dir, params_file, profile, resume, processes, samples):
+@click.option('--skip-tools',
+              help='Comma-separated list of tools (see available tools) to skip')
+@click.option('--preset',
+              default='default',
+              type=click.Choice(['default', 'jabba', 'hrd']),
+              help='Preset option: "default" (all tools), "jabba", or "hrd"')
+def pipeline(
+    pipeline_dir,
+    params_file,
+    profile,
+    resume,
+    processes,
+    samples,
+    skip_tools,
+    preset
+):
     from ..core.nextflow import NextflowRunner
     from ..core.params_wizard import create_params_file
     from ..core.nextflow_log import get_entries_with_process_names, get_entries_with_sample_names
     from ..core.module_loader import get_environment_defaults, load_required_modules
+    import json
 
     # Retrieve environment defaults
     env_defaults = get_environment_defaults()
@@ -51,11 +67,28 @@ def pipeline(pipeline_dir, params_file, profile, resume, processes, samples):
         default_params = './params.json'
         if not path.isfile(default_params):
             print("No params.json file found. Launching wizard to create one...")
-            # Call the wizard to create params.json
-            create_params_file()
+            # Call the wizard to create params.json with the preset supplied in the run command
+            create_params_file(preset=preset)
             params_file = default_params
         else:
             params_file = default_params
+
+    # Determine the skip_tools value.
+    if preset != 'default':
+        if preset == 'jabba':
+            skip_tools_value = "sage,snpeff,snv_multiplicity,signatures,hrdetect"
+        elif preset == 'hrd':
+            skip_tools_value = "non_integer_balance,lp_phased_balance,events,fusions"
+    else:
+        skip_tools_value = skip_tools if skip_tools else None
+
+    # Update the params.json file if a skip_tools value is set.
+    if skip_tools_value is not None:
+        with open(params_file, "r") as pf:
+            params_data = json.load(pf)
+        params_data["skip_tools"] = skip_tools_value
+        with open(params_file, "w") as pf:
+            json.dump(params_data, pf, indent=4)
 
     # Print all parameters
     print("Running gOS with the following parameters:")
