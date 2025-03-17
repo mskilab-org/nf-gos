@@ -1153,6 +1153,12 @@
                     "help_text": "If you use AWS iGenomes, this has already been set for you appropriately.\n\n> **NB** If none provided, will be generated automatically from the FASTA reference. Combine with `--save_reference` to save for future runs.",
                     "description": "Path to FASTA reference index."
                 },
+                "msisensorpro_list": {
+                    "type": "string",
+                    "fa_icon": "fas fa-file",
+                    "help_text": "This is the output of msisensorpro scan. This is provided for hg19 through the remote repository. If not provided, will run msisensorpro scan.",
+                    "description": "Path to MSIsensorPro list file.",
+                },
                 "known_indels": {
                     "type": "string",
                     "fa_icon": "fas fa-copy",

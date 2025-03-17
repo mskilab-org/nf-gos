@@ -86,6 +86,7 @@ def toolParamMap = [
 tool_input_output_map = [
     "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
     "bamqc": [ inputs: ['bam'], outputs: [] ],
+    "msisensorpro": [ inputs: ['bam'], outputs: ['msi', 'msi_germline'] ],
     "gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
     "amber": [ inputs: ['bam'], outputs: ['hets', 'amber_dir'] ],
     "fragcounter": [ inputs: ['bam'], outputs: ['frag_cov'] ],
@@ -329,6 +330,8 @@ inputs = ch_from_samplesheet.map {
     table,
     cram,
     bam,
+    msi,
+    msi_germline,
     hets,
     amber_dir,
     frag_cov,
@@ -951,6 +954,70 @@ workflow NFCASEREPORTS {
         // Gather QC
         reports = reports.mix(BAM_QC.out.reports.collect{ meta, report -> report })
         versions = versions.mix(BAM_QC.out.versions)
+    }
+
+    // MSISensorPro
+    // ##############################
+    if (tools_used.contains("all") || tools_used.contains("msisensorpro")) {
+
+        bam_msi_inputs = inputs.filter { it.msi.isEmpty() }.map { it -> [it.meta.sample] }
+        bam_msi = alignment_bams_final
+            .join(bam_msi_inputs)
+            .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
+        msisensorpro_existing_outputs = inputs.map { it -> [it.meta, it.msi] }.filter { !it[1].isEmpty() }
+        msisensorpro_existing_outputs_germline = inputs.map { it -> [it.meta, it.msi_germline] }.filter { !it[1].isEmpty() }
+
+        if (params.tumor_only) {
+            bam_msi_status = bam_msi.branch{
+                tumor:  it[0].status == 1
+            }
+
+            // add empty arrays to stand-in for normals
+            bam_msi_pair = bam_msi_status.tumor.map{ meta, bam, bai -> [ meta + [tumor_id: meta.sample], [], [], bam, bai, [] ] }
+        } else {
+            // getting the tumor and normal cram files separated
+            bam_msi_status = bam_msi.branch{
+                normal: it[0].status == 0
+                tumor:  it[0].status == 1
+            }
+
+            // All normal samples
+            bam_msi_normal_for_crossing = bam_msi_status.normal.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
+
+            // All tumor samples
+            bam_msi_tumor_for_crossing = bam_msi_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
+
+            // Crossing the normal and tumor samples to create tumor and normal pairs
+            bam_msi_pair = bam_msi_normal_for_crossing.cross(bam_msi_tumor_for_crossing)
+                .map { normal, tumor ->
+                    def meta = [:]
+
+                    meta.id         = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
+                    meta.normal_id  = normal[1].sample
+                    meta.patient    = normal[0]
+                    meta.sex        = normal[1].sex
+                    meta.tumor_id   = tumor[1].sample
+
+                    [ meta, normal[2], normal[3], tumor[2], tumor[3], [] ] // add empty array for intervals
+            }
+        }
+
+        BAM_MSISENSORPRO(
+            bam_msi_pair,
+            msisensorpro_scan
+        )
+
+        msi_from_msisensorpro = Channel.empty()
+            .mix(BAM_MSISENSORPRO.out.msi_somatic)
+            .mix(msisensorpro_existing_outputs)
+        versions = versions.mix(BAM_MSISENSORPRO.out.versions)
+
+        if (!params.tumor_only) {
+            germline_msi_from_msisensorpro = Channel.empty()
+                .mix(BAM_MSISENSORPRO.out.msi_germline)
+                .mix(msisensorpro_existing_outputs_germline)
+        }
+
     }
 
     // SV Calling

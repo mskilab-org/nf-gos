@@ -132,6 +132,52 @@
                 "format": "file-path",
                 "exists": true
             },
+            "msi": {
+                "errorMessage": "MSI somatic file must be a text file",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+            "msi_germline": {
+                "errorMessage": "MSI germline file must be a text file",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
             "hets": {
                 "errorMessage": "Pileups file and must have extension '.txt'",
                 "anyOf": [
