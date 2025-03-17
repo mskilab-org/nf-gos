@@ -9,6 +9,12 @@ def get_environment_defaults():
         'nextflow_module': "nextflow/23.04.4",
         'JAVA_HOME': '/gpfs/share/apps/jdk/17u028'
     }
+    nygc_defaults = {
+        'pipeline-dir': "/gpfs/commons/groups/imielinski_lab/git/nf-gos",
+        'profile': "nygc",
+        'nextflow_module': "nextflow/23.10.0",
+        'JAVA_HOME': '/nfs/sw/java/jdk-17.0.4'
+    }
     mapping = {
         'fn-': nyu_defaults,
         'a100-': nyu_defaults,
@@ -17,6 +23,10 @@ def get_environment_defaults():
         'gn-': nyu_defaults,
         'gpu-': nyu_defaults,
         'bigpurple': nyu_defaults,
+
+        'mskilab0': nygc_defaults,
+        'pe2': nygc_defaults,
+        'ne1': nygc_defaults,
     }
     hostname = socket.gethostname()
     for prefix, defaults in mapping.items():
