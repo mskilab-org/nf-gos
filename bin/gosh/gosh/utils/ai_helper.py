@@ -127,33 +127,55 @@ def query_ai(query: str, system_prompt: str = "You are a helpful assistant.") ->
     Returns:
         str: The AI response text
     """
+    from ..core.module_loader import get_environment_defaults
+
     if not query or query == "":
         raise ValueError("Query cannot be empty.")
 
-    model = "gpt-4o-mini"
-    model_version = f"{model}/v1.0.0"
-    nyu_endpoint = f"https://kong-api.prod1.nyumc.org/{model_version}"
-    nyu_api_key = os.environ.get("GOSH_OPENAI_API_KEY")
+    model = "gpt-4o"
+    api_key = os.environ.get("GOSH_OPENAI_API_KEY")
 
-    if not nyu_api_key:
-        raise ValueError("OpenAI API key is missing. Please set the GOSH_OPENAI_API_KEY environment variable to your OpenAI API key.")
+    profile = get_environment_defaults().get('profile')
+    if profile == "nyu":  # use nyu endpoint
+        model_version = f"{model}/v1.0.0"
+        nyu_endpoint = f"https://kong-api.prod1.nyumc.org/{model_version}"
 
-    try:
-        client = OpenAI(
-            base_url=nyu_endpoint,
-            api_key=nyu_api_key,
-            default_headers={"api-key": nyu_api_key}
-        )
-        completion = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": query}
-            ]
-        )
-        return completion.choices[0].message.content
-    except Exception as e:
-        raise Exception(f"Failed to get AI response: {str(e)}")
+        if not api_key:
+            raise ValueError("OpenAI API key is missing. Please set the GOSH_OPENAI_API_KEY environment variable to your OpenAI API key.")
+
+        try:
+            client = OpenAI(
+                base_url=nyu_endpoint,
+                api_key=api_key,
+                default_headers={"api-key": api_key}
+            )
+            completion = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": query}
+                ]
+            )
+            return completion.choices[0].message.content
+        except Exception as e:
+            raise Exception(f"Failed to get AI response: {str(e)}")
+    else:
+        try:
+            client = OpenAI(
+                api_key=api_key
+            )
+
+            completion = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": query}
+                ]
+            )
+
+            return completion.choices[0].message.content
+        except Exception as e:
+            raise Exception(f"Failed to get AI response: {str(e)}")
 
 def get_error_analysis_and_solution(error_messages: str) -> str:
     """
