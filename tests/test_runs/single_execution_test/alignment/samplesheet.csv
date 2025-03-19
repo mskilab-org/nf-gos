@@ -1,2 +1,0 @@
-patient,sex,status,sample,fastq_1,fastq_2
-1,NA,1,A,/gpfs/commons/home/spanja/projects/AA_PRAD/Flow/newbatch/alignment_Aug2023/getBamReads/COL-1088-Z1-Case-WGS/paired1.fq.gz,/gpfs/commons/home/spanja/projects/AA_PRAD/Flow/newbatch/alignment_Aug2023/getBamReads/COL-1088-Z1-Case-WGS/paired2.fq.gz

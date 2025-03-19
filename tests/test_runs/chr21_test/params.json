@@ -1,7 +1,0 @@
-{
-    "input": "./samplesheet.csv",
-    "outdir": "./results/",
-    "tools": "all",
-    "genome": "GATK.GRCh37",
-    "email": ""
-}

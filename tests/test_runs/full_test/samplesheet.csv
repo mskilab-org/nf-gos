@@ -1,3 +1,0 @@
-patient,sex,status,sample,bam,bai
-JTS-1501,XX,1,JTS-1501_T,/gpfs/commons/home/sdider/Projects/nf-casereports/tests/test_data/full_bams/JTS-1501/aligned.bam,/gpfs/commons/home/sdider/Projects/nf-casereports/tests/test_data/full_bams/JTS-1501/aligned.bam.bai
-JTS-1501,XX,0,JTS-1501_N,/gpfs/commons/home/sdider/Projects/nf-casereports/tests/test_data/full_bams/JTS-1501/JTS-1501-2-NT.bam,/gpfs/commons/home/sdider/Projects/nf-casereports/tests/test_data/full_bams/JTS-1501/JTS-1501-2-NT.bam.bai
