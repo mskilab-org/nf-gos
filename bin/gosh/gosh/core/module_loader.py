@@ -4,7 +4,7 @@ import os
 
 def get_environment_defaults():
     nyu_defaults = {
-        'pipeline-dir': "/gpfs/data/imielinskilab/projects/nf-casereports",
+        'pipeline-dir': "/gpfs/data/imielinskilab/git/mskilab/nf-gos",
         'profile': "nyu",
         'nextflow_module': "nextflow/23.04.4",
         'JAVA_HOME': '/gpfs/share/apps/jdk/17u028'
