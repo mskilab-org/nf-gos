@@ -274,6 +274,7 @@ params {
 	'GATK.GRCh37' {
 	    fasta                            = "${params.igenomes_base}/Homo_sapiens/GATK/GRCh37/Sequence/WholeGenomeFasta/human_g1k_v37_decoy.fasta"
 	    fasta_fai                        = "${params.igenomes_base}/Homo_sapiens/GATK/GRCh37/Sequence/WholeGenomeFasta/human_g1k_v37_decoy.fasta.fai"
+        msisensorpro_list                = "${params.mski_base}/msisensor/hg19/human_g1k_v37_decoy.list"
 	    chr_dir                          = "${params.igenomes_base}/Homo_sapiens/GATK/GRCh37/Sequence/Chromosomes"
 	    dict                             = "${params.igenomes_base}/Homo_sapiens/GATK/GRCh37/Sequence/WholeGenomeFasta/human_g1k_v37_decoy.dict"
 	    bwa                              = "${params.igenomes_base}/Homo_sapiens/GATK/GRCh37/Sequence/BWAIndex/"

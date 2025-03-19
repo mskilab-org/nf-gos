@@ -37,6 +37,7 @@ germline_resource                   = WorkflowNfcasereports.create_file_channel(
 known_indels                        = WorkflowNfcasereports.create_file_channel(params.known_indels)
 known_snps                          = WorkflowNfcasereports.create_file_channel(params.known_snps)
 pon                                 = WorkflowNfcasereports.create_file_channel(params.pon)
+msisensorpro_list                   = WorkflowNfcasereports.create_file_channel(params.msisensorpro_list)
 
 workflow PREPARE_GENOME {
 
@@ -49,7 +50,12 @@ workflow PREPARE_GENOME {
     BWAMEM2_INDEX(fasta)     // If aligner is bwa-mem2
 
     GATK4_CREATESEQUENCEDICTIONARY(fasta)
-    MSISENSORPRO_SCAN(fasta)
+    // only run msisensorpro_scan if the msisensorpro_list is an empty channel
+    if (msisensorpro_list.isEmpty()) {
+        MSISENSORPRO_SCAN(fasta)
+        msisensorpro_list = MSISENSORPRO_SCAN.out.list.map{ meta, list -> [list] }                // path: genome_msi.list
+    }
+
     SAMTOOLS_FAIDX(fasta, [['id':null], []])
 
 
@@ -123,7 +129,7 @@ workflow PREPARE_GENOME {
     germline_resource_tbi = TABIX_GERMLINE_RESOURCE.out.tbi.map{ meta, tbi -> [tbi] }.collect()   // path: germline_resource.vcf.gz.tbi
     known_snps_tbi        = TABIX_KNOWN_SNPS.out.tbi.map{ meta, tbi -> [tbi] }.collect()          // path: {known_indels*}.vcf.gz.tbi
     known_indels_tbi      = TABIX_KNOWN_INDELS.out.tbi.map{ meta, tbi -> [tbi] }.collect()        // path: {known_indels*}.vcf.gz.tbi
-    msisensorpro_scan     = MSISENSORPRO_SCAN.out.list.map{ meta, list -> [list] }                // path: genome_msi.list
+    msisensorpro_scan     = msisensorpro_list
     pon_tbi               = TABIX_PON.out.tbi.map{ meta, tbi -> [tbi] }.collect()                 // path: pon.vcf.gz.tbi
     allele_files
     chr_files
