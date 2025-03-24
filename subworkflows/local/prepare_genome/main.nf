@@ -53,7 +53,7 @@ workflow PREPARE_GENOME {
     // only run msisensorpro_scan if the msisensorpro_list is an empty channel
     if (msisensorpro_list.isEmpty()) {
         MSISENSORPRO_SCAN(fasta)
-        msisensorpro_list = MSISENSORPRO_SCAN.out.list.map{ meta, list -> [list] }                // path: genome_msi.list
+        msisensorpro_list = MSISENSORPRO_SCAN.out.list.map{ meta, list -> list }                // path: genome_msi.list
     }
 
     SAMTOOLS_FAIDX(fasta, [['id':null], []])

@@ -43,6 +43,9 @@ def checkPathParamList = [
 ]
 
 def toolParamMap = [
+    "msisensorpro": [
+        params.msisensorpro_list
+    ],
     "gridss": [
         params.blacklist_gridss,
         params.pon_gridss
@@ -82,6 +85,14 @@ def toolParamMap = [
         params.gc_profile,
     ],
 ]
+
+toolParamMap.each { tool, params ->
+    params.each { param ->
+        if (param) {
+            checkPathParamList.add(param)
+        }
+    }
+}
 
 tool_input_output_map = [
     "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
@@ -366,6 +377,8 @@ inputs = ch_from_samplesheet.map {
         crai: cram ? cram + '.crai' : [],
         bam: bam,
         bai: bam ? bam + '.bai': [],
+        msi: msi,
+        msi_germline: msi_germline,
         hets: hets,
         amber_dir: amber_dir,
         frag_cov: frag_cov,
@@ -570,6 +583,9 @@ include { BAM_APPLYBQSR } from '../subworkflows/local/bam_applybqsr/main'
 
 // Svaba
 include { BAM_SVCALLING_SVABA } from '../subworkflows/local/bam_svcalling_svaba/main'
+
+// MSISensor Pro
+include { BAM_MSISENSORPRO } from '../subworkflows/local/bam_msisensorpro/main'
 
 //GRIDSS
 include { BAM_SVCALLING_GRIDSS } from '../subworkflows/local/bam_svcalling_gridss/main'

@@ -2,7 +2,7 @@
 // BAM MSISENSORPRO
 //
 
-include { MSISENSORPRO_MSISOMATIC } from '../modules/nf-core/msisensorpro/msisomatic/main'
+include { MSISENSORPRO_MSISOMATIC } from '../../../modules/nf-core/msisensorpro/msisomatic/main'
 
 fasta     = WorkflowNfcasereports.create_file_channel(params.fasta)
 
