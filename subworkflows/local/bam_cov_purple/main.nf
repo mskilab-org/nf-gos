@@ -13,6 +13,9 @@ diploid_bed = WorkflowNfcasereports.create_file_channel(params.diploid_bed)
 genome_fasta = WorkflowNfcasereports.create_file_channel(params.fasta)
 genome_fai = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
 genome_ver     = WorkflowNfcasereports.create_value_channel(params.genome_ver_amber)
+highly_diploid_percentage = WorkflowNfcasereports.create_value_channel(params.purple_highly_diploid_percentage)
+min_purity   = WorkflowNfcasereports.create_value_channel(params.purple_min_purity)
+ploidy_penalty_factor = WorkflowNfcasereports.create_value_channel(params.purple_ploidy_penalty_factor)
 genome_dict = WorkflowNfcasereports.create_file_channel(params.dict)
 sage_known_hotspots_somatic = WorkflowNfcasereports.create_file_channel(params.somatic_hotspots)
 sage_known_hotspots_germline = WorkflowNfcasereports.create_file_channel(params.germline_hotspots)
@@ -43,13 +46,19 @@ workflow BAM_COV_PURPLE {
 
     tumor_sv        = tumor_sv.map { meta, vcf, tbi -> [meta.patient, vcf, tbi] }
     tumor_snv        = tumor_snv.map { meta, vcf, tbi -> [meta.patient, vcf, tbi] }
-    if (!params.tumor_only) {
-        normal_snv        = normal_snv.map { meta, vcf, tbi -> [meta.patient, vcf, tbi] }
-    }
+    normal_snv        = normal_snv.map { meta, vcf, tbi -> [meta.patient, vcf, tbi] }
     meta = bams.map { meta, tbam, tbai, nbam, nbai -> [meta.patient, meta] }
 
+    purple_inputs = meta
+        .join(amber_dir)
+        .join(cobalt_dir)
+        .map { patient, meta, amber_dir, cobalt_dir ->
+            [meta, amber_dir, cobalt_dir, [], [], [], [], [], []]
+        }
+
     if (params.tumor_only) {
-        purple_inputs = meta
+        if (params.use_svs && params.use_smlvs) {
+            purple_inputs = meta
             .join(amber_dir)
             .join(cobalt_dir)
             .join(tumor_sv)
@@ -57,22 +66,29 @@ workflow BAM_COV_PURPLE {
             .map { patient, meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi ->
                 [meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, [], []]
             }
+        }
     } else {
-        purple_inputs = meta
-            .join(amber_dir)
-            .join(cobalt_dir)
-            .join(tumor_sv)
-            .join(tumor_snv)
-            .join(normal_snv)
-            .map { patient, meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf, germ_snv_tbi ->
-                [meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf, germ_snv_tbi]
-            }
+        if (params.use_svs && params.use_smlvs) {
+            purple_inputs = meta
+                .join(amber_dir)
+                .join(cobalt_dir)
+                .join(tumor_sv)
+                .join(tumor_snv)
+                .join(normal_snv)
+                .map { patient, meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf, germ_snv_tbi ->
+                    [meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf, germ_snv_tbi]
+                }
+        }
     }
+
 
     PURPLE(
         purple_inputs,
         genome_fasta,
         genome_ver,
+        highly_diploid_percentage,
+        min_purity,
+        ploidy_penalty_factor,
         genome_fai,
         genome_dict,
         gc_profile,

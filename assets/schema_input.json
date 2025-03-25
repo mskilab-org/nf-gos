@@ -202,11 +202,11 @@
                 "exists": true
             },
             "amber_dir": {
-                "errorMessage": "Amber directory must be a valid path",
+                "errorMessage": "Amber directory must be a valid path to a directory",
                 "anyOf": [
                     {
                         "type": "string",
-                        "pattern": "^\\S+\\/$"
+                        "pattern": ".+",
                     },
                     {
                         "type": "string",
@@ -221,7 +221,7 @@
                         "maxLength": 0
                     }
                 ],
-                "format": "file-path",
+                "format": "directory-path",
                 "exists": true
             },
             "frag_cov": {

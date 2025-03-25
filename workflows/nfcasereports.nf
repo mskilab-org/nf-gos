@@ -104,7 +104,7 @@ tool_input_output_map = [
     "dryclean": [ inputs: ['frag_cov'], outputs: ['dryclean_cov'] ],
     "cbs": [ inputs: ['dryclean_cov'], outputs: ['seg', 'nseg'] ],
     "sage": [ inputs: ['bam'], outputs: ['snv_somatic_vcf', 'snv_germline_vcf'] ],
-    "purple": [ inputs: ['bam', 'amber_dir', 'vcf', 'snv_somatic_vcf'], outputs: ['ploidy'] ],
+    "purple": [ inputs: ['bam', 'amber_dir'], outputs: ['ploidy'] ],
     "jabba": [ inputs: ['vcf', 'hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
     "non_integer_balance": [ inputs: ['jabba_gg'], outputs: ['ni_balanced_gg'] ],
     "lp_phased_balance": [ inputs: ['ni_balanced_gg'], outputs: ['lp_balanced_gg'] ],
@@ -159,7 +159,8 @@ sampleList.each { input_map ->
 println "Provided inputs: ${available_inputs}"
 
 // Iteratively select tools based on available inputs
-def skip_tools = params.skip_tools ? params.skip_tools.split(',') : []
+def skip_tools = params.skip_tools ? params.skip_tools.split(',').collect { it.trim() } : []
+println "Skipping tools: ${skip_tools}"
 def selected_tools = []
 boolean changed
 do {
@@ -1631,10 +1632,9 @@ workflow NFCASEREPORTS {
             tumor:  it[0].status == 1
         }
 
+        purple_inputs_snv_germline = Channel.empty()
         if (params.tumor_only) {
-            bam_purple_pair = bam_snv_calling_status.tumor.map{ meta, bam, bai -> [ meta + [tumor_id: meta.sample], bam, bai, [], [] ] }
-            purple_inputs_snv_germline = Channel.empty()
-
+            bam_purple_pair = bam_purple_status.tumor.map{ meta, bam, bai -> [ meta + [tumor_id: meta.sample], bam, bai, [], [] ] }
         } else {
             // All normal samples
             bam_purple_normal_for_crossing = bam_purple_status.normal.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
@@ -1659,29 +1659,35 @@ workflow NFCASEREPORTS {
             purple_tumor_normal_meta = bam_purple_pair
                 .map { it -> [ it[0].patient, it[0] ] } // meta.patient, meta
 
-            // germline snvs
-            purple_inputs_snv_germline = purple_tumor_normal_meta
-                .join(germline_vcf_for_merge)
-                .map { it -> [ it[1], it[2], it[3] ] } // meta, vcf, tbi
+            if (params.purple_use_smlvs) {
+                // germline snvs
+                purple_inputs_snv_germline = purple_tumor_normal_meta
+                    .join(germline_vcf_for_merge)
+                    .map { it -> [ it[1], it[2], it[3] ] } // meta, vcf, tbi
+            }
         }
 
         purple_inputs_amber_dir = purple_inputs_for_merge
             .join(amber_dir_for_merge)
             .map { it -> [ it[1], it[2] ] } // meta, amber_dir
 
-        purple_inputs_sv = purple_inputs_for_merge
-            .join(vcf_from_sv_calling_for_merge)
-            .map { it -> [ it[1], it[2], it[3] ] } // meta, vcf, tbi
+        purple_inputs_sv = Channel.empty()
+        if (params.purple_use_svs) {
+            purple_inputs_sv = purple_inputs_for_merge
+                .join(vcf_from_sv_calling_for_merge)
+                .map { it -> [ it[1], it[2], it[3] ] } // meta, vcf, tbi
+        }
 
-
-        purple_inputs_snv = purple_inputs_for_merge
-            .join(filtered_somatic_vcf_for_merge)
-            .map { it -> [ it[1], it[2], it[3] ] } // meta, vcf, tbi
-
+        purple_inputs_snv = Channel.empty()
+        if (params.purple_use_smlvs) {
+            purple_inputs_snv = purple_inputs_for_merge
+                .join(filtered_somatic_vcf_for_merge)
+                .map { it -> [ it[1], it[2], it[3] ] } // meta, vcf, tbi
+        }
 
         purple_existing_outputs = inputs.map { it -> [it.meta, it.ploidy] }.filter { !it[1].isEmpty() }
 
-        BAM_COV_PURPLE(bam_purple_pair, amber_dir, purple_inputs_sv, purple_inputs_snv, purple_inputs_snv_germline)
+        BAM_COV_PURPLE(bam_purple_pair, purple_inputs_amber_dir, purple_inputs_sv, purple_inputs_snv, purple_inputs_snv_germline)
 
         versions = versions.mix(BAM_COV_PURPLE.out.versions)
         ploidy = Channel.empty()

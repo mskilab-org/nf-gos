@@ -11,6 +11,9 @@ process PURPLE {
     tuple val(meta), path(amber), path(cobalt), path(sv_tumor_vcf), path(sv_tumor_tbi), path(smlv_tumor_vcf), path(smlv_tumor_tbi), path(smlv_normal_vcf), path(smlv_normal_tbi)
     path genome_fasta
     val genome_ver
+    val highly_diploid_percentage
+    val min_purity
+    val ploidy_penalty_factor
     path genome_fai
     path genome_dict
     path gc_profile
@@ -40,8 +43,12 @@ process PURPLE {
 
     // def sv_tumor_recovery_vcf_arg = sv_tumor_unfiltered_vcf ? "-sv_recovery_vcf ${sv_tumor_unfiltered_vcf}" : ''
 
-    def smlv_tumor_vcf_arg = smlv_tumor_vcf ? "-somatic_vcf ${smlv_tumor_vcf}" : ''
-    def smlv_normal_vcf_arg = smlv_normal_vcf ? "-germline_vcf ${smlv_normal_vcf}" : ''
+    def smlv_tumor_vcf_arg =  smlv_tumor_vcf ? "-somatic_vcf ${smlv_tumor_vcf}" : ''
+    def smlv_normal_vcf_arg =  smlv_normal_vcf ? "-germline_vcf ${smlv_normal_vcf}" : ''
+
+    def highly_diploid_percentage_arg = highly_diploid_percentage ? "-highly_diploid_percentage ${highly_diploid_percentage}" : ''
+    def min_purity_arg = min_purity ? "-min_purity ${min_purity}" : ''
+    def ploidy_penalty_factor_arg = ploidy_penalty_factor ? "-ploidy_penalty_factor ${ploidy_penalty_factor}" : ''
 
     def sage_known_hotspots_germline_arg = sage_known_hotspots_germline ? "-germline_hotspots ${sage_known_hotspots_germline}" : ''
     def germline_del_arg = germline_del ? "-germline_del_freq_file ${germline_del}" : ''
@@ -61,6 +68,9 @@ process PURPLE {
         ${sv_tumor_vcf_arg} \\
         ${smlv_tumor_vcf_arg} \\
         ${smlv_normal_vcf_arg} \\
+        ${highly_diploid_percentage_arg} \\
+        ${min_purity_arg} \\
+        ${ploidy_penalty_factor_arg} \\
         -ref_genome ${genome_fasta} \\
         -ref_genome_version ${genome_ver} \\
         -driver_gene_panel ${driver_gene_panel} \\
