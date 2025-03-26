@@ -718,6 +718,29 @@
                 "format": "file-path",
                 "exists": true
             },
+            "onenesstwoness": {
+                "errorMessage": "OnenessTwoness file cannot contain spaces and must have extension '.rds'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.rds$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
         },
         "required": ["patient", "sample"]
     }

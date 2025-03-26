@@ -113,7 +113,8 @@ tool_input_output_map = [
     "snpeff": [ inputs: ['snv_somatic_vcf'], outputs: ['variant_somatic_ann', 'variant_somatic_bcf'] ],
     "snv_multiplicity": [ inputs: ['jabba_gg', 'variant_somatic_ann'], outputs: ['snv_multiplicity'] ],
     "signatures": [ inputs: ['snv_somatic_vcf'], outputs: ['sbs_signatures', 'indel_signatures', 'signatures_matrix'] ],
-    "hrdetect": [ inputs: ['hets', 'vcf', 'jabba_gg', 'snv_somatic_vcf'], outputs: ['hrdetect'] ]
+    "hrdetect": [ inputs: ['hets', 'vcf', 'jabba_gg', 'snv_somatic_vcf'], outputs: ['hrdetect'] ],
+    "onenesstwoness": [ inputs: ['events', 'hrdetect'], outputs: ['onenesstwoness'] ]
 ]
 
 def samplesheetToList(String filePath) {
@@ -368,7 +369,8 @@ inputs = ch_from_samplesheet.map {
     sbs_signatures,
     indel_signatures,
     signatures_matrix,
-    hrdetect
+    hrdetect,
+    onenesstwoness
     -> [
         meta: meta,
         fastq_1: fastq_1,
@@ -407,7 +409,8 @@ inputs = ch_from_samplesheet.map {
         sbs_signatures: sbs_signatures,
         indel_signatures: indel_signatures,
         signatures_matrix: signatures_matrix,
-        hrdetect: hrdetect
+        hrdetect: hrdetect,
+        onenesstwoness: onenesstwoness
     ]
 }
 
@@ -640,6 +643,9 @@ include { COV_GGRAPH_LP_PHASED_BALANCE as LP_PHASED_BALANCE } from '../subworkfl
 
 // HRDetect
 include { JUNC_SNV_GGRAPH_HRDETECT } from '../subworkflows/local/hrdetect/main'
+
+// OnenessTwoness
+include { HRD_ONENESS_TWONESS } from '../subworkflows/local/onenesstwoness/main'
 
 //STRELKA2
 include { BAM_SOMATIC_STRELKA } from '../subworkflows/local/bam_somatic_strelka/main'
@@ -1906,6 +1912,8 @@ workflow NFCASEREPORTS {
         events = Channel.empty()
             .mix(EVENTS.out.events_output)
             .mix(events_existing_outputs)
+
+        events_for_merge = events.map { it -> [ it[0].patient, it[1] ] } // meta.patient, events
     }
 
     // Fusions
@@ -2086,6 +2094,34 @@ workflow NFCASEREPORTS {
             hrdetect_rds = Channel.empty()
                 .mix(JUNC_SNV_GGRAPH_HRDETECT.out.hrdetect_rds)
                 .mix(hrdetect_existing_outputs)
+
+            hrdetect_rds_for_merge = hrdetect_rds
+                .map { it -> [ it[0].patient, it[1] ] } // meta.patient, hrdetect rds
+    }
+
+    // OnenessTwoness
+    // ##############################
+    if ((tools_used.contains("all") || tools_used.contains("onenesstwoness"))) {
+        onenesstwoness_inputs = inputs
+            .filter { it.onenesstwoness.isEmpty() }
+            .map { it -> [it.meta.patient, it.meta] }
+
+        onenesstwoness_inputs_events = events_for_merge
+            .join(onenesstwoness_inputs)
+            .map { it -> [ it[2], it[1] ] } // meta, events
+
+        onenesstwoness_inputs_hrd = hrdetect_rds_for_merge
+            .join(onenesstwoness_inputs)
+            .map { it -> [ it[2], it[1] ] } // meta, hrdetect rds
+
+        onenesstwoness_existing_outputs = inputs.map { it -> [it.meta, it.onenesstwoness] }.filter { !it[1].isEmpty() }
+
+        HRD_ONENESS_TWONESS(onenesstwoness_inputs_events, onenesstwoness_inputs_hrd)
+
+        versions = versions.mix(HRD_ONENESS_TWONESS.out.versions)
+        onenesstwoness_rds = Channel.empty()
+            .mix(HRD_ONENESS_TWONESS.out.oneness_twoness_results)
+            .mix(onenesstwoness_existing_outputs)
     }
 }
 

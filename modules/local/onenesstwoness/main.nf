@@ -9,10 +9,9 @@ process ONENESS_TWONESS {
 
     input:
     tuple val(meta), path(events_output), path(homeology), path(homeology_stats), path(hrdetect_results)
-    path(model)
 
     output:
-    tuple val(meta), path("*oneness_twoness_results.rds")      , emit: oneness_twoness, optional: true
+    tuple val(meta), path("*oneness_twoness_results.rds")      , emit: oneness_twoness_results, optional: true
     path "versions.yml"                                 , emit: versions
 
     when:
@@ -31,7 +30,6 @@ process ONENESS_TWONESS {
     --homeology $homeology \\
     --homeology_stats $homeology_stats \\
     --hrdetect_results $hrdetect_results \\
-    --model $model
     --libdir ./ \\
 
     cat <<-END_VERSIONS > versions.yml
