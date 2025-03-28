@@ -157,7 +157,7 @@ def pipeline(
                 confirm_again = input("Are you sure? This will cause the pipeline to rerun from these steps. (yes/no): ").strip().lower()
                 if confirm_again == 'yes' or confirm_again == 'y':
                     for workdir in workdirs_to_delete:
-                        rmtree(workdir)
+                        rmtree(workdir, ignore_errors=True)
                     print("Directories deleted.")
                 else:
                     print("Run cancelled.")
