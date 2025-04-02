@@ -254,6 +254,18 @@
                 "format": "file-path",
                 "exists": true
             },
+            "purity": {
+                "errorMessage": "purity must be a number",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "number"
+                    }
+                ],
+            },
             "ploidy": {
                 "errorMessage": "ploidy must be a number",
                 "anyOf": [

@@ -22,7 +22,6 @@ strict					 = WorkflowNfcasereports.create_value_channel(params.strict_jabba)
 allin					     = WorkflowNfcasereports.create_value_channel(params.allin_jabba)
 field					     = WorkflowNfcasereports.create_value_channel(params.field_jabba)
 maxna					     = WorkflowNfcasereports.create_value_channel(params.maxna_jabba)
-purity					 = WorkflowNfcasereports.create_value_channel(params.purity_jabba)
 pp_method					 = WorkflowNfcasereports.create_value_channel(params.pp_method_jabba)
 cnsignif					 = WorkflowNfcasereports.create_value_channel(params.cnsignif_jabba)
 slack					     = WorkflowNfcasereports.create_value_channel(params.slack_jabba)
@@ -40,7 +39,7 @@ help					     = WorkflowNfcasereports.create_value_channel(params.help_jabba)
 
 workflow COV_JUNC_TUMOR_ONLY_JABBA {
     take:
-    inputs  // [ meta, junction, cov, j_supp, hets, ploidy, seg_cbs, nseg_cbs ]
+    inputs  // [ meta, junction, cov, j_supp, hets, purity, ploidy, seg_cbs, nseg_cbs ]
 
     main:
     versions            = Channel.empty()
@@ -63,9 +62,10 @@ workflow COV_JUNC_TUMOR_ONLY_JABBA {
             "cov": samples[2],
             "j_supp": samples[3],
             "hets": samples[4],
-            "ploidy": samples[5],
-            "seg_cbs": samples[6],
-            "nseg_cbs": samples[7]
+            "purity": samples[5],
+            "ploidy": samples[6],
+            "seg_cbs": samples[7],
+            "nseg_cbs": samples[8]
         ]
     }
 
@@ -98,13 +98,14 @@ workflow COV_JUNC_TUMOR_ONLY_JABBA {
                     .map { sample ->
                         [
                             sample[1],  // meta (because sample[0] is meta.patient)
-                            sample[9],  // chr_coerced_junction
-                            sample[10], // chr_coerced_cov_rds
+                            sample[10],  // chr_coerced_junction
+                            sample[11], // chr_coerced_cov_rds
                             sample[4],  // j_supp
                             sample[5], // het_pileups_wgs
-                            sample[6],  // ploidy
-                            sample[7],  // seg_cbs
-                            sample[8]  // nseg_cbs
+                            sample[6],  // purity
+                            sample[7],  // ploidy
+                            sample[8],  // seg_cbs
+                            sample[9]  // nseg_cbs
                         ]
                     }
 
@@ -124,7 +125,6 @@ workflow COV_JUNC_TUMOR_ONLY_JABBA {
         field,
         maxna,
         blacklist_coverage,
-        purity,
         pp_method,
         cnsignif,
         slack,
@@ -164,7 +164,7 @@ workflow COV_JUNC_TUMOR_ONLY_JABBA {
 workflow COV_JUNC_JABBA {
 
     take:
-    inputs  // [ meta, junction, cov, j_supp, hets, ploidy, seg_cbs, nseg_cbs ]
+    inputs  // [ meta, junction, cov, j_supp, hets, purity, ploidy, seg_cbs, nseg_cbs ]
 
     main:
     versions            = Channel.empty()
@@ -190,9 +190,10 @@ workflow COV_JUNC_JABBA {
             "cov": samples[2],
             "j_supp": samples[3],
             "hets": samples[4],
-            "ploidy": samples[5],
-            "seg_cbs": samples[6],
-            "nseg_cbs": samples[7]
+            "purity": samples[5],
+            "ploidy": samples[6],
+            "seg_cbs": samples[7],
+            "nseg_cbs": samples[8]
         ]
     }
 
@@ -251,13 +252,14 @@ workflow COV_JUNC_JABBA {
                     .map { sample ->
                         [
                             sample[1],  // meta (because sample[0] is meta.patient)
-                            sample[9],  // chr_coerced_junction
-                            sample[10], // chr_coerced_cov_rds
-                            sample[11],  // chr_coerced_j_supp
-                            sample[12], // chr_coerced_het_pileups_wgs
-                            sample[6],  // ploidy
-                            sample[7],  // seg_cbs
-                            sample[8]  // nseg_cbs
+                            sample[10],  // chr_coerced_junction
+                            sample[11], // chr_coerced_cov_rds
+                            sample[12],  // chr_coerced_j_supp
+                            sample[13], // chr_coerced_het_pileups_wgs
+                            sample[6],  // purity
+                            sample[7],  // ploidy
+                            sample[8],  // seg_cbs
+                            sample[9]  // nseg_cbs
                         ]
                     }
 
@@ -277,7 +279,6 @@ workflow COV_JUNC_JABBA {
         field,
         maxna,
         blacklist_coverage,
-        purity,
         pp_method,
         cnsignif,
         slack,
