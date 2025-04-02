@@ -113,6 +113,7 @@ workflow BAM_COV_PURPLE {
     ploidy = ploidy.mix(EXTRACT_PURITYPLOIDY.out.ploidy_val) // meta, ploidy
 
     emit:
+    purity
     ploidy
 
     versions

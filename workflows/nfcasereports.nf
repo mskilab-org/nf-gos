@@ -104,7 +104,7 @@ tool_input_output_map = [
     "dryclean": [ inputs: ['frag_cov'], outputs: ['dryclean_cov'] ],
     "cbs": [ inputs: ['dryclean_cov'], outputs: ['seg', 'nseg'] ],
     "sage": [ inputs: ['bam'], outputs: ['snv_somatic_vcf', 'snv_germline_vcf'] ],
-    "purple": [ inputs: ['bam', 'amber_dir'], outputs: ['ploidy'] ],
+    "purple": [ inputs: ['bam', 'amber_dir'], outputs: ['purity', 'ploidy'] ],
     "jabba": [ inputs: ['vcf', 'hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
     "non_integer_balance": [ inputs: ['jabba_gg'], outputs: ['ni_balanced_gg'] ],
     "lp_phased_balance": [ inputs: ['ni_balanced_gg'], outputs: ['lp_balanced_gg'] ],
@@ -349,6 +349,7 @@ inputs = ch_from_samplesheet.map {
     amber_dir,
     frag_cov,
     dryclean_cov,
+    purity,
     ploidy,
     seg,
     nseg,
@@ -386,6 +387,7 @@ inputs = ch_from_samplesheet.map {
         amber_dir: amber_dir,
         frag_cov: frag_cov,
         dryclean_cov: dryclean_cov,
+        purity: purity,
         ploidy: ploidy,
         seg: seg,
         nseg: nseg,
@@ -1616,6 +1618,10 @@ workflow NFCASEREPORTS {
 
     // PURPLE
     // ##############################
+    purity_for_merge = inputs
+        .map { it -> [it.meta, it.purity] }
+        .filter { !it[1].isEmpty() }
+        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, purity
 
     ploidy_for_merge = inputs
         .map { it -> [it.meta, it.ploidy] }
@@ -1624,7 +1630,7 @@ workflow NFCASEREPORTS {
 
     if (tools_used.contains("all") || tools_used.contains("purple")) {
         // this channel is for merging with alignment_bams_final
-        purple_inputs = inputs.filter { it.ploidy.isEmpty() }.map { it -> [it.meta.sample] }
+        purple_inputs = inputs.filter { it.ploidy.isEmpty() && it.purity.isEmpty() }.map { it -> [it.meta.sample] }
         // need a channel with patient and meta for merging with rest
         purple_inputs_for_merge = inputs.filter { it.ploidy.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
 
@@ -1691,14 +1697,28 @@ workflow NFCASEREPORTS {
                 .map { it -> [ it[1], it[2], it[3] ] } // meta, vcf, tbi
         }
 
-        purple_existing_outputs = inputs.map { it -> [it.meta, it.ploidy] }.filter { !it[1].isEmpty() }
+        purple_existing_outputs_ploidy = inputs.map { it -> [it.meta, it.ploidy] }.filter { !it[1].isEmpty() }
+        purple_existing_outputs_purity = inputs.map { it -> [it.meta, it.purity] }.filter { !it[1].isEmpty() }
 
-        BAM_COV_PURPLE(bam_purple_pair, purple_inputs_amber_dir, purple_inputs_sv, purple_inputs_snv, purple_inputs_snv_germline)
+        BAM_COV_PURPLE(
+            bam_purple_pair,
+            purple_inputs_amber_dir,
+            purple_inputs_sv,
+            purple_inputs_snv,
+            purple_inputs_snv_germline
+        )
 
         versions = versions.mix(BAM_COV_PURPLE.out.versions)
+        purity = Channel.empty()
+            .mix(BAM_COV_PURPLE.out.purity)
+            .mix(purple_existing_outputs_purity)
+
+        purity_for_merge = purity
+            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, purity
+
         ploidy = Channel.empty()
             .mix(BAM_COV_PURPLE.out.ploidy)
-            .mix(purple_existing_outputs)
+            .mix(purple_existing_outputs_ploidy)
 
         ploidy_for_merge = ploidy
             .map { it -> [ it[0].patient, it[1] ] } // meta.patient, ploidy
@@ -1742,6 +1762,10 @@ workflow NFCASEREPORTS {
             .join(jabba_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, cov
 
+        jabba_inputs_purity = purity_for_merge
+            .join(jabba_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, purity
+
         jabba_inputs_ploidy = ploidy_for_merge
             .join(jabba_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, ploidy
@@ -1761,17 +1785,19 @@ workflow NFCASEREPORTS {
             jabba_input = jabba_inputs
                 .join(jabba_inputs_cov)
                 .join(jabba_inputs_hets)
+                .join(jabba_inputs_purity)
                 .join(jabba_inputs_ploidy)
                 .join(jabba_inputs_cbs_seg)
                 .join(jabba_inputs_cbs_nseg)
                 .join(jabba_inputs_junction_filtered_sv)
-                .map{ patient, meta, cov, hets, ploidy, seg, nseg, junction ->
+                .map{ patient, meta, cov, hets, purity, ploidy, seg, nseg, junction ->
                     [
                         meta,
                         junction,
                         cov,
                         [],
                         hets,
+                        purity,
                         ploidy,
                         seg,
                         nseg
@@ -1782,18 +1808,20 @@ workflow NFCASEREPORTS {
             jabba_input = jabba_inputs
                 .join(jabba_inputs_cov)
                 .join(jabba_inputs_hets)
+                .join(jabba_inputs_purity)
                 .join(jabba_inputs_ploidy)
                 .join(jabba_inputs_cbs_seg)
                 .join(jabba_inputs_cbs_nseg)
                 .join(jabba_inputs_sv)
                 .join(jabba_inputs_unfiltered_sv)
-                .map{ patient, meta, cov, hets, ploidy, seg, nseg, junction, j_supp ->
+                .map{ patient, meta, cov, hets, purity, ploidy, seg, nseg, junction, j_supp ->
                     [
                         meta,
                         junction,
                         cov,
                         j_supp,
                         hets,
+                        purity,
                         ploidy,
                         seg,
                         nseg
