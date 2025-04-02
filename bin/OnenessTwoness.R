@@ -8,12 +8,11 @@
     {
         option_list = list(
             make_option(c("--complex"), type = "character", help = "output of Events.task - path to .rds gGraph object annotated with complex SV event classes"),
-            make_option(c("--homeology"), type = "character", help = "output of homeology_hrd.task - path to homeology results"),
-            make_option(c("--homeology_stats"), type = "character", help = "output of homeology_hrd.task - path to homeology results, table of each sequence heatmap component for every junction"),
-            make_option(c("--hrdetect_results"), type = "character",
-                        help = "output of hrdetect_og.task - preferably run with Strelka2 snv and SvAbA indels"),
-            make_option(c("--outdir"), type = "character", default = './',
-                        help = "output directory")
+            make_option(c("--hrdetect_results"), type = "character", help = "output of hrdetect_og.task - preferably run with Strelka2 snv and SvAbA indels"),
+            make_option(c("--genome"), type = "character", help = "path to the reference genome fasta file used for alignment (e.g. hg19, hg38, mm10)"),
+            make_option(c("--model"), type = "character", help = "path to the model weights for prediction"),
+            make_option(c("--cores"), type = "integer", default = 1, help = "number of cores to use for parallel processing [default 1]"),
+            make_option(c("--outdir"), type = "character", default = './', help = "output directory")
         )
         message("Found input files")
 
@@ -24,9 +23,9 @@
 
         if (
             is.null(opt$complex)
-            || (is.null(opt$homeology))
-            || is.null(opt$homeology_stats)
             || is.null(opt$hrdetect_results)
+            || is.null(opt$genome)
+            || is.null(opt$model)
             )  # was opt$multinomial
             stop(print_help(parseobj))
 
@@ -46,6 +45,7 @@
         suppressPackageStartupMessages(expr = {
                 library(gGnome)
                 library(onenesstwoness)
+                library(GxG)
             })
     })
 
@@ -55,11 +55,13 @@
 
     ########## Oneness Twoness #########
 
-    predict_hrd(complex = opt$complex,
-        homeology = opt$homeology,
-        homeology_stats = opt$homeology_stats,
+    predict_B1_2(
+        complex = opt$complex,
         hrdetect_results = opt$hrdetect_results,
-        save = TRUE)
+        genome = opt$genome,
+        model = opt$model,
+        cores = opt$cores
+    )
 
     quit("no", 0)
 }

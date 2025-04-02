@@ -204,7 +204,6 @@ ref_genome_version_pave       = params.ref_genome_version   ?: Channel.empty()
 sigprofilerassignment_genome         = params.sigprofilerassignment_genome   ?: Channel.empty()
 sigprofilerassignment_cosmic_version = params.sigprofilerassignment_cosmic_version ?: Channel.empty()
 
-
 // Initialize files channels based on params, not defined within the params.genomes[params.genome] scope
 if (params.snpeff_cache && params.tools && params.tools.contains("snpeff")) {
     def snpeff_annotation_cache_key = params.use_annotation_cache_keys ? "${params.snpeff_genome}.${params.snpeff_db}/" : ""
@@ -228,3 +227,6 @@ if (params.vep_cache && params.tools && params.tools.contains("vep")) {
 } else vep_cache = []
 
 vep_extra_files = []
+
+// OnenessTwoness
+model_oneness_twoness = params.model_oneness_twoness ?: Channel.empty()
