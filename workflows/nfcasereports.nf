@@ -112,6 +112,7 @@ tool_input_output_map = [
     "fusions": [ inputs: ['ni_balanced_gg'], outputs: ['fusions'] ],
     "snpeff": [ inputs: ['snv_somatic_vcf'], outputs: ['variant_somatic_ann', 'variant_somatic_bcf'] ],
     "snv_multiplicity": [ inputs: ['jabba_gg', 'variant_somatic_ann'], outputs: ['snv_multiplicity'] ],
+    "oncokb": [ inputs: ['variant_somatic_ann', 'snv_multiplicity', 'jabba_gg', 'fusions'], outputs: ['oncokb_maf', 'oncokb_fusions', 'oncokb_cna'] ],
     "signatures": [ inputs: ['snv_somatic_vcf'], outputs: ['sbs_signatures', 'indel_signatures', 'signatures_matrix'] ],
     "hrdetect": [ inputs: ['hets', 'vcf', 'jabba_gg', 'snv_somatic_vcf'], outputs: ['hrdetect'] ],
     "onenesstwoness": [ inputs: ['events', 'hrdetect'], outputs: ['onenesstwoness'] ]
@@ -367,6 +368,9 @@ inputs = ch_from_samplesheet.map {
     variant_germline_ann,
     variant_germline_bcf,
     snv_multiplicity,
+    oncokb_maf,
+    oncokb_fusions,
+    oncokb_cna,
     sbs_signatures,
     indel_signatures,
     signatures_matrix,
@@ -408,6 +412,9 @@ inputs = ch_from_samplesheet.map {
         variant_germline_ann: variant_germline_ann,
         variant_germline_bcf: variant_germline_bcf,
         snv_multiplicity: snv_multiplicity,
+        oncokb_maf: oncokb_maf,
+        oncokb_fusions: oncokb_fusions,
+        oncokb_cna: oncokb_cna,
         sbs_signatures: sbs_signatures,
         indel_signatures: indel_signatures,
         signatures_matrix: signatures_matrix,
@@ -655,6 +662,9 @@ include { BAM_GERMLINE_STRELKA } from '../subworkflows/local/bam_germline_strelk
 
 // SNV MULTIPLICITY
 include { VCF_SNV_MULTIPLICITY } from '../subworkflows/local/vcf_snv_multiplicity/main'
+
+// ONCOKB
+include { VCF_FUSIONS_CNA_ONCOKB_ANNOTATOR } from '../subworkflows/local/oncokb/main'
 
 // PAVE
 include { VCF_PAVE as VCF_PAVE_SOMATIC } from '../subworkflows/local/vcf_pave/main'
@@ -1922,6 +1932,11 @@ workflow NFCASEREPORTS {
 
     // Events
     // ##############################
+    events_for_merge = inputs
+        .map { it -> [it.meta, it.events] }
+        .filter { !it[1].isEmpty() }
+        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, events
+
     if (tools_used.contains("all") || tools_used.contains("events")) {
         events_inputs = inputs.filter { it.events.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
         events_input_non_integer_balance = non_integer_balance_balanced_gg_for_merge
@@ -1946,6 +1961,11 @@ workflow NFCASEREPORTS {
 
     // Fusions
     // ##############################
+    fusions_for_merge = inputs
+        .map { it -> [it.meta, it.fusions] }
+        .filter { !it[1].isEmpty() }
+        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, fusions
+
     if (tools_used.contains("all") || tools_used.contains("fusions")) {
         fusions_inputs = inputs.filter { it.fusions.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
 
@@ -1973,11 +1993,21 @@ workflow NFCASEREPORTS {
             .mix(fusions_existing_outputs)
         altedge_annotations = Channel.empty()
             .mix(FUSIONS.out.altedge_annotations)
+
         versions = Channel.empty().mix(FUSIONS.out.versions)
+
+        fusions_for_merge = fusions
+            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, fusions
+
     }
 
     // SNV Multiplicity
     // ##############################
+    snv_multiplicity_for_merge = inputs
+        .map { it -> [it.meta, it.snv_multiplicity] }
+        .filter { !it[1].isEmpty() }
+        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, snv_multiplicity
+
     if (tools_used.contains("all") || tools_used.contains("snv_multiplicity")) {
         snv_multiplicity_inputs = inputs.filter { it.snv_multiplicity.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
 
@@ -2046,6 +2076,66 @@ workflow NFCASEREPORTS {
         snv_multiplicity = Channel.empty()
             .mix(VCF_SNV_MULTIPLICITY.out.snv_multiplicity_rds)
             .mix(snv_multiplicity_existing_outputs)
+
+        snv_multiplicity_for_merge = snv_multiplicity
+            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, snv multiplicity rds
+    }
+
+    // Oncokb
+    // ##############################
+    if ((tools_used.contains("all") || tools_used.contains("oncokb"))) {
+        oncokb_inputs = inputs
+            .filter { it.oncokb_maf.isEmpty() || it.oncokb_fusions.isEmpty() || it.oncokb_cna.isEmpty() }
+            .map { it -> [it.meta.patient, it.meta] }
+
+        oncokb_inputs_annotated_vcf = snv_somatic_annotations_for_merge
+            .join(oncokb_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, annotated somatic snv
+
+        oncokb_inputs_fusions = fusions_for_merge
+            .join(oncokb_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, fusions
+
+        oncokb_inputs_jabba_gg = jabba_gg_for_merge
+            .join(oncokb_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
+
+        oncokb_inputs_multiplicity = snv_multiplicity_for_merge
+            .join(oncokb_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, snv multiplicity rds
+
+        oncokb_existing_outputs_maf = inputs.map { it -> [it.meta, it.oncokb_maf] }.filter { !it[1].isEmpty() }
+        oncokb_existing_outputs_fusions = inputs.map { it -> [it.meta, it.oncokb_fusions] }.filter { !it[1].isEmpty() }
+        oncokb_existing_outputs_cna = inputs.map { it -> [it.meta, it.oncokb_cna] }.filter { !it[1].isEmpty() }
+
+        oncokb_input = oncokb_inputs
+            .join(oncokb_inputs_annotated_vcf)
+            .join(oncokb_inputs_fusions)
+            .join(oncokb_inputs_jabba_gg)
+            .join(oncokb_inputs_multiplicity)
+            .map{
+                patient,
+                meta,
+                snv_ann,
+                fusions,
+                jabba,
+                multiplicity ->[ meta, snv_ann, fusions, jabba, multiplicity ]
+            }
+
+            VCF_FUSIONS_CNA_ONCOKB_ANNOTATOR(oncokb_input)
+
+            versions = versions.mix(VCF_FUSIONS_CNA_ONCOKB_ANNOTATOR.out.versions)
+            merged_oncokb_vcf = Channel.empty()
+                .mix(VCF_FUSIONS_CNA_ONCOKB_ANNOTATOR.out.merged_oncokb_vcf)
+                .mix(oncokb_existing_outputs_maf)
+
+            merged_oncokb_fusions = Channel.empty()
+                .mix(VCF_FUSIONS_CNA_ONCOKB_ANNOTATOR.out.merged_oncokb_fusions)
+                .mix(oncokb_existing_outputs_fusions)
+
+            merged_oncokb_cna = Channel.empty()
+                .mix(VCF_FUSIONS_CNA_ONCOKB_ANNOTATOR.out.merged_oncokb_cna)
+                .mix(oncokb_existing_outputs_cna)
     }
 
     // Signatures

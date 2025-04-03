@@ -204,6 +204,9 @@ ref_genome_version_pave       = params.ref_genome_version   ?: Channel.empty()
 sigprofilerassignment_genome         = params.sigprofilerassignment_genome   ?: Channel.empty()
 sigprofilerassignment_cosmic_version = params.sigprofilerassignment_cosmic_version ?: Channel.empty()
 
+// OncoKB Annotator
+oncokb_api_token = params.oncokb_api_token ?: Channel.empty()
+
 // Initialize files channels based on params, not defined within the params.genomes[params.genome] scope
 if (params.snpeff_cache && params.tools && params.tools.contains("snpeff")) {
     def snpeff_annotation_cache_key = params.use_annotation_cache_keys ? "${params.snpeff_genome}.${params.snpeff_db}/" : ""
