@@ -4,7 +4,7 @@
 
 include { ONCOKB_ANNOTATOR } from '../../../modules/local/oncokb/main.nf'
 
-api_token    = WorkflowNfcasereports.create_value_channel(params.oncokb_api_token)
+// api_token    = WorkflowNfcasereports.create_value_channel(params.oncokb_api_token)
 genome_version  = WorkflowNfcasereports.create_value_channel(params.sigprofilerassignment_genome)
 do_vep = WorkflowNfcasereports.create_value_channel(params.do_vep_oncokb)
 vep_dir = WorkflowNfcasereports.create_file_channel(params.vep_dir_oncokb)
@@ -24,7 +24,6 @@ workflow VCF_FUSIONS_CNA_ONCOKB_ANNOTATOR {
 
     ONCOKB_ANNOTATOR(
         inputs,
-        api_token,
         genome_version,
         do_vep,
         vep_dir,

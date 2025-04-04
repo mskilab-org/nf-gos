@@ -1,6 +1,7 @@
 process ONCOKB_ANNOTATOR {
     tag "$meta.id"
     label 'process_medium'
+    secret 'ONCOKB_API_KEY'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'docker://mskilab/unified:initial':
@@ -8,7 +9,6 @@ process ONCOKB_ANNOTATOR {
 
     input:
     tuple val(meta), path(vcf), path(fusions), path(cna), path(multiplicity)
-    val oncokb_api_token
     val assembly // 'GRCh37' or 'GRCh38', default is 'GRCh37'
     val do_vep
     path vep_dir
@@ -33,7 +33,7 @@ process ONCOKB_ANNOTATOR {
     def VERSION = '0.1'
 
     """
-    export ONCOKB_TOKEN="${oncokb_api_token}"
+    export ONCOKB_TOKEN=\$ONCOKB_API_KEY
     export HOME=/root
     set +u  # Disable unbound variable check
     source /opt/conda/etc/profile.d/conda.sh
