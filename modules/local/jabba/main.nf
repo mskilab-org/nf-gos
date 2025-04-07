@@ -241,6 +241,7 @@ process RETIER_WHITELIST_JUNCTIONS {
     jpath_tiered = glue::glue('{tools::file_path_sans_ext(jpath)}___tiered.rds')
 
     # Read the VCF file into GRangesList
+    ra.all.grl = rowRanges(readVcf(jpath))
     ra.all = rowRanges(readVcf(jpath))
 
     # Important part is below
@@ -251,14 +252,14 @@ process RETIER_WHITELIST_JUNCTIONS {
     if (NROW(ix)) {
       cat("Whitelisted junctions overlapped with provided junctions. Retiering...\n")
       mcols_ra.all[["${tfield}"]][ix] = 1
-      mcols(ra.all) = mcols_ra.all
-      saveRDS(ra.all, jpath_tiered)
+      mcols(ra.all.grl) = mcols_ra.all
+      saveRDS(ra.all.grl, jpath_tiered)
 
       # Output the path of the saved file
       cat("Retiered junctions saved to:", jpath_tiered, "\n")
     } else {
       cat("No whitelisted junctions overlapped with provided junctions.\n")
-      saveRDS(ra.all, jpath_tiered)
+      saveRDS(ra.all.grl, jpath_tiered)
     }
     """
     stub:
