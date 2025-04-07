@@ -89,6 +89,7 @@ params.driver_gene_panel          = WorkflowMain.getGenomeAttribute(params, 'dri
 params.ensembl_data_resources          = WorkflowMain.getGenomeAttribute(params, 'ensembl_data_resources')
 params.gnomad_resource          = WorkflowMain.getGenomeAttribute(params, 'gnomad_resource')
 params.blacklist_coverage_jabba     = WorkflowMain.getGenomeAttribute(params, 'blacklist_coverage_jabba')
+params.whitelist_genes_jabba     = WorkflowMain.getGenomeAttribute(params, 'whitelist_genes_jabba')
 params.gencode_fusions     = WorkflowMain.getGenomeAttribute(params, 'gencode_fusions')
 params.gencode_oncokb     = WorkflowMain.getGenomeAttribute(params, 'gencode_oncokb')
 params.oncokb_genes     = WorkflowMain.getGenomeAttribute(params, 'oncokb_genes')

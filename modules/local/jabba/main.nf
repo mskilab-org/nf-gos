@@ -208,3 +208,70 @@ process COERCE_SEQNAMES {
     }
     """
 }
+
+process RETIER_WHITELIST_JUNCTIONS {
+    tag "$meta.id"
+    label 'process_low'
+
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'docker://mskilab/jabba:latest':
+        'mskilab/jabba:latest' }"
+
+    input:
+    tuple val(meta), path(junctions)
+    val(tfield)
+    path(whitelist_genes)
+
+    output:
+    tuple val(meta), path("*___tiered.rds"), emit: retiered_junctions, optional: true
+
+    script:
+    """
+    #!/usr/bin/env Rscript
+
+    library(gUtils)
+    library(dplyr)
+    library(VariantAnnotation)
+
+    # Load the whitelist genes
+    heme_gen = readRDS("${whitelist_genes}")
+
+    # Define the path to the junctions file
+    jpath = "${junctions}"
+    jpath_tiered = glue::glue('{tools::file_path_sans_ext(jpath)}___tiered.rds')
+
+    # Read the VCF file into GRangesList
+    ra.all = rowRanges(readVcf(jpath))
+
+    # Important part is below
+    mcols_ra.all = mcols(ra.all)
+    mcols_ra.all[["${tfield}"]] = rep_len(2, NROW(mcols_ra.all))
+    ix = unique((grl.unlist(ra.all) %&% heme_gen)\$grl.ix)
+
+    if (NROW(ix)) {
+      cat("Whitelisted junctions overlapped with provided junctions. Retiering...\n")
+      mcols_ra.all[["${tfield}"]][ix] = 1
+      mcols(ra.all) = mcols_ra.all
+      saveRDS(ra.all, jpath_tiered)
+
+      # Output the path of the saved file
+      cat("Retiered junctions saved to:", jpath_tiered, "\n")
+    } else {
+      cat("No whitelisted junctions overlapped with provided junctions.\n")
+      saveRDS(ra.all, jpath_tiered)
+    }
+    """
+    stub:
+
+    prefix = task.ext.prefix ?: "${meta.id}"
+    def VERSION = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
+
+    """
+    touch ___tiered.rds
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        Retier Junctions: ${VERSION}
+    END_VERSIONS
+    """
+}

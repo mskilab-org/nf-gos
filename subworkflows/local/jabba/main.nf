@@ -7,6 +7,9 @@ include { COERCE_SEQNAMES as COERCE_SEQNAMES_COV } from '../../../modules/local/
 include { COERCE_SEQNAMES as COERCE_SEQNAMES_SOM_SV } from '../../../modules/local/jabba/main.nf'
 include { COERCE_SEQNAMES as COERCE_SEQNAMES_UNFIL_SOM_SV } from '../../../modules/local/jabba/main.nf'
 include { COERCE_SEQNAMES as COERCE_SEQNAMES_HETS } from '../../../modules/local/jabba/main.nf'
+include { RETIER_WHITELIST_JUNCTIONS } from '../../../modules/local/jabba/main.nf'
+
+whitelist_genes             = WorkflowNfcasereports.create_file_channel(params.whitelist_genes_jabba)
 
 blacklist_coverage		    = WorkflowNfcasereports.create_file_channel(params.blacklist_coverage_jabba)
 blacklist_junctions        = WorkflowNfcasereports.create_value_channel(params.blacklist_junctions_jabba)
@@ -313,4 +316,19 @@ workflow COV_JUNC_JABBA {
     karyograph
 
     versions
+}
+
+workflow RETIER_JUNCTIONS {
+    take:
+    inputs  // [ meta, junction ]
+
+    main:
+    retiered_junctions  = Channel.empty()
+
+    RETIER_WHITELIST_JUNCTIONS(inputs, tfield, whitelist_genes)
+
+    retiered_junctions = RETIER_WHITELIST_JUNCTIONS.out.retiered_junctions
+
+    emit:
+    retiered_junctions
 }
