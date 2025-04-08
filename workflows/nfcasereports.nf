@@ -470,14 +470,14 @@ inputs = inputs
     }
 
 // Fails when missing sex information for CNV tools
-is_missing_sex = false
-inputs.map{
-    if (it.meta.sex == 'NA') {
-        is_missing_sex = true
-    }
-}
-
-if (is_missing_sex && tools_used.includes('amber')){log.warn('Please include sex information for samples if using Amber')}
+// is_missing_sex = false
+// inputs.map{
+//     if (it.meta.sex == 'NA') {
+//         is_missing_sex = true
+//     }
+// }
+//
+// if (is_missing_sex && tools_used.includes('amber')){log.warn('Please include sex information for samples if using Amber')}
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -809,7 +809,7 @@ workflow NFCASEREPORTS {
         input_fastq = inputs.filter { it.bam.isEmpty() }.map { it -> [it.meta, [it.fastq_1, it.fastq_2]] }
         alignment_existing_outputs = inputs.map { it -> [it.meta, it.bam] }.filter { !it[1].isEmpty() }
 
-        inputs.view { log.info "Input samples: ${it.meta} is empty? ${it.bam.isEmpty()}" }
+        // inputs.view { log.info "Input samples: ${it.meta} is empty? ${it.bam.isEmpty()}" }
         // input_fastq.view { log.info "Input FASTQ files: $it" }
         // alignment_existing_outputs.view { log.info "Alignment existing outputs: $it" }
 
@@ -1021,7 +1021,7 @@ workflow NFCASEREPORTS {
 
     // MSISensorPro
     // ##############################
-    if (tools_used.contains("all") || tools_used.contains("msisensorpro")) {
+    if (tools_used.contains("all") || tools_used.contains("msisensorpro") && !params.tumor_only) {
 
         bam_msi_inputs = inputs.filter { it.msi.isEmpty() }.map { it -> [it.meta.sample] }
         bam_msi = alignment_bams_final
