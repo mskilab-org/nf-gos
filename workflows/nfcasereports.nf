@@ -458,11 +458,11 @@ inputs = inputs
     }
 
 // Fails when missing sex information for CNV tools
-inputs.map{
-    if (it.meta.sex == 'NA') {
-        log.warn "Please specify sex information (if known) for each sample in your samplesheet when using Amber"
-    }
-}
+// inputs.map{
+//     if (it.meta.sex == 'NA') {
+//         log.warn "Please specify sex information (if known) for each sample in your samplesheet when using Amber"
+//     }
+// }
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -763,7 +763,7 @@ workflow NFCASEREPORTS {
         input_fastq = inputs.filter { it.bam.isEmpty() }.map { it -> [it.meta, [it.fastq_1, it.fastq_2]] }
         alignment_existing_outputs = inputs.map { it -> [it.meta, it.bam] }.filter { !it[1].isEmpty() }
 
-        inputs.view { log.info "Input samples: ${it.meta} is empty? ${it.bam.isEmpty()}" }
+        // inputs.view { log.info "Input samples: ${it.meta} is empty? ${it.bam.isEmpty()}" }
         // input_fastq.view { log.info "Input FASTQ files: $it" }
         // alignment_existing_outputs.view { log.info "Alignment existing outputs: $it" }
 
