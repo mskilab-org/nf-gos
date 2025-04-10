@@ -185,7 +185,7 @@ def pipeline(
 
     command = (
         f"{load_modules_command} "
-        f"{runner.cmd} secrets set ONCOKB_API_KEY {oncokb_api_key} &&"
+        f"{runner.cmd} secrets set ONCOKB_API_KEY {oncokb_api_key} && "
         f"{runner.cmd} run {pipeline_dir} "
         f"-params-file {params_file} "
         f"-profile {profile} "
