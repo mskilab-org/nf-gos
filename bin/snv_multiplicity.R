@@ -16,7 +16,7 @@
         make_option(c("--read_size"), type = "character", default = "151", help = "expected read size for binned coverage to average base coverage"),
         make_option(c("--tumor_name"), type = "character", default = as.character(NA), help = "Name of tumor sample"),
         make_option(c("--normal_name"), type = "character", default = as.character(NA), help = "Name of normal sample"),
-        make_option(c("-o", "--outdir"), type = "character", default = './', help = "output directory"),
+        make_option(c("-o", "--outdir"), type = "character", default = './', help = "output directory")
       )
 
       parseobj = OptionParser(option_list=option_list)
