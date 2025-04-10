@@ -4,8 +4,8 @@ process SNV_MULTIPLICITY {
     label 'process_medium'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/snv_multiplicity:0.0.3':
-        'mskilab/snv_multiplicity:0.0.3' }"
+        'docker://mskilab/snv_multiplicity:0.0.4':
+        'mskilab/snv_multiplicity:0.0.4' }"
 
     input:
     tuple val(meta), path(somatic_snv, stageAs: "somatic_snv.vcf"), path(germline_snv, stageAs: "germline_snv.vcf"), path(jabba_gg)
