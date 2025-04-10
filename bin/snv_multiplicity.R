@@ -22,8 +22,15 @@
       parseobj = OptionParser(option_list=option_list)
       opt = parse_args(parseobj)
 
-      if (is.null(opt$somatic_snv) | is.null(opt$jabba) | is.null(opt$germline_snv))
-      	stop(print_help(parseobj))
+
+
+      if (is.null(opt$jabba)) {
+        stop("Error: The jabba argument is required and must not be NULL.")
+      }
+
+      if (is.null(opt$somatic_snv) && is.null(opt$germline_snv) && is.null(opt$het_pileups_wgs)) {
+        stop("Error: At least one of somatic_snv, germline_snv, or het_pileups_wgs must be provided.")
+      }
 
       print(opt)
 
