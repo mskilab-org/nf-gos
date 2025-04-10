@@ -4,8 +4,8 @@ process JUNCTION_FILTER {
     label 'process_medium'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/hrdetect:0.0.4':  // using hrdetect container since it has all dependencies
-        'mskilab/hrdetect:0.0.4' }"
+        'docker://mskilab/hrdetect:0.0.5':  // using hrdetect container since it has all dependencies
+        'mskilab/hrdetect:0.0.5' }"
 
     input:
     tuple val(meta), path(filtered_sv_vcf), path(filtered_sv_vcf_tbi)

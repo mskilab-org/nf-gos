@@ -204,6 +204,8 @@ ref_genome_version_pave       = params.ref_genome_version   ?: Channel.empty()
 sigprofilerassignment_genome         = params.sigprofilerassignment_genome   ?: Channel.empty()
 sigprofilerassignment_cosmic_version = params.sigprofilerassignment_cosmic_version ?: Channel.empty()
 
+// OncoKB Annotator
+oncokb_api_token = params.oncokb_api_token ?: Channel.empty()
 
 // Initialize files channels based on params, not defined within the params.genomes[params.genome] scope
 if (params.snpeff_cache && params.tools && params.tools.contains("snpeff")) {
@@ -228,3 +230,6 @@ if (params.vep_cache && params.tools && params.tools.contains("vep")) {
 } else vep_cache = []
 
 vep_extra_files = []
+
+// OnenessTwoness
+model_oneness_twoness = params.model_oneness_twoness ?: Channel.empty()

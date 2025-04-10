@@ -30,6 +30,8 @@ def run_cli():
               default='default',
               type=click.Choice(['default', 'jabba', 'hrd']),
               help='Preset option: "default" (all tools), "jabba", or "hrd"')
+@click.option('--oncokb-api-key',
+              help='OncoKB API key for accessing OncoKB annotations. Required if using OncoKB')
 def pipeline(
     pipeline_dir,
     params_file,
@@ -38,7 +40,8 @@ def pipeline(
     processes,
     samples,
     skip_tools,
-    preset
+    preset,
+    oncokb_api_key
 ):
     from ..core.nextflow import NextflowRunner
     from ..core.params_wizard import create_params_file
@@ -89,6 +92,13 @@ def pipeline(
         params_data["skip_tools"] = skip_tools_value
         with open(params_file, "w") as pf:
             json.dump(params_data, pf, indent=4)
+
+    if skip_tools_value is not None and 'oncokb' not in skip_tools_value and not oncokb_api_key:
+        print("OncoKB API key is required for accessing OncoKB annotations. Please provide it using the --oncokb-api-key flag.")
+        exit(1)
+    elif not oncokb_api_key:
+        print("OncoKB API key is required for accessing OncoKB annotations. Please provide it using the --oncokb-api-key flag.")
+        exit(1)
 
     # Print all parameters
     print("Running gOS with the following parameters:")
@@ -157,7 +167,7 @@ def pipeline(
                 confirm_again = input("Are you sure? This will cause the pipeline to rerun from these steps. (yes/no): ").strip().lower()
                 if confirm_again == 'yes' or confirm_again == 'y':
                     for workdir in workdirs_to_delete:
-                        rmtree(workdir)
+                        rmtree(workdir, ignore_errors=True)
                     print("Directories deleted.")
                 else:
                     print("Run cancelled.")
@@ -175,6 +185,7 @@ def pipeline(
 
     command = (
         f"{load_modules_command} "
+        f"{runner.cmd} secrets set ONCOKB_API_KEY {oncokb_api_key} &&"
         f"{runner.cmd} run {pipeline_dir} "
         f"-params-file {params_file} "
         f"-profile {profile} "
