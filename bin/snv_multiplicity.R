@@ -72,16 +72,16 @@
                                       tau_in_gamma = F,
                                       verbose = T)
 
-    if(!is.null(snvplicity.run[["somatic_variants"]])){
-      saveRDS(snvplicity.run[["somatic_variants"]], paste0(opt$outdir, "est_snv_cn_somatic.rds"))
+    if(!is.null(snvplicity.run$somatic_variants)){
+      saveRDS(snvplicity.run$somatic_variants, paste0(opt$outdir, "est_snv_cn_somatic.rds"))
     }
 
-    if(!is.null(snvplicity.run[["germline_variants"]])){
-      saveRDS(snvplicity.run[["germline_variants"]], paste0(opt$outdir, "est_snv_cn_germline.rds"))
+    if(!is.null(snvplicity.run$germline_variants)){
+      saveRDS(snvplicity.run$germline_variants, paste0(opt$outdir, "est_snv_cn_germline.rds"))
     }
 
-    if(!is.null(snvplicity.run[["het_pileups"]])){
-      saveRDS(snvplicity.run[["het_pileups"]], paste0(opt$outdir, "est_snv_cn_hets.rds"))
+    if(!is.null(snvplicity.run$het_pileups)){
+      saveRDS(snvplicity.run$het_pileups, paste0(opt$outdir, "est_snv_cn_hets.rds"))
     }
 
 }
