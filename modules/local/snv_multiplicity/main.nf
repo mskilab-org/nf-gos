@@ -26,7 +26,7 @@ process SNV_MULTIPLICITY {
     // def SCRIPTS_DIR = "${baseDir}/bin/snpEff/"
 
     """
-    export RSCRIPT_PATH=\$(echo "${baseDir}/bin/snv_multiplicity3.R")
+    export RSCRIPT_PATH=\$(echo "${baseDir}/bin/snv_multiplicity.R")
 
     Rscript \$RSCRIPT_PATH \\
         --somatic_snv ${somatic_snv} \\
