@@ -5,11 +5,10 @@
     {
       option_list = list(
         
-        make_option(c("-s", "--somatic_snv"), type = "character", help = "Path to somatic snv file"),
-        make_option(c("-g", "--germline_snv"), type = "character", help = "Path to germline snv file"),
-        make_option(c("-p", "--het_pileups_wgs"), type = "character", help = "Path to Het SNPs pileups WGS file"),
+        make_option(c("-s", "--somatic_snv"), type = "character", default = NULL, help = "Path to somatic snv file"),
+        make_option(c("-g", "--germline_snv"), type = "character", default = NULL, help = "Path to germline snv file"),
+        make_option(c("-p", "--het_pileups_wgs"), type = "character", default = NULL, help = "Path to Het SNPs pileups WGS file"),
         make_option(c("-j", "--jabba"), type = "character", help = "Path to jabba file"),
-        make_option(c("--snpeff_path"), type = "character", help = "Path to SnpEff directory containing scripts and modules"),
         make_option(c("--filter_pass"), type = "logical", default = TRUE, help = "FILTER == PASS variants?"),
         make_option(c("--tumor_cbs"), type = "character", help = "Path to drycleaned CBS file with seg means contained in field seg.mean"),
         make_option(c("--tumor_dryclean"), type = "character", help = "Path to drycleaned cov file"),
@@ -18,7 +17,6 @@
         make_option(c("--tumor_name"), type = "character", default = as.character(NA), help = "Name of tumor sample"),
         make_option(c("--normal_name"), type = "character", default = as.character(NA), help = "Name of normal sample"),
         make_option(c("-o", "--outdir"), type = "character", default = './', help = "output directory"),
-        make_option(c("-l", "--libdir"), type = "character", default = "~/modules/multiplicity", help = "Directory containing this R file")
       )
 
       parseobj = OptionParser(option_list=option_list)
@@ -67,16 +65,16 @@
                                       tau_in_gamma = F,
                                       verbose = T)
 
-    if(!is.null(snvplicity.run[[1]])){
-      saveRDS(snvplicity.run[[1]], paste0(opt$outdir, "est_snv_cn_somatic.rds"))
+    if(!is.null(snvplicity.run[["somatic_variants"]])){
+      saveRDS(snvplicity.run[["somatic_variants"]], paste0(opt$outdir, "est_snv_cn_somatic.rds"))
     }
 
-    if(!is.null(snvplicity.run[[2]])){
-      saveRDS(snvplicity.run[[2]], paste0(opt$outdir, "est_snv_cn_germline.rds"))
+    if(!is.null(snvplicity.run[["germline_variants"]])){
+      saveRDS(snvplicity.run[["germline_variants"]], paste0(opt$outdir, "est_snv_cn_germline.rds"))
     }
 
-    if(!is.null(snvplicity.run[[3]])){
-      saveRDS(snvplicity.run[[3]], paste0(opt$outdir, "est_snv_cn_hets.rds"))
+    if(!is.null(snvplicity.run[["het_pileups"]])){
+      saveRDS(snvplicity.run[["het_pileups"]], paste0(opt$outdir, "est_snv_cn_hets.rds"))
     }
 
 }
