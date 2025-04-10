@@ -105,9 +105,10 @@ workflow BAM_COV_PURPLE {
 
     // initializing outputs from fragcounter
     purple_dir        = Channel.empty().mix(PURPLE.out.purple_dir)
+    purple_purity     = Channel.empty().mix(PURPLE.out.purple_purity)
     versions          = versions.mix(PURPLE.out.versions)
 
-    EXTRACT_PURITYPLOIDY(purple_dir)
+    EXTRACT_PURITYPLOIDY(purple_purity)
 
     purity = Channel.empty().mix(EXTRACT_PURITYPLOIDY.out.purity_val) // meta, purity
     ploidy = ploidy.mix(EXTRACT_PURITYPLOIDY.out.ploidy_val) // meta, ploidy

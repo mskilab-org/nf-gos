@@ -747,12 +747,10 @@ workflow NFCASEREPORTS {
     dict       = params.dict        ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect()
                                     : PREPARE_GENOME.out.dict
     fasta_fai  = WorkflowNfcasereports.create_file_channel(params.fasta_fai, PREPARE_GENOME.out.fasta_fai)
-    bwa        = WorkflowNfcasereports.create_file_channel(params.bwa, PREPARE_GENOME.out.bwa)
     bwamem2    = WorkflowNfcasereports.create_file_channel(params.bwamem2, PREPARE_GENOME.out.bwamem2)
 
     // Gather index for mapping given the chosen aligner
-    index_alignment = (params.aligner == "bwa-mem") ? bwa :
-        params.aligner == "bwa-mem2" ? bwamem2 : null
+    index_alignment = (params.aligner == "bwa-mem") ? bwa : bwamem2
 
     // TODO: add a params for msisensorpro_scan
     msisensorpro_scan      = PREPARE_GENOME.out.msisensorpro_scan
@@ -1132,7 +1130,7 @@ workflow NFCASEREPORTS {
 
         BAM_SVCALLING_GRIDSS(
             bam_sv_calling_pair,
-            bwa
+            index_alignment
         )
 
         vcf_from_gridss_gridss = Channel.empty()
@@ -1899,7 +1897,7 @@ workflow NFCASEREPORTS {
                 .map{ patient, meta, rds, hets, cov -> [ meta, rds, cov, hets ] }
         }
 
-        NON_INTEGER_BALANCE(non_integer_balance_inputs, bwa)
+        NON_INTEGER_BALANCE(non_integer_balance_inputs, index_alignment)
         versions = Channel.empty().mix(NON_INTEGER_BALANCE.out.versions)
 
         non_integer_balance_balanced_gg = Channel.empty()

@@ -9,7 +9,6 @@
 // If and extra condition exists, it's specified in comments
 
 
-include { BWA_INDEX as BWAMEM1_INDEX             } from '../../../modules/nf-core/bwa/index/main'
 include { BWAMEM2_INDEX                          } from '../../../modules/nf-core/bwamem2/index/main'
 include { GATK4_CREATESEQUENCEDICTIONARY         } from '../../../modules/nf-core/gatk4/createsequencedictionary/main'
 include { MSISENSORPRO_SCAN                      } from '../../../modules/nf-core/msisensorpro/scan/main'
@@ -46,8 +45,7 @@ workflow PREPARE_GENOME {
     versions = Channel.empty()
 
 
-    BWAMEM1_INDEX(fasta)     // If aligner is bwa-mem
-    BWAMEM2_INDEX(fasta)     // If aligner is bwa-mem2
+    BWAMEM2_INDEX(fasta)
 
     GATK4_CREATESEQUENCEDICTIONARY(fasta)
     // only run msisensorpro_scan if the msisensorpro_list is an empty channel
@@ -108,7 +106,6 @@ workflow PREPARE_GENOME {
 
     // Gather versions of all tools used
     versions = versions.mix(SAMTOOLS_FAIDX.out.versions)
-    versions = versions.mix(BWAMEM1_INDEX.out.versions)
     versions = versions.mix(BWAMEM2_INDEX.out.versions)
     versions = versions.mix(GATK4_CREATESEQUENCEDICTIONARY.out.versions)
     versions = versions.mix(MSISENSORPRO_SCAN.out.versions)
@@ -121,8 +118,7 @@ workflow PREPARE_GENOME {
 
 
     emit:
-    bwa                   = BWAMEM1_INDEX.out.index.map{ meta, index -> [index] }.collect()       // path: bwa/*
-    bwamem2               = BWAMEM2_INDEX.out.index.map{ meta, index -> [index] }.collect()       // path: bwamem2/*
+    bwamem2               = BWAMEM2_INDEX.out.index.map{ meta, index -> [index] }.collect() // path: bwamem2/*
     dbsnp_tbi             = TABIX_DBSNP.out.tbi.map{ meta, tbi -> [tbi] }.collect()               // path: dbsnb.vcf.gz.tbi
     dict                  = GATK4_CREATESEQUENCEDICTIONARY.out.dict                               // path: genome.fasta.dict
     fasta_fai             = SAMTOOLS_FAIDX.out.fai.map{ meta, fai -> [fai] }                      // path: genome.fasta.fai
