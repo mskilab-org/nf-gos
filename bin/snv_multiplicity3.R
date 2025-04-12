@@ -62,7 +62,7 @@ snvplicity.run <- multiplicity(somatic_snv = opt$somatic_snv,
                                 tumor_name = opt$tumor_name,
                                 normal_name = opt$normal_name,
                                 # snpeff_path = system.file("extdata", "snpeff_scripts", package = "multiplicity"),
-                                snpeff_path = opt$snpeff_path
+                                snpeff_path = opt$snpeff_path,
                                 filterpass = opt$filter_pass,
                                 tau_in_gamma = F,
                                 verbose = T)
