@@ -1951,6 +1951,13 @@ workflow NFCASEREPORTS {
         snv_multiplicity_inputs_jabba_gg = jabba_gg_for_merge
             .join(snv_multiplicity_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
+        snv_multiplicity_inputs_hets_sites = hets_sites_for_merge
+            .join(snv_multiplicity_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, het sites
+        snv_multiplicity_inputs_dryclean_tumor_cov = dryclean_tumor_cov_for_merge
+            .join(snv_multiplicity_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, dryclean cov
+
 
         if (params.tumor_only) {
             // tumor/sample id is required for snv multiplicity
@@ -1963,9 +1970,11 @@ workflow NFCASEREPORTS {
             input_snv_multiplicity = snv_multiplicity_inputs
                 .join(snv_multiplicity_inputs_somatic_vcf)
                 .join(snv_multiplicity_inputs_jabba_gg)
+                .join(snv_multiplicity_inputs_het_sites)
+                .join(snv_multiplicity_inputs_dryclean_tumor_cov)
                 .map{
-                    patient, meta, somatic_ann, ggraph ->
-                    [ meta, somatic_ann, [], ggraph ]
+                    patient, meta, somatic_ann, ggraph, hets, dryclean_cov  ->
+                    [ meta, somatic_ann, [], ggraph, hets, dryclean_cov ]
                 }
         } else {
             // getting the tumor and normal cram files separated
@@ -1997,9 +2006,11 @@ workflow NFCASEREPORTS {
                 .join(snv_multiplicity_inputs_somatic_vcf)
                 .join(snv_multiplicity_inputs_germline_vcf)
                 .join(snv_multiplicity_inputs_jabba_gg)
+                .join(snv_multiplicity_inputs_het_sites)
+                .join(snv_multiplicity_inputs_dryclean_tumor_cov)
                 .map{
-                    patient, meta, somatic_ann, germline_ann, ggraph ->
-                    [ meta, somatic_ann, germline_ann, ggraph ]
+                    patient, meta, somatic_ann, germline_ann, ggraph, hets, dryclean_cov ->
+                    [ meta, somatic_ann, germline_ann, ggraph, hets, dryclean_cov ]
                 }
         }
 

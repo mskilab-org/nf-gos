@@ -8,7 +8,7 @@ process SNV_MULTIPLICITY {
         'mskilab/snv_multiplicity:0.0.3' }"
 
     input:
-    tuple val(meta), path(somatic_snv, stageAs: "somatic_snv.vcf"), path(germline_snv, stageAs: "germline_snv.vcf"), path(jabba_gg)
+    tuple val(meta), path(somatic_snv, stageAs: "somatic_snv.vcf"), path(germline_snv, stageAs: "germline_snv.vcf"), path(jabba_gg), path(hets, stageAs: "hets_sites.txt"), path(dryclean_cov, stageAs: "dryclean_cov.rds")
 
     output:
     tuple val(meta), path('*est_snv_cn_somatic.rds'), emit: snv_multiplicity_rds
@@ -31,6 +31,8 @@ process SNV_MULTIPLICITY {
     Rscript \$RSCRIPT_PATH \\
         --somatic_snv ${somatic_snv} \\
         ${germline_flag} \\
+        --het_pileups_wgs ${hets} \\
+        --tumor_dryclean ${dryclean_cov} \\
         --jabba ${jabba_gg} \\
         --snpeff_path ${SCRIPTS_DIR} \\
         --tumor_name ${meta.tumor_id} \\
