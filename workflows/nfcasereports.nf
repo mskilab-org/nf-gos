@@ -2041,7 +2041,7 @@ workflow NFCASEREPORTS {
             input_snv_multiplicity = snv_multiplicity_inputs
                 .join(snv_multiplicity_inputs_somatic_vcf)
                 .join(snv_multiplicity_inputs_jabba_gg)
-                .join(snv_multiplicity_inputs_het_sites)
+                .join(snv_multiplicity_inputs_hets_sites)
                 .join(snv_multiplicity_inputs_dryclean_tumor_cov)
                 .map{
                     patient, meta, somatic_ann, ggraph, hets, dryclean_cov  ->
@@ -2077,7 +2077,7 @@ workflow NFCASEREPORTS {
                 .join(snv_multiplicity_inputs_somatic_vcf)
                 .join(snv_multiplicity_inputs_germline_vcf)
                 .join(snv_multiplicity_inputs_jabba_gg)
-                .join(snv_multiplicity_inputs_het_sites)
+                .join(snv_multiplicity_inputs_hets_sites)
                 .join(snv_multiplicity_inputs_dryclean_tumor_cov)
                 .map{
                     patient, meta, somatic_ann, germline_ann, ggraph, hets, dryclean_cov ->
