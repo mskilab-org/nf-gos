@@ -18,7 +18,7 @@ def up(results_dir, cohort_type, gos_dir, cores):
         click.echo(f"Error: The directory '{results_dir}' does not exist.")
         return
 
-    makedirs(expanduser(gos_dir), exist_ok=True)
+    makedirs(path.expanduser(gos_dir), exist_ok=True)
 
     r_code = f'''
     devtools::load_all("~/git/skilift")

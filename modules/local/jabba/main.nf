@@ -7,7 +7,7 @@ process JABBA {
         'mskilab/jabba:latest' }"
 
     input:
-    tuple val(meta), path(junction), path(cov_rds), val(j_supp), val(het_pileups_wgs), val(ploidy), val(cbs_seg_rds), val(cbs_nseg_rds)
+    tuple val(meta), path(junction), path(cov_rds), val(j_supp), val(het_pileups_wgs), val(purity), val(ploidy), val(cbs_seg_rds), val(cbs_nseg_rds)
     val(blacklist_junctions)    // this is declared as val to allow for "NULL" default value, but is treated like a path
     val(geno)
     val(indel)
@@ -22,7 +22,6 @@ process JABBA {
     val(field)
     val(maxna)
     path(blacklist_coverage)
-    val(purity)
     val(pp_method)
     val(cnsignif)
     val(slack)
@@ -94,6 +93,7 @@ process JABBA {
     export cmd="Rscript \$jba $junction $cov_rds    \\
     $j_supp                                         \\
     $het_pileups_wgs                                \\
+    --purity				$purity                 \\
     --ploidy				$ploidy                 \\
     $cbs_seg_rds                                    \\
     $cbs_nseg_rds                                   \\
@@ -111,7 +111,6 @@ process JABBA {
     --field					$field                  \\
     --maxna					$maxna                  \\
     --blacklist.coverage	$blacklist_coverage     \\
-    --purity				$purity                 \\
     --ppmethod				$pp_method              \\
     --cnsignif				$cnsignif               \\
     --slack					$slack                  \\
@@ -207,5 +206,83 @@ process COERCE_SEQNAMES {
         data[[1]] <- gsub("chr","",data[[1]])
         write.table(data, file = outputfn, sep = "\\t", row.names = F, quote = F)
     }
+    """
+}
+
+process RETIER_WHITELIST_JUNCTIONS {
+    tag "$meta.id"
+    label 'process_low'
+
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'docker://mskilab/jabba:latest':
+        'mskilab/jabba:latest' }"
+
+    input:
+    tuple val(meta), path(junctions)
+    val(tfield)
+    path(whitelist_genes)
+
+    output:
+    tuple val(meta), path("*___tiered.vcf"), emit: retiered_junctions, optional: true
+
+    script:
+    """
+    #!/usr/bin/env Rscript
+
+    library(gUtils)
+    library(dplyr)
+    library(VariantAnnotation)
+
+    # Load the whitelist genes
+    heme_gen = readRDS("${whitelist_genes}")
+
+    # Define the path to the junctions file
+    jpath = "${junctions}"
+    jpath_tiered = glue::glue('{tools::file_path_sans_ext(jpath)}___tiered.vcf')
+
+    # Read the VCF file
+    vcf_obj = readVcf(jpath)
+    ra.all = rowRanges(vcf_obj)
+
+    # Important part is below
+    mcols_ra.all = mcols(ra.all)
+    mcols_ra.all[["${tfield}"]] = rep_len(2, NROW(mcols_ra.all))
+    ix = unique((ra.all %&% heme_gen)\$ix)
+
+    if (NROW(ix)) {
+      cat("Whitelisted junctions overlapped with provided junctions. Retiering...\n")
+      mcols_ra.all[["${tfield}"]][ix] = 1
+      mcols(ra.all) = mcols_ra.all
+
+      # Update the rowRanges in the VCF object
+      rowRanges(vcf_obj) = ra.all
+
+      # Save as VCF file
+      writeVcf(vcf_obj, jpath_tiered)
+
+      # Output the path of the saved file
+      cat("Retiered junctions saved to:", jpath_tiered, "\n")
+    } else {
+      cat("No whitelisted junctions overlapped with provided junctions.\n")
+
+      # Update the rowRanges in the VCF object
+      rowRanges(vcf_obj) = ra.all
+
+      # Save as VCF file
+      writeVcf(vcf_obj, jpath_tiered)
+    }
+    """
+    stub:
+
+    prefix = task.ext.prefix ?: "${meta.id}"
+    def VERSION = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
+
+    """
+    touch ___tiered.rds
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        Retier Junctions: ${VERSION}
+    END_VERSIONS
     """
 }
