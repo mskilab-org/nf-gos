@@ -14,7 +14,7 @@ gencode = WorkflowNfcasereports.create_file_channel(params.gencode_oncokb)
 workflow VCF_FUSIONS_CNA_ONCOKB_ANNOTATOR {
 
     take:
-    inputs  // [ meta, annnotated_vcf, fusions, jabba_rds, multiplicity]
+    inputs  // [ meta, annnotated_vcf, fusions, jabba_rds]
 
     main:
     versions            = Channel.empty()

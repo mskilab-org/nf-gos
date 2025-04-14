@@ -2129,10 +2129,6 @@ workflow NFCASEREPORTS {
             .join(oncokb_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
 
-        oncokb_inputs_multiplicity = snv_multiplicity_for_merge
-            .join(oncokb_inputs)
-            .map { it -> [ it[0], it[1] ] } // meta.patient, snv multiplicity rds
-
         oncokb_existing_outputs_maf = inputs.map { it -> [it.meta, it.oncokb_maf] }.filter { !it[1].isEmpty() }
         oncokb_existing_outputs_fusions = inputs.map { it -> [it.meta, it.oncokb_fusions] }.filter { !it[1].isEmpty() }
         oncokb_existing_outputs_cna = inputs.map { it -> [it.meta, it.oncokb_cna] }.filter { !it[1].isEmpty() }
@@ -2141,14 +2137,13 @@ workflow NFCASEREPORTS {
             .join(oncokb_inputs_annotated_vcf)
             .join(oncokb_inputs_fusions)
             .join(oncokb_inputs_jabba_gg)
-            .join(oncokb_inputs_multiplicity)
             .map{
                 patient,
                 meta,
                 snv_ann,
                 fusions,
-                jabba,
-                multiplicity ->[ meta, snv_ann, fusions, jabba, multiplicity ]
+                jabba ->[ meta, snv_ann, fusions, jabba]
+                
             }
 
             VCF_FUSIONS_CNA_ONCOKB_ANNOTATOR(oncokb_input)
