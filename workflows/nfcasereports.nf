@@ -727,6 +727,25 @@ normal_frag_cov_for_merge = inputs
     .normal
     .map { meta, frag_cov -> [ meta.sample, meta, frag_cov ] }
 
+dryclean_tumor_cov_for_merge = inputs
+        .map { it -> [it.meta, it.dryclean_cov] }
+        .filter { !it[1].isEmpty() }
+        .branch{
+            normal: it[0].status == 0
+            tumor:  it[0].status == 1
+        }
+        .tumor
+        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, dryclean_cov
+
+dryclean_normal_cov_for_merge = inputs
+    .map { it -> [it.meta, it.dryclean_cov] }
+    .filter { !it[1].isEmpty() }
+    .branch{
+        normal: it[0].status == 0
+        tumor:  it[0].status == 1
+    }
+    .normal
+    .map { it -> [ it[0].patient, it[1] ] } // meta.patient, dryclean_cov
 
 workflow NFCASEREPORTS {
 
@@ -1293,25 +1312,6 @@ workflow NFCASEREPORTS {
     // Dryclean
     // ##############################
 
-    dryclean_tumor_cov_for_merge = inputs
-        .map { it -> [it.meta, it.dryclean_cov] }
-        .filter { !it[1].isEmpty() }
-        .branch{
-            normal: it[0].status == 0
-            tumor:  it[0].status == 1
-        }
-        .tumor
-        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, dryclean_cov
-
-    dryclean_normal_cov_for_merge = inputs
-        .map { it -> [it.meta, it.dryclean_cov] }
-        .filter { !it[1].isEmpty() }
-        .branch{
-            normal: it[0].status == 0
-            tumor:  it[0].status == 1
-        }
-        .normal
-        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, dryclean_cov
 
     if (tools_used.contains("all") || tools_used.contains("dryclean")) {
         cov_dryclean_inputs = inputs
@@ -2020,6 +2020,13 @@ workflow NFCASEREPORTS {
         snv_multiplicity_inputs_jabba_gg = jabba_gg_for_merge
             .join(snv_multiplicity_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
+        snv_multiplicity_inputs_hets_sites = hets_sites_for_merge
+            .join(snv_multiplicity_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, het sites
+        snv_multiplicity_inputs_dryclean_tumor_cov = dryclean_tumor_cov_for_merge
+            .join(snv_multiplicity_inputs)
+            .map { it -> [ it[0], it[1] ] } // meta.patient, dryclean cov
+
 
         if (params.tumor_only) {
             // tumor/sample id is required for snv multiplicity
@@ -2032,9 +2039,11 @@ workflow NFCASEREPORTS {
             input_snv_multiplicity = snv_multiplicity_inputs
                 .join(snv_multiplicity_inputs_somatic_vcf)
                 .join(snv_multiplicity_inputs_jabba_gg)
+                .join(snv_multiplicity_inputs_hets_sites)
+                .join(snv_multiplicity_inputs_dryclean_tumor_cov)
                 .map{
-                    patient, meta, somatic_ann, ggraph ->
-                    [ meta, somatic_ann, [], ggraph ]
+                    patient, meta, somatic_ann, ggraph, hets, dryclean_cov  ->
+                    [ meta, somatic_ann, [], ggraph, hets, dryclean_cov ]
                 }
         } else {
             // getting the tumor and normal cram files separated
@@ -2066,9 +2075,11 @@ workflow NFCASEREPORTS {
                 .join(snv_multiplicity_inputs_somatic_vcf)
                 .join(snv_multiplicity_inputs_germline_vcf)
                 .join(snv_multiplicity_inputs_jabba_gg)
+                .join(snv_multiplicity_inputs_hets_sites)
+                .join(snv_multiplicity_inputs_dryclean_tumor_cov)
                 .map{
-                    patient, meta, somatic_ann, germline_ann, ggraph ->
-                    [ meta, somatic_ann, germline_ann, ggraph ]
+                    patient, meta, somatic_ann, germline_ann, ggraph, hets, dryclean_cov ->
+                    [ meta, somatic_ann, germline_ann, ggraph, hets, dryclean_cov ]
                 }
         }
 
@@ -2079,9 +2090,24 @@ workflow NFCASEREPORTS {
         snv_multiplicity = Channel.empty()
             .mix(VCF_SNV_MULTIPLICITY.out.snv_multiplicity_rds)
             .mix(snv_multiplicity_existing_outputs)
+        
+        snv_multiplicity = Channel.empty()
+            .mix(VCF_SNV_MULTIPLICITY.out.snv_multiplicity_germline_rds)
+            .mix(snv_multiplicity_existing_outputs)
+
+        snv_multiplicity = Channel.empty()
+            .mix(VCF_SNV_MULTIPLICITY.out.snv_multiplicity_hets_rds)
+            .mix(snv_multiplicity_existing_outputs)
 
         snv_multiplicity_for_merge = snv_multiplicity
-            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, snv multiplicity rds
+            .map { it -> [ it[0].patient, it[1], it[2], it[3] ] } // meta.patient, snv multiplicity rds, snv_multiplicity_germline_rds, snv_multiplicity_hets_rds
+
+        if (params.tumor_only) {
+            snv_multiplicity_for_merge.map{
+                patient, snv_multiplicity_rds, snv_multiplicity_germline_rds, snv_multiplicity_hets_rds ->
+                [ patient, snv_multiplicity_rds, [], snv_multiplicity_hets_rds ]
+            }
+        }
     }
 
     // Oncokb

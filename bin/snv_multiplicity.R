@@ -9,14 +9,14 @@
         make_option(c("-g", "--germline_snv"), type = "character", default = NULL, help = "Path to germline snv file"),
         make_option(c("-p", "--het_pileups_wgs"), type = "character", default = NULL, help = "Path to Het SNPs pileups WGS file"),
         make_option(c("-j", "--jabba"), type = "character", help = "Path to jabba file"),
-        make_option(c("--filter_pass"), type = "logical", default = TRUE, help = "FILTER == PASS variants?"),
-        make_option(c("--tumor_cbs"), type = "character", help = "Path to drycleaned CBS file with seg means contained in field seg.mean"),
-        make_option(c("--tumor_dryclean"), type = "character", help = "Path to drycleaned cov file"),
+        make_option(c("--filter_pass"), type = "logical", default = FALSE, help = "FILTER == PASS variants?"),
+        make_option(c("--tumor_cbs"), type = "character", default = NULL, help = "Path to drycleaned CBS file with seg means contained in field seg.mean"),
+        make_option(c("--tumor_dryclean"), type = "character", default = NULL, help = "Path to drycleaned cov file"),
         make_option(c("--dryclean_field"), type = "character", default = "foreground", help = "field that references binned coverage in the dryclean file; usually foreground"),
-        make_option(c("--read_size"), type = "character", default = "151", help = "expected read size for binned coverage to average base coverage"),
+        make_option(c("--read_size"), type = "integer", default = 151L, help = "expected read size for binned coverage to average base coverage"),
         make_option(c("--tumor_name"), type = "character", default = as.character(NA), help = "Name of tumor sample"),
         make_option(c("--normal_name"), type = "character", default = as.character(NA), help = "Name of normal sample"),
-        make_option(c("-o", "--outdir"), type = "character", default = './', help = "output directory"),
+        make_option(c("-o", "--outdir"), type = "character", default = './', help = "output directory")
       )
 
       parseobj = OptionParser(option_list=option_list)
@@ -26,6 +26,10 @@
 
       if (is.null(opt$jabba)) {
         stop("Error: The jabba argument is required and must not be NULL.")
+      }
+      
+      if (is.null(opt$tumor_dryclean)) {
+        stop("Error: Dryclean argument is required and must not be NULL.")
       }
 
       if (is.null(opt$somatic_snv) && is.null(opt$germline_snv) && is.null(opt$het_pileups_wgs)) {
@@ -72,16 +76,16 @@
                                       tau_in_gamma = F,
                                       verbose = T)
 
-    if(!is.null(snvplicity.run[["somatic_variants"]])){
-      saveRDS(snvplicity.run[["somatic_variants"]], paste0(opt$outdir, "est_snv_cn_somatic.rds"))
+    if(!is.null(snvplicity.run$somatic_variants)){
+      saveRDS(snvplicity.run$somatic_variants, paste0(opt$outdir, "est_snv_cn_somatic.rds"))
     }
 
-    if(!is.null(snvplicity.run[["germline_variants"]])){
-      saveRDS(snvplicity.run[["germline_variants"]], paste0(opt$outdir, "est_snv_cn_germline.rds"))
+    if(!is.null(snvplicity.run$germline_variants)){
+      saveRDS(snvplicity.run$germline_variants, paste0(opt$outdir, "est_snv_cn_germline.rds"))
     }
 
-    if(!is.null(snvplicity.run[["het_pileups"]])){
-      saveRDS(snvplicity.run[["het_pileups"]], paste0(opt$outdir, "est_snv_cn_hets.rds"))
+    if(!is.null(snvplicity.run$het_pileups)){
+      saveRDS(snvplicity.run$het_pileups, paste0(opt$outdir, "est_snv_cn_hets.rds"))
     }
 
 }
