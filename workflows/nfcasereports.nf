@@ -2092,9 +2092,24 @@ workflow NFCASEREPORTS {
         snv_multiplicity = Channel.empty()
             .mix(VCF_SNV_MULTIPLICITY.out.snv_multiplicity_rds)
             .mix(snv_multiplicity_existing_outputs)
+        
+        snv_multiplicity = Channel.empty()
+            .mix(VCF_SNV_MULTIPLICITY.out.snv_multiplicity_germline_rds)
+            .mix(snv_multiplicity_existing_outputs)
+
+        snv_multiplicity = Channel.empty()
+            .mix(VCF_SNV_MULTIPLICITY.out.snv_multiplicity_hets_rds)
+            .mix(snv_multiplicity_existing_outputs)
 
         snv_multiplicity_for_merge = snv_multiplicity
-            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, snv multiplicity rds
+            .map { it -> [ it[0].patient, it[1], it[2], it[3] ] } // meta.patient, snv multiplicity rds, snv_multiplicity_germline_rds, snv_multiplicity_hets_rds
+
+        if (params.tumor_only) {
+            snv_multiplicity_for_merge.map{
+                patient, snv_multiplicity_rds, snv_multiplicity_germline_rds, snv_multiplicity_hets_rds ->
+                [ patient, snv_multiplicity_rds, [], snv_multiplicity_hets_rds ]
+            }
+        }
     }
 
     // Oncokb
