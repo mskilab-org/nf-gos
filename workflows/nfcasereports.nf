@@ -727,6 +727,25 @@ normal_frag_cov_for_merge = inputs
     .normal
     .map { meta, frag_cov -> [ meta.sample, meta, frag_cov ] }
 
+dryclean_tumor_cov_for_merge = inputs
+        .map { it -> [it.meta, it.dryclean_cov] }
+        .filter { !it[1].isEmpty() }
+        .branch{
+            normal: it[0].status == 0
+            tumor:  it[0].status == 1
+        }
+        .tumor
+        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, dryclean_cov
+
+dryclean_normal_cov_for_merge = inputs
+    .map { it -> [it.meta, it.dryclean_cov] }
+    .filter { !it[1].isEmpty() }
+    .branch{
+        normal: it[0].status == 0
+        tumor:  it[0].status == 1
+    }
+    .normal
+    .map { it -> [ it[0].patient, it[1] ] } // meta.patient, dryclean_cov
 
 workflow NFCASEREPORTS {
 
@@ -1295,25 +1314,6 @@ workflow NFCASEREPORTS {
     // Dryclean
     // ##############################
 
-    dryclean_tumor_cov_for_merge = inputs
-        .map { it -> [it.meta, it.dryclean_cov] }
-        .filter { !it[1].isEmpty() }
-        .branch{
-            normal: it[0].status == 0
-            tumor:  it[0].status == 1
-        }
-        .tumor
-        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, dryclean_cov
-
-    dryclean_normal_cov_for_merge = inputs
-        .map { it -> [it.meta, it.dryclean_cov] }
-        .filter { !it[1].isEmpty() }
-        .branch{
-            normal: it[0].status == 0
-            tumor:  it[0].status == 1
-        }
-        .normal
-        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, dryclean_cov
 
     if (tools_used.contains("all") || tools_used.contains("dryclean")) {
         cov_dryclean_inputs = inputs
