@@ -7,7 +7,7 @@ include { SNV_MULTIPLICITY } from '../../../modules/local/snv_multiplicity/main.
 workflow VCF_SNV_MULTIPLICITY {
     // defining inputs
     take:
-    input                                       // required: [meta, somatic_vcf, somatic_tbi, germline_vcf, germline_tbi, jabba_gg]
+    input                                       // required: [meta, somatic_vcf, somatic_tbi, germline_vcf, germline_tbi, jabba_gg, hets, dryclean_cov]
 
     //Creating empty channels for output
     main:
