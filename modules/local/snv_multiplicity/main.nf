@@ -11,7 +11,7 @@ process SNV_MULTIPLICITY {
     tuple val(meta), path(somatic_snv, stageAs: "somatic_snv.vcf"), path(germline_snv, stageAs: "germline_snv.vcf"), path(jabba_gg), path(hets, stageAs: "hets_sites.txt"), path(dryclean_cov, stageAs: "dryclean_cov.rds")
 
     output:
-    tuple val(meta), path('*est_snv_cn_somatic.rds'), emit: snv_multiplicity_rds
+    tuple val(meta), path('*est_snv_cn_somatic.rds'), path('*est_snv_cn_germline.rds'), path('*est_snv_cn_hets.rds'), emit: snv_multiplicity_rds, snv_multiplicity_germline_rds, snv_multiplicity_hets_rds
     path "versions.yml"                                     , emit: versions
 
     when:
