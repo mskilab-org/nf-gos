@@ -47,6 +47,8 @@ process SNV_MULTIPLICITY {
     stub:
     """
     touch est_snv_cn_somatic.rds
+    touch est_snv_cn_germline.rds
+    touch est_snv_cn_hets.rds
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

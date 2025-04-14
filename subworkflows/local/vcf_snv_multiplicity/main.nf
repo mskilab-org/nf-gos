@@ -13,6 +13,8 @@ workflow VCF_SNV_MULTIPLICITY {
     main:
     versions        = Channel.empty()
     snv_multiplicity_rds	= Channel.empty()
+    snv_multiplicity_germline_rds	= Channel.empty()
+    snv_multiplicity_hets_rds	= Channel.empty()
 
     SNV_MULTIPLICITY(
         input
@@ -20,9 +22,13 @@ workflow VCF_SNV_MULTIPLICITY {
 
     // initializing outputs from snv_multiplicity
     snv_multiplicity_rds              = SNV_MULTIPLICITY.out.snv_multiplicity_rds
+    snv_multiplicity_germline_rds              = SNV_MULTIPLICITY.out.snv_multiplicity_germline_rds
+    snv_multiplicity_hets_rds              = SNV_MULTIPLICITY.out.snv_multiplicity_hets_rds
     versions                = SNV_MULTIPLICITY.out.versions
 
     emit:
     snv_multiplicity_rds
+    snv_multiplicity_germline_rds
+    snv_multiplicity_hets_rds
     versions
 }
