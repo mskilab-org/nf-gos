@@ -9,7 +9,6 @@
 // If and extra condition exists, it's specified in comments
 
 
-include { BWAMEM2_INDEX                          } from '../../../modules/nf-core/bwamem2/index/main'
 include { GATK4_CREATESEQUENCEDICTIONARY         } from '../../../modules/nf-core/gatk4/createsequencedictionary/main'
 include { MSISENSORPRO_SCAN                      } from '../../../modules/nf-core/msisensorpro/scan/main'
 include { SAMTOOLS_FAIDX                         } from '../../../modules/nf-core/samtools/faidx/main'
@@ -32,6 +31,7 @@ chr_dir                             = WorkflowNfcasereports.create_file_channel(
 dbsnp                               = WorkflowNfcasereports.create_file_channel(params.dbsnp)
 fasta                               = WorkflowNfcasereports.create_file_channel(params.fasta)
 fasta_fai                           = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
+bwa                                 = WorkflowNfcasereports.create_file_channel(params.bwa)
 germline_resource                   = WorkflowNfcasereports.create_file_channel(params.germline_resource)
 known_indels                        = WorkflowNfcasereports.create_file_channel(params.known_indels)
 known_snps                          = WorkflowNfcasereports.create_file_channel(params.known_snps)
@@ -42,10 +42,8 @@ workflow PREPARE_GENOME {
 
     main:
     fasta = fasta.map{ fasta -> [ [ id:fasta.baseName ], fasta ] }
+
     versions = Channel.empty()
-
-
-    BWAMEM2_INDEX(fasta)
 
     GATK4_CREATESEQUENCEDICTIONARY(fasta)
     // only run msisensorpro_scan if the msisensorpro_list is an empty channel
@@ -106,7 +104,6 @@ workflow PREPARE_GENOME {
 
     // Gather versions of all tools used
     versions = versions.mix(SAMTOOLS_FAIDX.out.versions)
-    versions = versions.mix(BWAMEM2_INDEX.out.versions)
     versions = versions.mix(GATK4_CREATESEQUENCEDICTIONARY.out.versions)
     versions = versions.mix(MSISENSORPRO_SCAN.out.versions)
     versions = versions.mix(TABIX_DBSNP.out.versions)
@@ -118,7 +115,7 @@ workflow PREPARE_GENOME {
 
 
     emit:
-    bwamem2               = BWAMEM2_INDEX.out.index.map{ meta, index -> [index] }.collect() // path: bwamem2/*
+    bwa                  = bwa
     dbsnp_tbi             = TABIX_DBSNP.out.tbi.map{ meta, tbi -> [tbi] }.collect()               // path: dbsnb.vcf.gz.tbi
     dict                  = GATK4_CREATESEQUENCEDICTIONARY.out.dict                               // path: genome.fasta.dict
     fasta_fai             = SAMTOOLS_FAIDX.out.fai.map{ meta, fai -> [fai] }                      // path: genome.fasta.fai

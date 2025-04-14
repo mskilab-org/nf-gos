@@ -766,10 +766,10 @@ workflow NFCASEREPORTS {
     dict       = params.dict        ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect()
                                     : PREPARE_GENOME.out.dict
     fasta_fai  = WorkflowNfcasereports.create_file_channel(params.fasta_fai, PREPARE_GENOME.out.fasta_fai)
-    bwamem2    = WorkflowNfcasereports.create_file_channel(params.bwamem2, PREPARE_GENOME.out.bwamem2)
+    bwa = WorkflowNfcasereports.create_file_channel(params.bwa)
 
     // Gather index for mapping given the chosen aligner
-    index_alignment = (params.aligner == "bwa-mem") ? bwa : bwamem2
+    index_alignment = bwa
 
     // TODO: add a params for msisensorpro_scan
     msisensorpro_scan      = PREPARE_GENOME.out.msisensorpro_scan
@@ -2090,7 +2090,7 @@ workflow NFCASEREPORTS {
         snv_multiplicity = Channel.empty()
             .mix(VCF_SNV_MULTIPLICITY.out.snv_multiplicity_rds)
             .mix(snv_multiplicity_existing_outputs)
-        
+
         snv_multiplicity = Channel.empty()
             .mix(VCF_SNV_MULTIPLICITY.out.snv_multiplicity_germline_rds)
             .mix(snv_multiplicity_existing_outputs)
@@ -2143,7 +2143,7 @@ workflow NFCASEREPORTS {
                 snv_ann,
                 fusions,
                 jabba ->[ meta, snv_ann, fusions, jabba]
-                
+
             }
 
             VCF_FUSIONS_CNA_ONCOKB_ANNOTATOR(oncokb_input)
