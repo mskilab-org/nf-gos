@@ -5,8 +5,8 @@ process FRAGCOUNTER {
 
     // TODO add fragcounter container
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/fragcounter:0.1':
-        'mskilab/fragcounter:0.1' }"
+        'docker://mskilab/fragcounter:0.2':
+        'mskilab/fragcounter:0.2' }"
 
     input:
     tuple val(meta), path(bam), path(bai)                    // Mandatory: Format should be [meta, bam, bai] : can also provide cram & crai
@@ -40,7 +40,7 @@ process FRAGCOUNTER {
     def fasta       = fasta ? "-r ${fasta}" : ""
     def paired      = paired ? "-p ${paired}" : ""
     def exome       = exome ? "-e ${exome}" : ""
-    def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
+    def VERSION    = '0.2' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
     """
     export R_DATATABLE_NUM_THREADS=1
@@ -62,7 +62,7 @@ process FRAGCOUNTER {
 
     stub:
     prefix = task.ext.prefix ?: "${meta.id}"
-    def VERSION = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
+    def VERSION = '0.2' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
     """
     touch cov.rds
     touch cov.corrected.bw
@@ -82,8 +82,8 @@ process REBIN_RAW_FRAGCOUNTER {
 
     // TODO add fragcounter container
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/fragcounter:0.1':
-        'mskilab/fragcounter:0.1' }"
+        'docker://mskilab/fragcounter:0.2':
+        'mskilab/fragcounter:0.2' }"
 
     input:
     tuple val(meta), path(cov_raw)
