@@ -1157,7 +1157,7 @@
                     "type": "string",
                     "fa_icon": "fas fa-file",
                     "help_text": "This is the output of msisensorpro scan. This is provided for hg19 through the remote repository. If not provided, will run msisensorpro scan.",
-                    "description": "Path to MSIsensorPro list file.",
+                    "description": "Path to MSIsensorPro list file."
                 },
                 "known_indels": {
                     "type": "string",
