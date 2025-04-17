@@ -14,7 +14,7 @@ process ONENESS_TWONESS {
     path(model)
 
     output:
-    tuple val(meta), path("*oneness_twoness_results.rds"), emit: oneness_twoness_results, optional: true
+    tuple val(meta), path("*onenesstwoness_results.rds"), emit: oneness_twoness_results, optional: true
     path "versions.yml"                                 , emit: versions
 
     when:
