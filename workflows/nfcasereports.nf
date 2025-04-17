@@ -2019,7 +2019,7 @@ workflow NFCASEREPORTS {
         snv_multiplicity_inputs_somatic_vcf = snv_somatic_annotations_for_merge
             .join(snv_multiplicity_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, annotated somatic snv vcf
-        snv_multiplicity_inputs_jabba_gg = jabba_gg_for_merge
+        snv_multiplicity_inputs_jabba_gg = non_integer_balance_balanced_gg_for_merge
             .join(snv_multiplicity_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
         snv_multiplicity_inputs_hets_sites = hets_sites_for_merge
@@ -2127,7 +2127,7 @@ workflow NFCASEREPORTS {
             .join(oncokb_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, fusions
 
-        oncokb_inputs_jabba_gg = jabba_gg_for_merge
+        oncokb_inputs_jabba_gg = non_integer_balance_balanced_gg_for_merge
             .join(oncokb_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
 
