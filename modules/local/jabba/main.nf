@@ -223,7 +223,7 @@ process RETIER_WHITELIST_JUNCTIONS {
     path(whitelist_genes)
 
     output:
-    tuple val(meta), path("*___tiered.vcf"), emit: retiered_junctions, optional: true
+    tuple val(meta), path("*___tiered.rds"), emit: retiered_junctions, optional: true
 
     script:
     """
@@ -232,45 +232,35 @@ process RETIER_WHITELIST_JUNCTIONS {
     library(gUtils)
     library(dplyr)
     library(VariantAnnotation)
+    library(gGnome)
 
     # Load the whitelist genes
     heme_gen = readRDS("${whitelist_genes}")
 
     # Define the path to the junctions file
     jpath = "${junctions}"
-    jpath_tiered = glue::glue('{tools::file_path_sans_ext(jpath)}___tiered.vcf')
+    jpath_tiered = glue::glue('{tools::file_path_sans_ext(jpath)}___tiered.rds')
 
     # Read the VCF file
-    vcf_obj = readVcf(jpath)
-    ra.all = rowRanges(vcf_obj)
+    ra.all = gGnome:::read.juncs(jpath)
 
     # Important part is below
     mcols_ra.all = mcols(ra.all)
     mcols_ra.all[["${tfield}"]] = rep_len(2, NROW(mcols_ra.all))
-    ix = unique((ra.all %&% heme_gen)\$ix)
+    ix = unique((grl.unlist(ra.all) %&% heme_gen)$grl.ix)
 
     if (NROW(ix)) {
       cat("Whitelisted junctions overlapped with provided junctions. Retiering...\n")
       mcols_ra.all[["${tfield}"]][ix] = 1
       mcols(ra.all) = mcols_ra.all
 
-      # Update the rowRanges in the VCF object
-      rowRanges(vcf_obj) = ra.all
-
-      # Save as VCF file
-      writeVcf(vcf_obj, jpath_tiered)
-
       # Output the path of the saved file
       cat("Retiered junctions saved to:", jpath_tiered, "\n")
     } else {
       cat("No whitelisted junctions overlapped with provided junctions.\n")
-
-      # Update the rowRanges in the VCF object
-      rowRanges(vcf_obj) = ra.all
-
-      # Save as VCF file
-      writeVcf(vcf_obj, jpath_tiered)
     }
+
+    saveRDS(ra.all, jpath_tiered)
     """
     stub:
 
