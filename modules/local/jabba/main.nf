@@ -247,7 +247,7 @@ process RETIER_WHITELIST_JUNCTIONS {
     # Important part is below
     mcols_ra.all = mcols(ra.all)
     mcols_ra.all[["${tfield}"]] = rep_len(2, NROW(mcols_ra.all))
-    ix = unique((grl.unlist(ra.all) %&% heme_gen)$grl.ix)
+    ix = unique((grl.unlist(ra.all) %&% heme_gen)[["grl.ix"]])
 
     if (NROW(ix)) {
       cat("Whitelisted junctions overlapped with provided junctions. Retiering...\n")
