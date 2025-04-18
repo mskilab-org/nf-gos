@@ -96,7 +96,7 @@ toolParamMap.each { tool, params ->
 
 tool_input_output_map = [
     "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
-    "bamqc": [ inputs: ['bam'], outputs: [] ],
+    "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics'] ],
     "msisensorpro": [ inputs: ['bam'], outputs: ['msi', 'msi_germline'] ],
     "gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
     "amber": [ inputs: ['bam'], outputs: ['hets', 'amber_dir'] ],
