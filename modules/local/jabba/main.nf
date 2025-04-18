@@ -249,8 +249,8 @@ process RETIER_WHITELIST_JUNCTIONS {
 	is_na = is_len_one && (is.na(jpath) || jpath %in% c("NA", base::nullfile()))
 	is_possible_path = is_character && is_len_one && !is_na
   	is_existent_path = is_possible_path && file.exists(jpath)
-  	is_rds = is_possible_path && grepl(".rds$", jpath)
-	is_vcf = is_possible_path && grepl(".vcf(.bgz|.gz){0,}$", jpath)
+  	is_rds = is_possible_path && grepl(".rds\$", jpath)
+	is_vcf = is_possible_path && grepl(".vcf(.bgz|.gz){0,}\$", jpath)
 	
 	if (is_existent_path && is_rds) {
 		ra.all = readRDS(jpath)
