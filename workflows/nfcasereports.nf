@@ -1761,15 +1761,15 @@ workflow NFCASEREPORTS {
 				.map { it -> [ it[1], it[2] ] } // meta, (vcf or rds)
 
 			RETIER_JUNCTIONS(untiered_junctions_input)
-			retiered_junctions_output = Channel.empty()
+			retiered_junctions_output_for_merge = Channel.empty()
 				.mix(RETIER_JUNCTIONS.out.retiered_junctions)
 				.map { meta, rds -> [ meta.patient, rds ] } // meta.patient, retiered junctions
 		}
 
 		if (is_vcf_from_sv_calling_for_merge_retiered) {
-			jabba_vcf_from_sv_calling_for_merge = retiered_junctions_output
+			jabba_vcf_from_sv_calling_for_merge = retiered_junctions_output_for_merge
 		} else if (is_final_filtered_sv_rds_for_merge_retiered) {
-			final_filtered_sv_rds_for_merge = retiered_junctions_output
+			final_filtered_sv_rds_for_merge = retiered_junctions_output_for_merge
 		}
 		// Dev block to retier either vcf or filtered retiered junctions
 
