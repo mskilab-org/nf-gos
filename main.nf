@@ -137,7 +137,8 @@ WorkflowMain.initialise(workflow, params, log)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { NFCASEREPORTS } from './workflows/nfcasereports'
+// include { NFCASEREPORTS } from './workflows/nfcasereports'
+include { NFCASEREPORTS } from './workflows/debug'
 
 //
 // WORKFLOW: Run main mskilab-org/nf-jabba analysis pipeline

@@ -96,7 +96,7 @@ toolParamMap.each { tool, params ->
 
 tool_input_output_map = [
     "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
-    "bamqc": [ inputs: ['bam'], outputs: [] ],
+    "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics'] ],
     "msisensorpro": [ inputs: ['bam'], outputs: ['msi', 'msi_germline'] ],
     "gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
     "amber": [ inputs: ['bam'], outputs: ['hets', 'amber_dir'] ],
@@ -160,6 +160,8 @@ sampleList.each { input_map ->
 
 println "Provided inputs: ${available_inputs}"
 
+println "tool_input_output_map: ${tool_input_output_map}"
+
 // Iteratively select tools based on available inputs
 def skip_tools = params.skip_tools ? params.skip_tools.split(',').collect { it.trim() } : []
 println "Skipping tools: ${skip_tools}"
@@ -169,9 +171,13 @@ do {
     changed = false
     tool_input_output_map.each { tool, io ->
         if (!selected_tools.contains(tool) && !skip_tools.contains(tool)) {
+			println "tool: ${tool}"
+			println "io: ${io}"
             def inputsRequired = io.inputs
             def inputsPresent = inputsRequired.every { available_inputs.contains(it) }
             def outputsNeeded = io.outputs.any { !available_inputs.contains(it) }
+			println "inputsPresent: ${inputsPresent}"
+			println "outputsNeeded: ${outputsNeeded}"
             if (inputsPresent && outputsNeeded) {
                 selected_tools.add(tool)
                 available_inputs.addAll(io.outputs)
@@ -184,3 +190,8 @@ do {
 tools_used = selected_tools
 
 println "Tools that will be run based on your inputs: ${tools_used}"
+
+
+workflow NFCASEREPORTS {
+	println "${tools_used}"
+}
