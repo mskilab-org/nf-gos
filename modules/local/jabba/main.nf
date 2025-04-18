@@ -253,7 +253,7 @@ process RETIER_WHITELIST_JUNCTIONS {
 	is_vcf = is_possible_path && grepl(".vcf(.bgz|.gz){0,}$", jpath)
 	
 	if (is_existent_path && is_rds) {
-		ra.all = readRDS(ra.all)
+		ra.all = readRDS(jpath)
 	} else if (is_existent_path && is_vcf) {
 		ra.all = gGnome:::read.juncs(jpath)
 	} else if (!is_existent_path) {
