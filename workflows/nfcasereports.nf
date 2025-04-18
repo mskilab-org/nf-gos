@@ -1743,21 +1743,53 @@ workflow NFCASEREPORTS {
     if (tools_used.contains("all") || tools_used.contains("jabba")) {
         jabba_inputs = inputs.filter { (it.jabba_gg.isEmpty() || it.jabba_rds.isEmpty()) && it.meta.status == 1}.map { it -> [it.meta.patient, it.meta] }
 
-        jabba_vcf_from_sv_calling_for_merge = vcf_from_sv_calling_for_merge
-        if (params.is_retier_whitelist_junctions) {
-            untiered_junctions = jabba_inputs
-                .join(vcf_from_sv_calling_for_merge)
-                .map { it -> [ it[1], it[2] ] } // meta, vcf, tbi
+		// Dev block to retier either vcf or filtered retiered junctions
+		is_final_filtered_sv_rds_for_merge_retiered = params.is_retier_whitelist_junctions && params.tumor_only
+		is_vcf_from_sv_calling_for_merge_retiered = params.is_retier_whitelist_junctions && ! params.tumor_only
 
-            RETIER_JUNCTIONS(untiered_junctions)
-            jabba_vcf_from_sv_calling_for_merge = Channel.empty()
-                .mix(RETIER_JUNCTIONS.out.retiered_junctions)
-                .map { meta, vcf -> [ meta.patient, vcf ] } // meta.patient, retiered junctions
-        }
+		// The variable below will get propagated to jabba if retiering is not done to ! params.tumor_only block
+		jabba_vcf_from_sv_calling_for_merge = vcf_from_sv_calling_for_merge
+		// Variable exists in case retiering is done
+		untiered_junctions_for_merge = vcf_from_sv_calling_for_merge
+		if (is_final_filtered_sv_rds_for_merge_retiered) {
+			untiered_junctions_for_merge = final_filtered_sv_rds_for_merge
+		}
+
+		if (params.is_retier_whitelist_junctions) {
+			untiered_junctions_input = jabba_inputs
+				.join(untiered_junctions_for_merge)
+				.map { it -> [ it[1], it[2] ] } // meta, (vcf or rds)
+
+			RETIER_JUNCTIONS(untiered_junctions_input)
+			retiered_junctions_output = Channel.empty()
+				.mix(RETIER_JUNCTIONS.out.retiered_junctions)
+				.map { meta, rds -> [ meta.patient, rds ] } // meta.patient, retiered junctions
+		}
+
+		if (is_vcf_from_sv_calling_for_merge_retiered) {
+			jabba_vcf_from_sv_calling_for_merge = retiered_junctions_output
+		} else if (is_final_filtered_sv_rds_for_merge_retiered) {
+			final_filtered_sv_rds_for_merge = retiered_junctions_output
+		}
+		// Dev block to retier either vcf or filtered retiered junctions
+
+
+
+        // jabba_vcf_from_sv_calling_for_merge = vcf_from_sv_calling_for_merge
+        // if (params.is_retier_whitelist_junctions) {
+        //     untiered_junctions = jabba_inputs
+        //         .join(vcf_from_sv_calling_for_merge)
+        //         .map { it -> [ it[1], it[2] ] } // meta, vcf, tbi
+
+        //     RETIER_JUNCTIONS(untiered_junctions)
+        //     jabba_vcf_from_sv_calling_for_merge = Channel.empty()
+        //         .mix(RETIER_JUNCTIONS.out.retiered_junctions)
+        //         .map { meta, vcf -> [ meta.patient, vcf ] } // meta.patient, retiered junctions
+        // }
 
         jabba_inputs_sv = jabba_vcf_from_sv_calling_for_merge
             .join(jabba_inputs)
-            .map { it -> [ it[0], it[1] ] } // meta.patient, vcf
+            .map { it -> [ it[0], it[1] ] } // meta.patient, (vcf or rds if retiered)
 
         if (params.tumor_only) {
             jabba_inputs_junction_filtered_sv = final_filtered_sv_rds_for_merge

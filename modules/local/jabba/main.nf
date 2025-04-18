@@ -229,6 +229,8 @@ process RETIER_WHITELIST_JUNCTIONS {
     """
     #!/usr/bin/env Rscript
 
+	options(error = function() {traceback(2); quit(save = "no", status = 1)})
+
     library(gUtils)
     library(dplyr)
     library(VariantAnnotation)
@@ -242,7 +244,33 @@ process RETIER_WHITELIST_JUNCTIONS {
     jpath_tiered = glue::glue('{tools::file_path_sans_ext(jpath)}___tiered.rds')
 
     # Read the VCF file
-    ra.all = gGnome:::read.juncs(jpath)
+	is_character = is.character(jpath)
+	is_len_one = NROW(jpath) == 1
+	is_na = is_len_one && (is.na(jpath) || jpath %in% c("NA", base::nullfile()))
+	is_possible_path = is_character && is_len_one && !is_na
+  	is_existent_path = is_possible_path && file.exists(jpath)
+  	is_rds = is_possible_path && grepl(".rds$", jpath)
+	is_vcf = is_possible_path && grepl(".vcf(.bgz|.gz){0,}$", jpath)
+	
+	if (is_existent_path && is_rds) {
+		ra.all = readRDS(ra.all)
+	} else if (is_existent_path && is_vcf) {
+		ra.all = gGnome:::read.juncs(jpath)
+	} else if (!is_existent_path) {
+		stop("jpath does not exist or is invalid path: ", jpath)
+	}
+
+	is_properly_formatted_grangeslist = (
+	    inherits(ra.all, "GRangesList")
+		&& (
+			all(S4Vectors::elementNROWS(ra.all) == 2)
+			|| (NROW(ra.all) == 0)
+		)
+	)
+
+	if (!is_properly_formatted_grangeslist) {
+		stop("Improperly formatted junctions")
+	}
 
     # Important part is below
     mcols_ra.all = mcols(ra.all)
