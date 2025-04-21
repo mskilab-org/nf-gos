@@ -13,7 +13,7 @@ process MSISENSORPRO_MSISOMATIC {
     path (msisensor_scan)
 
     output:
-    tuple val(meta), path("${prefix}")         , emit: output_report
+    tuple val(meta), path("${prefix}_report")         , emit: output_report
     tuple val(meta), path("${prefix}_dis")     , emit: output_dis
     tuple val(meta), path("${prefix}_germline"), emit: output_germline
     tuple val(meta), path("${prefix}_somatic") , emit: output_somatic
