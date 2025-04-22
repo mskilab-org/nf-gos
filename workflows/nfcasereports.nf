@@ -1002,7 +1002,7 @@ workflow NFCASEREPORTS {
 
     // BAM Postprocessing
     // ##############################
-    if ((tools_used.contains("all") || tools_used.contains("postprocessing")) && params.aligner != "fq2bam") { // fq2bam does not need postprocessing
+    if ((tools_used.contains("all") || tools_used.contains("aligner")) && params.aligner != "fq2bam") { // fq2bam does not need postprocessing
         cram_markduplicates_no_spark = Channel.empty()
 
         // STEP 2: markduplicates (+QC) + convert to CRAM
