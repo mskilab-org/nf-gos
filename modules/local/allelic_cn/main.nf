@@ -32,7 +32,7 @@ process NON_INTEGER_BALANCE {
     val(pad)
 
     output:
-    tuple val(meta), path("non_integer.balanced.gg.rds")                , emit: non_integer_balance_balanced_gg, optional: true
+    tuple val(meta), path("non_integer.balanced.gg.rds")    , emit: non_integer_balance_balanced_gg, optional: true
     tuple val(meta), path("hets.gg.rds")                    , emit: non_integer_balance_hets_gg, optional: true
     path "versions.yml"                                     , emit: versions
 

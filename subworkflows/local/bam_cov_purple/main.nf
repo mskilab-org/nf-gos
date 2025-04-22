@@ -2,14 +2,11 @@
 // PURPLE (COBALT)
 //
 
-include { COBALT } from '../../../modules/local/cobalt/main'
 include { PURPLE } from '../../../modules/local/purple/main'
 include { EXTRACT_PURITYPLOIDY } from '../../../modules/local/purple/main'
 
-//COBALT
-gc_profile = WorkflowNfcasereports.create_file_channel(params.gc_profile)
-diploid_bed = WorkflowNfcasereports.create_file_channel(params.diploid_bed)
 //PURPLE
+gc_profile = WorkflowNfcasereports.create_file_channel(params.gc_profile)
 genome_fasta = WorkflowNfcasereports.create_file_channel(params.fasta)
 genome_fai = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
 genome_ver     = WorkflowNfcasereports.create_value_channel(params.genome_ver_amber)
@@ -25,7 +22,7 @@ ensembl_data_resources = WorkflowNfcasereports.create_file_channel(params.ensemb
 workflow BAM_COV_PURPLE {
     // defining inputs
     take:
-    bams // required: [meta, tbam, tbai, nbam, nbai]
+    cobalt_dir // required: [meta, cobalt_dir]
     amber_dir // required: [meta, amber_dir]
     tumor_sv // required: [meta, vcf, tbi]
     tumor_snv // required: [meta, vcf, tbi]
@@ -36,18 +33,20 @@ workflow BAM_COV_PURPLE {
     versions        = Channel.empty()
     ploidy          = Channel.empty()
 
+    meta = tumor_sv.map { meta, vcf, tbi ->
+        meta.tumor_id = meta.id
+        [meta.patient, meta]
+    }
+
+    cobalt_dir = cobalt_dir
+        .map { meta, cobalt_dir -> [meta.patient, cobalt_dir] }
+
     amber_dir = amber_dir
         .map { meta, amber_dir -> [meta.patient, amber_dir] }
-
-    COV_COBALT(bams)
-
-    cobalt_dir = COV_COBALT.out.cobalt_dir
-        .map { meta, cobalt_dir -> [meta.patient, cobalt_dir] }
 
     tumor_sv        = tumor_sv.map { meta, vcf, tbi -> [meta.patient, vcf, tbi] }
     tumor_snv        = tumor_snv.map { meta, vcf, tbi -> [meta.patient, vcf, tbi] }
     normal_snv        = normal_snv.map { meta, vcf, tbi -> [meta.patient, vcf, tbi] }
-    meta = bams.map { meta, tbam, tbai, nbam, nbai -> [meta.patient, meta] }
 
     purple_inputs = meta
         .join(amber_dir)
@@ -105,9 +104,10 @@ workflow BAM_COV_PURPLE {
 
     // initializing outputs from fragcounter
     purple_dir        = Channel.empty().mix(PURPLE.out.purple_dir)
+    purple_purity     = Channel.empty().mix(PURPLE.out.purple_purity)
     versions          = versions.mix(PURPLE.out.versions)
 
-    EXTRACT_PURITYPLOIDY(purple_dir)
+    EXTRACT_PURITYPLOIDY(purple_purity)
 
     purity = Channel.empty().mix(EXTRACT_PURITYPLOIDY.out.purity_val) // meta, purity
     ploidy = ploidy.mix(EXTRACT_PURITYPLOIDY.out.ploidy_val) // meta, ploidy
@@ -116,38 +116,5 @@ workflow BAM_COV_PURPLE {
     purity
     ploidy
 
-    versions
-}
-
-
-workflow COV_COBALT {
-    take:
-    input // [meta, tbam, tbai, nbam, nbai]
-
-    main:
-    cobalt_dir        = Channel.empty()
-    versions          = Channel.empty()
-
-    if (params.tumor_only) {
-        COBALT(
-            input,
-            gc_profile,
-            diploid_bed,
-            []
-        )
-    } else {
-        COBALT(
-            input,
-            gc_profile,
-            [],
-            []
-        )
-    }
-
-    cobalt_dir        = cobalt_dir.mix(COBALT.out.cobalt_dir)
-    versions          = versions.mix(COBALT.out.versions)
-
-    emit:
-    cobalt_dir
     versions
 }
