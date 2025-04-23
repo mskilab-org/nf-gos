@@ -352,7 +352,7 @@
                 "anyOf": [
                     {
                         "type": "string",
-                        "pattern": "^\\S+\\.vcf(\\.gz)?$"
+                        "pattern": "^\\S+\\.vcf(\\.gz|\\.bgz)?$"
                     },
                     {
                         "type": "string",
