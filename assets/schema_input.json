@@ -348,11 +348,15 @@
                 "exists": true
             },
             "vcf": {
-                "errorMessage": "VCF file for reads 1 cannot contain spaces and must have extension '.vcf' or '.vcf.gz'",
+                "errorMessage": "VCF file for reads 1 cannot contain spaces and must have extension '.vcf' or '.vcf.gz' or '.rds'",
                 "anyOf": [
                     {
                         "type": "string",
                         "pattern": "^\\S+\\.vcf(\\.gz)?$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.rds$"
                     },
                     {
                         "type": "string",
