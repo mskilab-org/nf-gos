@@ -141,6 +141,9 @@ process LP_PHASED_BALANCE {
     """
     export RSCRIPT_PATH=\$(echo "${baseDir}/bin/lp_phased_balance.R")
 
+    # Remove 'chr' from chromosome names in sites.txt (for hg38)
+    awk 'BEGIN{OFS=" "} {gsub(/^chr/,"",\$1); print}' sites.txt > sites.tmp && mv sites.tmp sites.txt
+
     Rscript \$RSCRIPT_PATH \\
         --id $id \\
         --jab $hets_gg \\

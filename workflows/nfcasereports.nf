@@ -1795,6 +1795,15 @@ workflow NFCASEREPORTS {
         purple_existing_outputs_ploidy = inputs.map { it -> [it.meta, it.ploidy] }.filter { !it[1].isEmpty() }
         purple_existing_outputs_purity = inputs.map { it -> [it.meta, it.purity] }.filter { !it[1].isEmpty() }
 
+        if (!params.purple_use_smlvs && !params.purple_use_svs) {
+            BAM_COV_PURPLE(
+                purple_inputs_cobalt_dir,
+                purple_inputs_amber_dir,
+                [],
+                [],
+                []
+            )
+        }
         BAM_COV_PURPLE(
             purple_inputs_cobalt_dir,
             purple_inputs_amber_dir,
