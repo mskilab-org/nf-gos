@@ -173,7 +173,7 @@ Values:
 	// fragCounter options
 	midpoint_frag              = "TRUE"                           // If TRUE only count midpoint if FALSE then count bin footprint of every fragment interval: Default=TRUE
 	windowsize_frag            = 1000                            // Window / bin size : Default= 200 in program but dryclean uses 1000 binsize, hence set to 1000
-	minmapq_frag               = 60                              // Minimal map quality : Default = 1
+	minmapq_frag               = 20                              // Minimal map quality : Default = 1
 	paired_frag                = "TRUE"                           // Is the dataset paired : Default = TRUE
 	exome_frag                 = "FALSE"	                        // Use exons as bins instead of fixed window : Default = FALSE
 

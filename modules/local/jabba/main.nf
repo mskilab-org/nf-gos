@@ -223,54 +223,72 @@ process RETIER_WHITELIST_JUNCTIONS {
     path(whitelist_genes)
 
     output:
-    tuple val(meta), path("*___tiered.vcf"), emit: retiered_junctions, optional: true
+    tuple val(meta), path("*___tiered.rds"), emit: retiered_junctions, optional: true
 
     script:
     """
     #!/usr/bin/env Rscript
 
+	options(error = function() {traceback(2); quit(save = "no", status = 1)})
+
     library(gUtils)
     library(dplyr)
     library(VariantAnnotation)
+    library(gGnome)
 
     # Load the whitelist genes
     heme_gen = readRDS("${whitelist_genes}")
 
     # Define the path to the junctions file
     jpath = "${junctions}"
-    jpath_tiered = glue::glue('{tools::file_path_sans_ext(jpath)}___tiered.vcf')
+    jpath_tiered = glue::glue('{tools::file_path_sans_ext(jpath)}___tiered.rds')
 
     # Read the VCF file
-    vcf_obj = readVcf(jpath)
-    ra.all = rowRanges(vcf_obj)
+	is_character = is.character(jpath)
+	is_len_one = NROW(jpath) == 1
+	is_na = is_len_one && (is.na(jpath) || jpath %in% c("NA", base::nullfile()))
+	is_possible_path = is_character && is_len_one && !is_na
+  	is_existent_path = is_possible_path && file.exists(jpath)
+  	is_rds = is_possible_path && grepl(".rds\$", jpath)
+	is_vcf = is_possible_path && grepl(".vcf(.bgz|.gz){0,}\$", jpath)
+	
+	if (is_existent_path && is_rds) {
+		ra.all = readRDS(jpath)
+	} else if (is_existent_path && is_vcf) {
+		ra.all = gGnome:::read.juncs(jpath)
+	} else if (!is_existent_path) {
+		stop("jpath does not exist or is invalid path: ", jpath)
+	}
+
+	is_properly_formatted_grangeslist = (
+	    inherits(ra.all, "GRangesList")
+		&& (
+			all(S4Vectors::elementNROWS(ra.all) == 2)
+			|| (NROW(ra.all) == 0)
+		)
+	)
+
+	if (!is_properly_formatted_grangeslist) {
+		stop("Improperly formatted junctions")
+	}
 
     # Important part is below
     mcols_ra.all = mcols(ra.all)
     mcols_ra.all[["${tfield}"]] = rep_len(2, NROW(mcols_ra.all))
-    ix = unique((ra.all %&% heme_gen)\$ix)
+    ix = unique(mcols(grl.unlist(ra.all) %&% heme_gen)[["grl.ix"]])
 
     if (NROW(ix)) {
       cat("Whitelisted junctions overlapped with provided junctions. Retiering...\n")
       mcols_ra.all[["${tfield}"]][ix] = 1
       mcols(ra.all) = mcols_ra.all
 
-      # Update the rowRanges in the VCF object
-      rowRanges(vcf_obj) = ra.all
-
-      # Save as VCF file
-      writeVcf(vcf_obj, jpath_tiered)
-
       # Output the path of the saved file
       cat("Retiered junctions saved to:", jpath_tiered, "\n")
     } else {
       cat("No whitelisted junctions overlapped with provided junctions.\n")
-
-      # Update the rowRanges in the VCF object
-      rowRanges(vcf_obj) = ra.all
-
-      # Save as VCF file
-      writeVcf(vcf_obj, jpath_tiered)
     }
+
+    saveRDS(ra.all, jpath_tiered)
     """
     stub:
 
