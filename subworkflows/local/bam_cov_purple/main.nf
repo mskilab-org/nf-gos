@@ -22,64 +22,12 @@ ensembl_data_resources = WorkflowNfcasereports.create_file_channel(params.ensemb
 workflow BAM_COV_PURPLE {
     // defining inputs
     take:
-    cobalt_dir // required: [meta, cobalt_dir]
-    amber_dir // required: [meta, amber_dir]
-    tumor_sv // required: [meta, vcf, tbi]
-    tumor_snv // required: [meta, vcf, tbi]
-    normal_snv // optional [meta, vcf, tbi]
+    purple_inputs
 
     //Creating empty channels for output
     main:
     versions        = Channel.empty()
     ploidy          = Channel.empty()
-
-    meta = tumor_sv.map { meta, vcf, tbi ->
-        meta.tumor_id = meta.id
-        [meta.patient, meta]
-    }
-
-    cobalt_dir = cobalt_dir
-        .map { meta, cobalt_dir -> [meta.patient, cobalt_dir] }
-
-    amber_dir = amber_dir
-        .map { meta, amber_dir -> [meta.patient, amber_dir] }
-
-    tumor_sv        = tumor_sv.map { meta, vcf, tbi -> [meta.patient, vcf, tbi] }
-    tumor_snv        = tumor_snv.map { meta, vcf, tbi -> [meta.patient, vcf, tbi] }
-    normal_snv        = normal_snv.map { meta, vcf, tbi -> [meta.patient, vcf, tbi] }
-
-    purple_inputs = meta
-        .join(amber_dir)
-        .join(cobalt_dir)
-        .map { patient, meta, amber_dir, cobalt_dir ->
-            [meta, amber_dir, cobalt_dir, [], [], [], [], [], []]
-        }
-
-    if (params.tumor_only) {
-        if (params.use_svs && params.use_smlvs) {
-            purple_inputs = meta
-            .join(amber_dir)
-            .join(cobalt_dir)
-            .join(tumor_sv)
-            .join(tumor_snv)
-            .map { patient, meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi ->
-                [meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, [], []]
-            }
-        }
-    } else {
-        if (params.use_svs && params.use_smlvs) {
-            purple_inputs = meta
-                .join(amber_dir)
-                .join(cobalt_dir)
-                .join(tumor_sv)
-                .join(tumor_snv)
-                .join(normal_snv)
-                .map { patient, meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf, germ_snv_tbi ->
-                    [meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf, germ_snv_tbi]
-                }
-        }
-    }
-
 
     PURPLE(
         purple_inputs,
