@@ -98,7 +98,8 @@ tool_input_output_map = [
     "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
     "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics'] ],
     "msisensorpro": [ inputs: ['bam'], outputs: ['msi', 'msi_germline'] ],
-    "gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
+    // "gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
+	"gridss": [ inputs: ['bam'], outputs: ['vcf', "vcf_filtered"] ],
     "amber": [ inputs: ['bam'], outputs: ['hets', 'amber_dir'] ],
     "fragcounter": [ inputs: ['bam'], outputs: ['frag_cov'] ],
     "dryclean": [ inputs: ['frag_cov'], outputs: ['dryclean_cov'] ],
@@ -355,6 +356,7 @@ inputs = ch_from_samplesheet.map {
     seg,
     nseg,
     vcf,
+	vcf_unfiltered,
     jabba_rds,
     jabba_gg,
     ni_balanced_gg,
@@ -397,6 +399,8 @@ inputs = ch_from_samplesheet.map {
         nseg: nseg,
         vcf: vcf,
         vcf_tbi: vcf ? vcf + '.tbi' : [],
+		vcf_unfiltered: vcf_unfiltered,
+        vcf_unfiltered_tbi: vcf_unfiltered ? vcf_unfiltered + '.tbi' : [],
         jabba_rds: jabba_rds,
         jabba_gg: jabba_gg,
         ni_balanced_gg: ni_balanced_gg,
@@ -694,13 +698,41 @@ alignment_bams_final = inputs
 
 final_filtered_sv_rds_for_merge = inputs
     .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
-    .filter { !it[1].isEmpty() && !it[2].isEmpty() }
-    .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
+	.map { 
+		// def vcf = it[1]
+		// def is_vcf = vcf =~ /\.vcf(\.gz|\.bgz)?$/
+		// def is_rds = vcf =~ /\.rds$/
+		// println it[1]
+		// println it[1].getClass()
+		// println it[1].isEmpty()
+		// println it[1].exists()
+		// println is_vcf
+		// println is_rds
+		// println "tbi"
+		// println it[2]
+		// println it[2].getClass()
+		// println it[2].isEmpty()
+		// println it[2].exists()
+		return it }
+    .filter { 
+		def vcf_or_rds = it[1]
+		def is_rds = vcf_or_rds =~ /\.rds$/
+		def is_vcf_or_rds_filesize_zero_or_nonexistent = vcf_or_rds.isEmpty()
+		! is_vcf_or_rds_filesize_zero_or_nonexistent && is_rds }
+    .map { 
+		it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
+
+println "${final_filtered_sv_rds_for_merge.view()}"
 
 vcf_from_sv_calling_for_merge = inputs
     .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
     .filter { !it[1].isEmpty() && !it[2].isEmpty() }
     .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
+
+vcf_unfiltered_from_sv_calling_for_merge = inputs
+    .map { it -> [it.meta, it.vcf_unfiltered, it.vcf_unfiltered_tbi] }
+    .filter { !it[1].isEmpty() && !it[2].isEmpty() }
+    .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf_unfiltered, tbi
 
 unfiltered_som_sv_for_merge = inputs
     .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
@@ -1158,11 +1190,17 @@ workflow NFCASEREPORTS {
     if (tools_used.contains("all") || tools_used.contains("gridss")) {
 
         // Filter out bams for which SV calling has already been done
-        bam_sv_inputs = inputs.filter { it.vcf.isEmpty() }.map { it -> [it.meta.sample] }
+        
+		// bam_sv_inputs = inputs.filter { it.vcf.isEmpty() }.map { it -> [it.meta.sample] }
+		bam_sv_inputs = inputs.filter { it.vcf_unfiltered.isEmpty() }.map { it -> [it.meta.sample] }
         bam_sv_calling = alignment_bams_final
             .join(bam_sv_inputs)
             .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
-        gridss_existing_outputs = inputs.map { it -> [it.meta, it.vcf, it.vcf_tbi] }.filter { !it[1].isEmpty() && !it[2].isEmpty() }
+        
+		// gridss_existing_outputs = inputs.map { it -> [it.meta, it.vcf, it.vcf_tbi] }.filter { !it[1].isEmpty() && !it[2].isEmpty() }
+		gridss_existing_outputs = inputs.map { 
+			it -> [it.meta, it.vcf_unfiltered, it.vcf_unfiltered_tbi] }
+			.filter { !it[1].isEmpty() && !it[2].isEmpty() }
 
         if (params.tumor_only) {
             bam_sv_calling_status = bam_sv_calling.branch{
