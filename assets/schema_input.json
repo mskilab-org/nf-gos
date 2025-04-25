@@ -254,6 +254,29 @@
                 "format": "file-path",
                 "exists": true
             },
+            "cobalt_dir": {
+                "errorMessage": "Cobalt directory must be a valid path to a directory",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": ".+",
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "directory-path",
+                "exists": true
+            },
             "purity": {
                 "errorMessage": "purity must be a number",
                 "anyOf": [
@@ -325,11 +348,15 @@
                 "exists": true
             },
             "vcf": {
-                "errorMessage": "VCF file for reads 1 cannot contain spaces and must have extension '.vcf' or '.vcf.gz'",
+                "errorMessage": "VCF file for reads 1 cannot contain spaces and must have extension '.vcf' or '.vcf.gz' or '.rds'",
                 "anyOf": [
                     {
                         "type": "string",
-                        "pattern": "^\\S+\\.vcf(\\.gz)?$"
+                        "pattern": "^\\S+\\.vcf(\\.gz|\\.bgz)?$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.rds$"
                     },
                     {
                         "type": "string",

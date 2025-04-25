@@ -27,7 +27,8 @@ process PURPLE {
     path target_region_msi_indels
 
     output:
-    tuple val(meta), path('purple/'), emit: purple_dir
+    tuple val(meta), path('purple/*'), emit: purple_dir
+    tuple val(meta), path('purple/*.purple.purity.tsv'), emit: purple_purity
     path 'versions.yml'             , emit: versions
 
     when:
@@ -94,18 +95,17 @@ process PURPLE {
 
     stub:
     """
-    mkdir purple/
-    touch purple/${meta.tumor_id}.purple.cnv.gene.tsv
-    touch purple/${meta.tumor_id}.purple.cnv.somatic.tsv
-    touch purple/${meta.tumor_id}.purple.driver.catalog.germline.tsv
-    touch purple/${meta.tumor_id}.purple.driver.catalog.somatic.tsv
-    touch purple/${meta.tumor_id}.purple.germline.vcf.gz
-    touch purple/${meta.tumor_id}.purple.germline.vcf.gz
-    touch purple/${meta.tumor_id}.purple.purity.tsv
-    touch purple/${meta.tumor_id}.purple.qc
-    touch purple/${meta.tumor_id}.purple.somatic.vcf.gz
-    touch purple/${meta.tumor_id}.purple.sv.germline.vcf.gz
-    touch purple/${meta.tumor_id}.purple.sv.vcf.gz
+    touch ${meta.tumor_id}.purple.cnv.gene.tsv
+    touch ${meta.tumor_id}.purple.cnv.somatic.tsv
+    touch ${meta.tumor_id}.purple.driver.catalog.germline.tsv
+    touch ${meta.tumor_id}.purple.driver.catalog.somatic.tsv
+    touch ${meta.tumor_id}.purple.germline.vcf.gz
+    touch ${meta.tumor_id}.purple.germline.vcf.gz
+    touch ${meta.tumor_id}.purple.purity.tsv
+    touch ${meta.tumor_id}.purple.qc
+    touch ${meta.tumor_id}.purple.somatic.vcf.gz
+    touch ${meta.tumor_id}.purple.sv.germline.vcf.gz
+    touch ${meta.tumor_id}.purple.sv.vcf.gz
 
     echo -e '${task.process}:\\n  stub: noversions\\n' > versions.yml
     """
@@ -113,7 +113,7 @@ process PURPLE {
 
 process EXTRACT_PURITYPLOIDY {
     input:
-    tuple val(meta), path(purple_dir)
+    tuple val(meta), path(purple_purity)
 
     output:
     tuple val(meta), env(purity_val), emit: purity_val
@@ -121,7 +121,7 @@ process EXTRACT_PURITYPLOIDY {
 
     script:
     """
-    export purity_val=\$(awk 'NR==2 {print \$1}' ${purple_dir}/${meta.tumor_id}.purple.purity.tsv)
-    export ploidy_val=\$(awk 'NR==2 {print \$5}' ${purple_dir}/${meta.tumor_id}.purple.purity.tsv)
+    export purity_val=\$(awk 'NR==2 {print \$1}' ${purple_purity})
+    export ploidy_val=\$(awk 'NR==2 {print \$5}' ${purple_purity})
     """
 }
