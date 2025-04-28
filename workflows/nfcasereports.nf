@@ -179,6 +179,9 @@ do {
             def inputsRequired = io.inputs
             def inputsPresent = inputsRequired.every { available_inputs.contains(it) }
             def outputsNeeded = io.outputs.any { !available_inputs.contains(it) }
+			if (tool == "sage" && params.tumor_only) {
+				outputsNeeded = !available_inputs.contains("snv_somatic_vcf")
+			}
             if (inputsPresent && outputsNeeded) {
                 selected_tools.add(tool)
                 available_inputs.addAll(io.outputs)
