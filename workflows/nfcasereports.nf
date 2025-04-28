@@ -103,7 +103,7 @@ tool_input_output_map = [
     "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics'] ],
     "msisensorpro": [ inputs: ['bam'], outputs: ['msi', 'msi_germline'] ],
     // "gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
-	"gridss": [ inputs: ['bam'], outputs: ['structural_variants'] ],
+	"gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
     "amber": [ inputs: ['bam'], outputs: ['hets', 'amber_dir'] ],
     "fragcounter": [ inputs: ['bam'], outputs: ['frag_cov'] ],
     "dryclean": [ inputs: ['frag_cov'], outputs: ['dryclean_cov'] ],
@@ -111,7 +111,7 @@ tool_input_output_map = [
     "sage": [ inputs: ['bam'], outputs: ['snv_somatic_vcf', 'snv_germline_vcf'] ],
     "cobalt": [ inputs: ['bam'], outputs: ['cobalt_dir'] ],
     "purple": [ inputs: ['cobalt_dir', 'amber_dir'], outputs: ['purity', 'ploidy'] ],
-    "jabba": [ inputs: ['structural_variants', 'hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
+    "jabba": [ inputs: ['vcf', 'hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
     "non_integer_balance": [ inputs: ['jabba_gg'], outputs: ['ni_balanced_gg'] ],
     "lp_phased_balance": [ inputs: ['ni_balanced_gg'], outputs: ['lp_balanced_gg'] ],
     "events": [ inputs: ['ni_balanced_gg'], outputs: ['events'] ],
@@ -120,7 +120,7 @@ tool_input_output_map = [
     "snv_multiplicity": [ inputs: ['jabba_gg', 'variant_somatic_ann'], outputs: ['snv_multiplicity'] ],
     "oncokb": [ inputs: ['variant_somatic_ann', 'snv_multiplicity', 'jabba_gg', 'fusions'], outputs: ['oncokb_maf', 'oncokb_fusions', 'oncokb_cna'] ],
     "signatures": [ inputs: ['snv_somatic_vcf'], outputs: ['sbs_signatures', 'indel_signatures', 'signatures_matrix'] ],
-    "hrdetect": [ inputs: ['hets', 'structural_variants', 'jabba_gg', 'snv_somatic_vcf'], outputs: ['hrdetect'] ],
+    "hrdetect": [ inputs: ['hets', 'vcf', 'jabba_gg', 'snv_somatic_vcf'], outputs: ['hrdetect'] ],
     "onenesstwoness": [ inputs: ['events', 'hrdetect'], outputs: ['onenesstwoness'] ]
 ]
 
@@ -365,7 +365,7 @@ inputs = ch_from_samplesheet.map {
     ploidy,
     seg,
     nseg,
-    structural_variants,
+    vcf,
     jabba_rds,
     jabba_gg,
     ni_balanced_gg,
@@ -407,8 +407,8 @@ inputs = ch_from_samplesheet.map {
         ploidy: ploidy,
         seg: seg,
         nseg: nseg,
-        structural_variants: structural_variants,
-        structural_variants_tbi: structural_variants ? structural_variants + '.tbi' : [],
+        vcf: vcf,
+        vcf_tbi: vcf ? vcf + '.tbi' : [],
         jabba_rds: jabba_rds,
         jabba_gg: jabba_gg,
         ni_balanced_gg: ni_balanced_gg,
@@ -708,7 +708,7 @@ alignment_bams_final = inputs
     .map { it -> [it[0].id, it[0], it[1], it[2]] }
 
 final_filtered_sv_rds_for_merge = inputs
-    .map { it -> [it.meta, it.structural_variants, it.structural_variants_tbi] }
+    .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
     .filter { 
 		def vcf_or_rds = it[1]
 		def is_rds = vcf_or_rds =~ /\.rds$/
@@ -718,12 +718,12 @@ final_filtered_sv_rds_for_merge = inputs
 		it -> [ it[0].patient, it[1] ] } // meta.patient, vcf_or_rds
 
 vcf_from_sv_calling_for_merge = inputs
-    .map { it -> [it.meta, it.structural_variants, it.structural_variants_tbi] }
+    .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
     .filter { !it[1].isEmpty() && !it[2].isEmpty() }
     .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf_or_rds, tbi
 
 unfiltered_som_sv_for_merge = inputs
-    .map { it -> [it.meta, it.structural_variants, it.structural_variants_tbi] }
+    .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
     .filter { !it[1].isEmpty() && !it[2].isEmpty() }
     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf_or_rds
 
@@ -1251,14 +1251,14 @@ workflow NFCASEREPORTS {
 
         // Filter out bams for which SV calling has already been done
         
-		bam_sv_inputs = inputs.filter { it.structural_variants.isEmpty() }.map { it -> [it.meta.sample] }
+		bam_sv_inputs = inputs.filter { it.vcf.isEmpty() }.map { it -> [it.meta.sample] }
         bam_sv_calling = alignment_bams_final
             .join(bam_sv_inputs)
             .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
         
 		// gridss_existing_outputs = inputs.map { it -> [it.meta, it.vcf, it.vcf_tbi] }.filter { !it[1].isEmpty() && !it[2].isEmpty() }
 		gridss_existing_outputs = inputs.map { 
-			it -> [it.meta, it.structural_variants, it.structural_variants_tbi] }
+			it -> [it.meta, it.vcf, it.vcf_tbi] }
 			.filter { !it[1].isEmpty() && !it[2].isEmpty() }
 
         if (params.tumor_only) {
