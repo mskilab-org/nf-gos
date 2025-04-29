@@ -8,7 +8,7 @@ process ONCOKB_ANNOTATOR {
         'mskilab/unified:initial' }"
 
     input:
-    tuple val(meta), path(vcf), path(fusions), path(cna), path(multiplicity)
+    tuple val(meta), path(vcf), path(fusions), path(cna)
     val assembly // 'GRCh37' or 'GRCh38', default is 'GRCh37'
     val do_vep
     path vep_dir
@@ -31,6 +31,7 @@ process ONCOKB_ANNOTATOR {
     def verbose = "TRUE"
     def tumor_type = "unknown"
     def VERSION = '0.1'
+    def multiplicity = "/dev/null" // multiplicity is a required argument for process_singularity.sh
 
     """
     export ONCOKB_TOKEN=\$ONCOKB_API_KEY
