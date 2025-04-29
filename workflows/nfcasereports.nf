@@ -101,6 +101,7 @@ toolParamMap.each { tool, params ->
 tool_input_output_map = [
     "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
     "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics'] ],
+	"postprocessing": [ inputs: ['bam'], outputs: [] ], // FIXME: Postprocessing will never be selected as a tool given the current set of inputs/outputs, empty output means tool will not be selected. postprocessing tool must be controlled by params.is_run_post_processing.
     "msisensorpro": [ inputs: ['bam'], outputs: ['msi', 'msi_germline'] ],
     // "gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
 	"gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
@@ -1077,7 +1078,12 @@ workflow NFCASEREPORTS {
 
     // BAM Postprocessing
     // ##############################
-    if ((tools_used.contains("all") || tools_used.contains("aligner")) && params.aligner != "fq2bam") { // fq2bam does not need postprocessing
+	def do_post_processing_bc_aligner_not_fq2bam = (tools_used.contains("all") || tools_used.contains("aligner")) && params.aligner != "fq2bam"
+	def do_post_processing_bc_of_tool_or_flag = tools_used.contains("all") || tools_used.contains("postprocessing") || params.is_run_post_processing // FIXME: If bam is provided as input, tools_used currently will never contain postprocessing and only controlled by params, but leaving here as a reminder.
+    if (do_post_processing_bc_aligner_not_fq2bam || do_post_processing_bc_of_tool_or_flag) { // fq2bam does not need postprocessing
+		
+		bam_mapped = alignment_bams_final
+            .map { id, meta, bam, bai -> [meta + [data_type: "bam"], bam] }
         cram_markduplicates_no_spark = Channel.empty()
 
         // STEP 2: markduplicates (+QC) + convert to CRAM
@@ -2259,7 +2265,7 @@ workflow NFCASEREPORTS {
 
     // Oncokb
     // ##############################
-    if ((tools_used.contains("all") || tools_used.contains("oncokb"))) {
+    if ((tools_used.contains ("all") || tools_used.contains("oncokb"))) {
         oncokb_inputs = inputs
             .filter { it.oncokb_maf.isEmpty() || it.oncokb_fusions.isEmpty() || it.oncokb_cna.isEmpty() }
             .map { it -> [it.meta.patient, it.meta] }
