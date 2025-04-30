@@ -35,13 +35,13 @@ process SAMTOOLS_SUBSAMPLE {
                     args.contains("--output-fmt cram") ? "cram" :
                     aligned_input.getExtension()
     if ("$aligned_input" == "${prefix}.${file_type}") error "Input and output names are the same, use \"task.ext.prefix\" to disambiguate!"
-	def num_subsampled_reads = params.num_subsampled_reads ?: 100000000
+	def num_subsampled_reads = params.num_subsampled_reads ?: 800_000_000 * 2 // 800 million read pairs ~ 80X WGS
     """
 
 	FRAC=\$( samtools idxstats \\
 		${aligned_input} | \\
 		cut -f3 | \\
-		awk 'BEGIN {total=0} {total += \$1} END {frac=${num_subsampled_reads}/total; if (frac > 1) {print 1} else {print frac}}' )
+		awk 'BEGIN {total=0} {total += \$1} END {frac=${num_subsampled_reads}/total; if (frac > 1) {printf "%.1f\\n", 1.0} else {print frac}}' )
 
     samtools \\
         view \\
