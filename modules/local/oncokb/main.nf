@@ -32,10 +32,12 @@ process ONCOKB_ANNOTATOR {
     def tumor_type = "unknown"
     def VERSION = '0.1'
     def multiplicity = "/dev/null" // multiplicity is a required argument for process_singularity.sh
+	def safe_tmpdir = System.getenv('TMPDIR') ?: '/tmp'
 
     """
     export ONCOKB_TOKEN=\$ONCOKB_API_KEY
     export HOME=/root
+	export TMPDIR=${safe_tmpdir}
     set +u  # Disable unbound variable check
     source /opt/conda/etc/profile.d/conda.sh
     conda activate pact
