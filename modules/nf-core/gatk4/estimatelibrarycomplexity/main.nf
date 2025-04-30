@@ -26,6 +26,7 @@ process GATK4_ESTIMATELIBRARYCOMPLEXITY {
     def prefix = task.ext.prefix ?: "${meta.id}"
     def input_list = input.collect(){"--INPUT $it"}.join(" ")
     def reference = fasta ? "--REFERENCE_SEQUENCE ${fasta}" : ""
+	def pixel_dist = params.optical_duplicate_pixel_distance ?: 100
 
     def avail_mem = 3072
     if (!task.memory) {
@@ -40,6 +41,7 @@ process GATK4_ESTIMATELIBRARYCOMPLEXITY {
         --OUTPUT ${prefix}.metrics \\
         $reference \\
         --TMP_DIR . \\
+		--OPTICAL_DUPLICATE_PIXEL_DISTANCE $pixel_dist \
         $args
 
     cat <<-END_VERSIONS > versions.yml
