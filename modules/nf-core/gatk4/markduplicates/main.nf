@@ -57,7 +57,7 @@ process GATK4_MARKDUPLICATES {
     fi
 
     # If cram files are wished as output, the run samtools for conversion
-    if [[ ${prefix} == *.cram && ! -f ${prefix} ]]; then
+    if [[ ${prefix} == *.cram ]]; then
         samtools view -@ ${task.cpus} -Ch -T ${fasta} -o ${prefix} ${prefix_bam}
         rm ${prefix_bam}
         samtools index ${prefix}
