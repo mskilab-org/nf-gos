@@ -32,7 +32,7 @@ process NON_INTEGER_BALANCE {
     val(pad)
 
     output:
-    tuple val(meta), path("non_integer.balanced.gg.rds")                , emit: non_integer_balance_balanced_gg, optional: true
+    tuple val(meta), path("non_integer.balanced.gg.rds")    , emit: non_integer_balance_balanced_gg, optional: true
     tuple val(meta), path("hets.gg.rds")                    , emit: non_integer_balance_hets_gg, optional: true
     path "versions.yml"                                     , emit: versions
 
@@ -140,6 +140,9 @@ process LP_PHASED_BALANCE {
 
     """
     export RSCRIPT_PATH=\$(echo "${baseDir}/bin/lp_phased_balance.R")
+
+    # Remove 'chr' from chromosome names in sites.txt (for hg38)
+    awk 'BEGIN{OFS=" "} {gsub(/^chr/,"",\$1); print}' sites.txt > sites.tmp && mv sites.tmp sites.txt
 
     Rscript \$RSCRIPT_PATH \\
         --id $id \\
