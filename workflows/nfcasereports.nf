@@ -100,9 +100,18 @@ toolParamMap.each { tool, params ->
 
 tool_input_output_map = [
     "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
-	"qc_coverage": [ inputs: ['bam'], outputs: ['wgs_metrics'] ],
-	"qc_multiple_metrics": [ inputs: ['bam'], outputs: ['alignment_metrics', 'insert_size_metrics'] ],
-	"qc_duplicates": [ inputs: ['bam'], outputs: ['estimate_library_complexity'] ],
+	"qc_coverage": [ 
+		inputs: ['bam'], 
+		outputs: ['qc_coverage_metrics', 'qc_coverage_metrics_tumor', 'qc_coverage_metrics_normal'] 
+	],
+	"qc_multiple_metrics": [ 
+		inputs: ['bam'], 
+		outputs: [
+			['qc_alignment_summary', 'qc_alignment_summary_tumor', 'qc_alignment_summary_normal'],
+			['qc_insert_size', 'qc_insert_size_tumor', 'qc_insert_size_normal']
+		] 
+	],
+	"qc_duplicates": [ inputs: ['bam'], outputs: ['qc_dup_rate', 'qc_dup_rate_tumor', 'qc_dup_rate_normal'] ],
     // "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics', "estimate_library_complexity"] ],
 	"postprocessing": [ inputs: ['bam'], outputs: [] ], // FIXME: Postprocessing will never be selected as a tool given the current set of inputs/outputs, empty output means tool will not be selected. postprocessing tool must be controlled by params.is_run_post_processing.
     "msisensorpro": [ inputs: ['bam'], outputs: ['msi', 'msi_germline'] ],
@@ -175,6 +184,7 @@ def skip_tools = params.skip_tools ? params.skip_tools.split(',').collect { it.t
 println "Skipping tools: ${skip_tools}"
 // TODO: if GRIDSS - skip if vcf is found, but not if vcf_unfiltered is present.
 def selected_tools = []
+def tools_qc = ["qc_coverage", "qc_multiple_metrics", "qc_duplicates"]
 boolean changed
 do {
     changed = false
@@ -183,9 +193,26 @@ do {
             def inputsRequired = io.inputs
             def inputsPresent = inputsRequired.every { available_inputs.contains(it) }
             def outputsNeeded = io.outputs.any { !available_inputs.contains(it) }
+
+			// Treat special cases
 			if (tool == "sage" && params.tumor_only) {
 				outputsNeeded = !available_inputs.contains("snv_somatic_vcf")
 			}
+
+			is_current_tool_qc = tools_qc.contains(tool)
+			is_current_tool_qc_multiple_metrics = tool == "qc_multiple_metrics"
+			if (is_current_tool_qc) {
+				if (is_current_tool_qc_multiple_metrics) {
+					is_any_alignment_summary_present = io.outputs[0].any { it in available_inputs }
+					is_any_insert_size_present = io.outputs[1].any { it in available_inputs }
+					outputsPresent = is_any_alignment_summary_present && is_any_insert_size_present
+				} else if (is_current_tool_qc && ! is_current_tool_qc_multiple_metrics) {
+					outputsPresent = io.outputs.any { available_inputs.contains(it) }
+				}
+				outputsNeeded = ! outputsPresent
+			}
+			// End Treat special cases
+			
             if (inputsPresent && outputsNeeded) {
                 selected_tools.add(tool)
                 available_inputs.addAll(io.outputs)
@@ -364,6 +391,18 @@ inputs = ch_from_samplesheet.map {
     table,
     cram,
     bam,
+	qc_dup_rate,
+	qc_dup_rate_tumor,
+	qc_dup_rate_normal,
+	qc_insert_size,
+	qc_insert_size_tumor,
+	qc_insert_size_normal,
+	qc_alignment_summary,
+	qc_alignment_summary_tumor,
+	qc_alignment_summary_normal,
+	qc_coverage_metrics,
+	qc_coverage_metrics_tumor,
+	qc_coverage_metrics_normal,
     msi,
     msi_germline,
     hets,
@@ -406,6 +445,18 @@ inputs = ch_from_samplesheet.map {
         crai: cram ? cram + '.crai' : [],
         bam: bam,
         bai: bam ? bam + '.bai': [],
+		qc_dup_rate: qc_dup_rate,
+		qc_dup_rate_tumor: qc_dup_rate_tumor,
+		qc_dup_rate_normal: qc_dup_rate_normal,
+		qc_insert_size: qc_insert_size,
+		qc_insert_size_tumor: qc_insert_size_tumor,
+		qc_insert_size_normal: qc_insert_size_normal,
+		qc_alignment_summary: qc_alignment_summary,
+		qc_alignment_summary_tumor: qc_alignment_summary_tumor,
+		qc_alignment_summary_normal: qc_alignment_summary_normal,
+		qc_coverage_metrics: qc_coverage_metrics,
+		qc_coverage_metrics_tumor: qc_coverage_metrics_tumor,
+		qc_coverage_metrics_normal: qc_coverage_metrics_normal,
         msi: msi,
         msi_germline: msi_germline,
         hets: hets,
