@@ -100,7 +100,10 @@ toolParamMap.each { tool, params ->
 
 tool_input_output_map = [
     "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
-    "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics'] ],
+	"qc_coverage": [ inputs: ['bam'], outputs: ['wgs_metrics'] ],
+	"qc_multiple_metrics": [ inputs: ['bam'], outputs: ['alignment_metrics', 'insert_size_metrics'] ],
+	"qc_duplicates": [ inputs: ['bam'], outputs: ['estimate_library_complexity'] ],
+    // "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics', "estimate_library_complexity"] ],
 	"postprocessing": [ inputs: ['bam'], outputs: [] ], // FIXME: Postprocessing will never be selected as a tool given the current set of inputs/outputs, empty output means tool will not be selected. postprocessing tool must be controlled by params.is_run_post_processing.
     "msisensorpro": [ inputs: ['bam'], outputs: ['msi', 'msi_germline'] ],
     // "gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
@@ -195,6 +198,12 @@ do {
 tools_used = selected_tools
 
 println "Tools that will be run based on your inputs: ${tools_used}"
+
+is_run_qc_duplicates = params.is_run_qc_duplicates ?: false // if parameter doesn't exist, set to false
+do_qc_coverage = tools_used.contains("qc_coverage")
+do_qc_multiple_metrics = tools_used.contains("qc_multiple_metrics")
+do_qc_duplicates = tools_used.contains("qc_duplicates") || is_run_qc_duplicates
+do_bamqc = do_qc_coverage || do_qc_multiple_metrics || do_qc_duplicates
 
 if (!params.dbsnp && !params.known_indels) {
     if (!params.skip_tools || (params.skip_tools && !params.skip_tools.contains('baserecalibrator'))) {
@@ -591,6 +600,9 @@ include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_RECAL } from '../subworkflows/loc
 
 // BAM Picard QC
 include { BAM_QC } from '../subworkflows/local/bam_qc/main'
+include { BAM_QC_PICARD_COLLECTMULTIPLEMETRICS } from '../subworkflows/local/bam_qc/main'
+include { BAM_QC_PICARD_COLLECTWGSMETRICS } from '../subworkflows/local/bam_qc/main'
+include { BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY } from '../subworkflows/local/bam_qc/main'
 
 // Create recalibration tables
 include { BAM_BASERECALIBRATOR } from '../subworkflows/local/bam_baserecalibrator/main'
@@ -948,15 +960,15 @@ workflow NFCASEREPORTS {
         intervals_bed_combined.map{it -> [ [ id:it.baseName ], it ]}.collect() :
         Channel.value([ [ id:'null' ], [] ])
 
-    intervals            = PREPARE_INTERVALS.out.intervals_bed        // [ interval, num_intervals ] multiple interval.bed files, divided by useful intervals for scatter/gather
+     PREPARE_INTERVALS.out.intervals_bed        // [ interval, num_intervals ] multiple interval.bed files, divided by useful intervals for scatter/gather
     intervals_bed_gz_tbi = PREPARE_INTERVALS.out.intervals_bed_gz_tbi // [ interval_bed, tbi, num_intervals ] multiple interval.bed.gz/.tbi files, divided by useful intervals for scatter/gather
 
-    intervals_and_num_intervals = intervals.map{ interval, num_intervals ->
+    intervals_and_num_ intervals.map{ interval, num_intervals ->
         if ( num_intervals < 1 ) [ [], num_intervals ]
         else [ interval, num_intervals ]
     }
 
-    intervals_bed_gz_tbi_and_num_intervals = intervals_bed_gz_tbi.map{ intervals, num_intervals ->
+    intervals_bed_gz_tbi_and_num_ intervals_bed_gz_tbi.map{ intervals, num_intervals ->
         if ( num_intervals < 1 ) [ [], [], num_intervals ]
         else [ intervals[0], intervals[1], num_intervals ]
     }
@@ -1172,19 +1184,51 @@ workflow NFCASEREPORTS {
     }
 
     // Post-alignment QC
-    if (tools_used.contains("all") || tools_used.contains("bamqc")) {
+    // if (tools_used.contains("all") || tools_used.contains("bamqc")) {
+    //     bam_qc_inputs = inputs.map { it -> [it.meta.sample] }
+    //     bam_qc_calling = bam_qc_inputs
+    //         .join(alignment_bams_final)
+    //         .map { id, meta, bam, bai -> [ meta, bam, bai ] }
+
+    //     // omit meta since it is not used in the BAM_QC
+    //     dict_path = dict.map{ meta, dict -> [dict] }
+    //     BAM_QC(bam_qc_calling, dict_path)
+
+    //     // Gather QC
+    //     reports = reports.mix(BAM_QC.out.reports.collect{ meta, report -> report })
+    //     versions = versions.mix(BAM_QC.out.versions)
+    // }
+
+	// Post-alignment QC Draft
+    if (tools_used.contains("all") || do_bamqc) {
         bam_qc_inputs = inputs.map { it -> [it.meta.sample] }
         bam_qc_calling = bam_qc_inputs
             .join(alignment_bams_final)
             .map { id, meta, bam, bai -> [ meta, bam, bai ] }
+		
+		bam_qc_calling = bam_qc_calling.broadcast()
 
         // omit meta since it is not used in the BAM_QC
         dict_path = dict.map{ meta, dict -> [dict] }
-        BAM_QC(bam_qc_calling, dict_path)
+		dict_path = dict_path.broadcast()
+        // BAM_QC(bam_qc_calling, dict_path)
 
-        // Gather QC
-        reports = reports.mix(BAM_QC.out.reports.collect{ meta, report -> report })
-        versions = versions.mix(BAM_QC.out.versions)
+		if (do_qc_multiple_metrics) {
+			BAM_QC_PICARD_COLLECTMULTIPLEMETRICS(bam_qc_calling, dict_path)
+			reports = reports.mix(BAM_QC_PICARD_COLLECTMULTIPLEMETRICS.out.reports.collect{ meta, report -> report })
+			versions = versions.mix(BAM_QC_PICARD_COLLECTMULTIPLEMETRICS.out.versions)
+		}
+		if (do_qc_wgs_metrics) {
+			BAM_QC_PICARD_COLLECTWGSMETRICS(bam_qc_calling, dict_path)
+			reports = reports.mix(BAM_QC_PICARD_COLLECTWGSMETRICS.out.reports.collect{ meta, report -> report })
+			versions = versions.mix(BAM_QC_PICARD_COLLECTWGSMETRICS.out.versions)
+		}
+		if (do_qc_duplicates) {
+			BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY(bam_qc_calling, dict_path)
+			reports = reports.mix(BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY.out.reports.collect{ meta, report -> report })
+			versions = versions.mix(BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY.out.versions)
+		}
+        
     }
 
     // MSISensorPro
