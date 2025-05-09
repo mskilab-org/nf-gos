@@ -201,75 +201,6 @@
                 "format": "file-path",
                 "exists": true
             },
-			"qc_alignment_summary": {
-                "errorMessage": "Picard MultipleMetrics alignment summary file and must have extension '.metrics'",
-                "anyOf": [
-                    {
-                        "type": "string",
-                        "pattern": "^\\S+\\.metrics$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^NA$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^/dev/null$"
-                    },
-                    {
-                        "type": "string",
-                        "maxLength": 0
-                    }
-                ],
-                "format": "file-path",
-                "exists": true
-            },
-			"qc_alignment_summary_tumor": {
-                "errorMessage": "Tumor Picard MultipleMetrics alignment summary file and must have extension '.metrics'",
-                "anyOf": [
-                    {
-                        "type": "string",
-                        "pattern": "^\\S+\\.metrics$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^NA$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^/dev/null$"
-                    },
-                    {
-                        "type": "string",
-                        "maxLength": 0
-                    }
-                ],
-                "format": "file-path",
-                "exists": true
-            },
-			"qc_alignment_summary_normal": {
-                "errorMessage": "Normal Picard MultipleMetrics alignment summary file and must have extension '.metrics'",
-                "anyOf": [
-                    {
-                        "type": "string",
-                        "pattern": "^\\S+\\.metrics$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^NA$"
-                    },
-                    {
-                        "type": "string",
-                        "pattern": "^/dev/null$"
-                    },
-                    {
-                        "type": "string",
-                        "maxLength": 0
-                    }
-                ],
-                "format": "file-path",
-                "exists": true
-            },
 			"qc_insert_size": {
                 "errorMessage": "Picard MultipleMetrics insert size file must have extension '.metrics'",
                 "anyOf": [
@@ -318,6 +249,75 @@
             },
 			"qc_insert_size_normal": {
                 "errorMessage": "Normal Picard MultipleMetrics insert size file must have extension '.metrics'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.metrics$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+			"qc_alignment_summary": {
+                "errorMessage": "Picard MultipleMetrics alignment summary file and must have extension '.metrics'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.metrics$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+			"qc_alignment_summary_tumor": {
+                "errorMessage": "Tumor Picard MultipleMetrics alignment summary file and must have extension '.metrics'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.metrics$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+			"qc_alignment_summary_normal": {
+                "errorMessage": "Normal Picard MultipleMetrics alignment summary file and must have extension '.metrics'",
                 "anyOf": [
                     {
                         "type": "string",

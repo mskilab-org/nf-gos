@@ -206,7 +206,7 @@ do {
 					is_any_alignment_summary_present = io.outputs[0].any { it in available_inputs }
 					is_any_insert_size_present = io.outputs[1].any { it in available_inputs }
 					outputsPresent = is_any_alignment_summary_present && is_any_insert_size_present
-				} else if (is_current_tool_qc && ! is_current_tool_qc_multiple_metrics) {
+				} else if (! is_current_tool_qc_multiple_metrics) {
 					outputsPresent = io.outputs.any { available_inputs.contains(it) }
 				}
 				outputsNeeded = ! outputsPresent
