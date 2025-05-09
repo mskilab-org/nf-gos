@@ -38,6 +38,7 @@ process PICARD_COLLECTMULTIPLEMETRICS {
         $args \\
         --INPUT $bam \\
         --OUTPUT ${prefix}.CollectMultipleMetrics \\
+		--TMP_DIR . \\
         $reference
 
     cat <<-END_VERSIONS > versions.yml

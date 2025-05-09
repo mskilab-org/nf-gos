@@ -39,6 +39,7 @@ process PICARD_COLLECTWGSMETRICS {
         --INPUT $bam \\
         --OUTPUT ${prefix}.CollectWgsMetrics.coverage_metrics \\
         --REFERENCE_SEQUENCE ${fasta} \\
+		--TMP_DIR . \\
         $interval
 
 

@@ -3,7 +3,6 @@ process FRAGCOUNTER {
     tag "$meta.id"
     label 'process_medium'
 
-    // TODO add fragcounter container
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'docker://mskilab/fragcounter:0.3':
         'mskilab/fragcounter:0.3' }"
@@ -80,10 +79,9 @@ process REBIN_RAW_FRAGCOUNTER {
     tag "$meta.id"
     label 'process_low'
 
-    // TODO add fragcounter container
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/fragcounter:0.2':
-        'mskilab/fragcounter:0.2' }"
+        'docker://mskilab/fragcounter:0.3':
+        'mskilab/fragcounter:0.3' }"
 
     input:
     tuple val(meta), path(cov_raw)
