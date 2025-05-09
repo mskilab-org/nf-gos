@@ -5,8 +5,8 @@ process FRAGCOUNTER {
 
     // TODO add fragcounter container
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/fragcounter:0.2':
-        'mskilab/fragcounter:0.2' }"
+        'docker://mskilab/fragcounter:0.3':
+        'mskilab/fragcounter:0.3' }"
 
     input:
     tuple val(meta), path(bam), path(bai)                    // Mandatory: Format should be [meta, bam, bai] : can also provide cram & crai

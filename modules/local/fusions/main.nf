@@ -5,8 +5,8 @@ process FUSIONS {
 
     // using events container since the dependencies are the same
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/unified:initial':
-        'mskilab/unified:initial' }"
+        'docker://mskilab/unified:0.0.2':
+        'mskilab/unified:0.0.2' }"
 
     input:
     tuple val(meta), path(gGraph), path(sv_vcf), path(sv_vcf_tbi)

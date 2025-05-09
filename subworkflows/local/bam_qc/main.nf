@@ -45,11 +45,11 @@ workflow BAM_QC {
     reports = Channel.empty()
 
 
-	SUBSAMPLE_BAM(
-		bam,
-		fasta.map{ it -> [ [ id:'fasta' ], it ] },
-	)
-	bams_subsampled = SUBSAMPLE_BAM.out.bams_subsampled
+	// SUBSAMPLE_BAM(
+	// 	bam,
+	// 	fasta.map{ it -> [ [ id:'fasta' ], it ] },
+	// )
+	// bams_subsampled = SUBSAMPLE_BAM.out.bams_subsampled
 
 	// TODO: define subsample_interval as a parameter in default config
 	// on NYU: "/gpfs/data/imielinskilab/DB/references/hg19/human_g1k_v37_decoy.fasta.subsampled_0.33.interval_list"
@@ -69,23 +69,23 @@ workflow BAM_QC {
     )
 
     // bam_only = bam.map{ meta, bam, bai -> [ meta, bam ] }
-	bam_only = bams_subsampled.map{ meta, bam, bai -> [ meta, bam ] }
-    GATK4_ESTIMATELIBRARYCOMPLEXITY(
-        bam_only,
-        fasta,
-        fai,
-        dict
-    )
+	// bam_only = bams_subsampled.map{ meta, bam, bai -> [ meta, bam ] }
+    // GATK4_ESTIMATELIBRARYCOMPLEXITY(
+    //     bam_only,
+    //     fasta,
+    //     fai,
+    //     dict
+    // )
 
     // Gather all reports generated
     reports = reports.mix(PICARD_COLLECTWGSMETRICS.out.metrics)
     reports = reports.mix(PICARD_COLLECTMULTIPLEMETRICS.out.metrics)
-    reports = reports.mix(GATK4_ESTIMATELIBRARYCOMPLEXITY.out.metrics)
+    // reports = reports.mix(GATK4_ESTIMATELIBRARYCOMPLEXITY.out.metrics)
 
     // Gather versions of all tools used
     versions = versions.mix(PICARD_COLLECTWGSMETRICS.out.versions)
     versions = versions.mix(PICARD_COLLECTMULTIPLEMETRICS.out.versions)
-    versions = versions.mix(GATK4_ESTIMATELIBRARYCOMPLEXITY.out.versions)
+    // versions = versions.mix(GATK4_ESTIMATELIBRARYCOMPLEXITY.out.versions)
 
     emit:
     reports
