@@ -132,6 +132,282 @@
                 "format": "file-path",
                 "exists": true
             },
+			"qc_dup_rate": {
+                "errorMessage": "EstimateLibraryComplexity file and must have extension '.metrics'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.metrics$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+			"qc_dup_rate_tumor": {
+                "errorMessage": "Tumor EstimateLibraryComplexity file and must have extension '.metrics'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.metrics$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+			"qc_dup_rate_normal": {
+                "errorMessage": "Normal EstimateLibraryComplexity file and must have extension '.metrics'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.metrics$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+			"qc_alignment_summary": {
+                "errorMessage": "Picard MultipleMetrics alignment summary file and must have extension '.metrics'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.metrics$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+			"qc_alignment_summary_tumor": {
+                "errorMessage": "Tumor Picard MultipleMetrics alignment summary file and must have extension '.metrics'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.metrics$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+			"qc_alignment_summary_normal": {
+                "errorMessage": "Normal Picard MultipleMetrics alignment summary file and must have extension '.metrics'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.metrics$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+			"qc_insert_size": {
+                "errorMessage": "Picard MultipleMetrics insert size file must have extension '.metrics'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.metrics$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+			"qc_insert_size_tumor": {
+                "errorMessage": "Tumor Picard MultipleMetrics insert size file must have extension '.metrics'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.metrics$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+			"qc_insert_size_normal": {
+                "errorMessage": "Normal Picard MultipleMetrics insert size file must have extension '.metrics'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.metrics$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+			"qc_coverage_metrics": {
+                "errorMessage": "Picard CollectWGSMetrics file must have extension '.metrics'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.metrics$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+			"qc_coverage_metrics_tumor": {
+                "errorMessage": "Tumor Picard CollectWGSMetrics file must have extension '.metrics'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.metrics$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
+			"qc_coverage_metrics_normal": {
+                "errorMessage": "Normal Picard CollectWGSMetrics file must have extension '.metrics'",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\.metrics$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true
+            },
             "msi": {
                 "errorMessage": "MSI somatic file must be a text file",
                 "anyOf": [
@@ -206,7 +482,7 @@
                 "anyOf": [
                     {
                         "type": "string",
-                        "pattern": ".+",
+                        "pattern": ".+"
                     },
                     {
                         "type": "string",
@@ -259,7 +535,7 @@
                 "anyOf": [
                     {
                         "type": "string",
-                        "pattern": ".+",
+                        "pattern": ".+"
                     },
                     {
                         "type": "string",
@@ -287,7 +563,7 @@
                     {
                         "type": "number"
                     }
-                ],
+                ]
             },
             "ploidy": {
                 "errorMessage": "ploidy must be a number",
@@ -299,7 +575,7 @@
                     {
                         "type": "number"
                     }
-                ],
+                ]
             },
             "seg": {
                 "errorMessage": "SEG file cannot contain spaces and must have extension '.rds'",
@@ -860,7 +1136,7 @@
                 ],
                 "format": "file-path",
                 "exists": true
-            },
+            }
         },
         "required": ["patient", "sample"]
     }

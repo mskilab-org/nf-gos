@@ -771,6 +771,38 @@ alignment_bams_final = inputs
     .filter { !it[1].isEmpty() }
     .map { it -> [it[0].id, it[0], it[1], it[2]] }
 
+bam_qc_duplicates_inputs = inputs.filter {
+	def is_qc_dup_rate_all_absent = [
+		it.qc_dup_rate,
+		it.qc_dup_rate_tumor,
+		it.qc_dup_rate_normal
+	].every { field -> field.isEmpty() }
+	return is_qc_dup_rate_all_absent
+}.map { it -> [it.meta.sample] }
+
+bam_qc_multiple_metrics_inputs = inputs.filter {
+	def is_qc_aln_all_absent = [
+		it.qc_alignment_summary,
+		it.qc_alignment_summary_tumor,
+		it.qc_alignment_summary_normal
+	].every { field -> field.isEmpty() }
+	def is_qc_insert_all_absent = [
+		it.qc_insert_size,
+		it.qc_insert_size_tumor,
+		it.qc_insert_size_normal
+	].every { field -> field.isEmpty() }
+	return is_qc_aln_all_absent || is_qc_insert_all_absent
+}.map { it -> [it.meta.sample] }
+
+bam_qc_coverage_inputs = inputs.filter {
+	def is_qc_coverage_all_absent = [
+		it.qc_coverage_metrics,
+		it.qc_coverage_metrics_tumor,
+		it.qc_coverage_metrics_normal
+	].every { field -> field.isEmpty() }
+	return is_qc_coverage_all_absent
+}.map { it -> [it.meta.sample] }
+
 final_filtered_sv_rds_for_merge = inputs
     .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
     .filter { 
@@ -1252,12 +1284,27 @@ workflow NFCASEREPORTS {
 
 	// Post-alignment QC Draft
     if (tools_used.contains("all") || do_bamqc) {
-        bam_qc_inputs = inputs.map { it -> [it.meta.sample] }
-        bam_qc_calling = bam_qc_inputs
+
+        // bam_qc_calling = bam_qc_inputs
+        //     .join(alignment_bams_final)
+        //     .map { id, meta, bam, bai -> [ meta, bam, bai ] }
+		
+		// bam_qc_calling = bam_qc_calling.broadcast()
+
+		bam_qc_duplicates_calling = bam_qc_duplicates_inputs
             .join(alignment_bams_final)
             .map { id, meta, bam, bai -> [ meta, bam, bai ] }
+			.broadcast()
+
+		bam_qc_multiple_metrics_calling = bam_qc_multiple_metrics_inputs
+            .join(alignment_bams_final)
+            .map { id, meta, bam, bai -> [ meta, bam, bai ] }
+			.broadcast()
 		
-		bam_qc_calling = bam_qc_calling.broadcast()
+		bam_qc_coverage_calling = bam_qc_coverage_inputs
+            .join(alignment_bams_final)
+            .map { id, meta, bam, bai -> [ meta, bam, bai ] }
+			.broadcast()
 
         // omit meta since it is not used in the BAM_QC
         dict_path = dict.map{ meta, dict -> [dict] }
@@ -1265,17 +1312,17 @@ workflow NFCASEREPORTS {
         // BAM_QC(bam_qc_calling, dict_path)
 
 		if (do_qc_multiple_metrics) {
-			BAM_QC_PICARD_COLLECTMULTIPLEMETRICS(bam_qc_calling, dict_path)
+			BAM_QC_PICARD_COLLECTMULTIPLEMETRICS(bam_qc_multiple_metrics_calling, dict_path)
 			reports = reports.mix(BAM_QC_PICARD_COLLECTMULTIPLEMETRICS.out.reports.collect{ meta, report -> report })
 			versions = versions.mix(BAM_QC_PICARD_COLLECTMULTIPLEMETRICS.out.versions)
 		}
 		if (do_qc_wgs_metrics) {
-			BAM_QC_PICARD_COLLECTWGSMETRICS(bam_qc_calling, dict_path)
+			BAM_QC_PICARD_COLLECTWGSMETRICS(bam_qc_coverage_calling, dict_path)
 			reports = reports.mix(BAM_QC_PICARD_COLLECTWGSMETRICS.out.reports.collect{ meta, report -> report })
 			versions = versions.mix(BAM_QC_PICARD_COLLECTWGSMETRICS.out.versions)
 		}
 		if (do_qc_duplicates) {
-			BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY(bam_qc_calling, dict_path)
+			BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY(bam_qc_duplicates_calling, dict_path)
 			reports = reports.mix(BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY.out.reports.collect{ meta, report -> report })
 			versions = versions.mix(BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY.out.versions)
 		}
