@@ -419,7 +419,10 @@ tool_input_output_map = [
     // "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics', "estimate_library_complexity"] ],
 	"postprocessing": [ inputs: ['bam'], outputs: [] ], // FIXME: Postprocessing will never be selected as a tool given the current set of inputs/outputs, empty output means tool will not be selected. postprocessing tool must be controlled by params.is_run_post_processing.
     "msisensorpro": [ inputs: ['bam'], outputs: ['msi', 'msi_germline'] ],
-    // "gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
+	// TODO: figure out what the best way to 
+    // "gridss": [ inputs: ['bam'], outputs: ['vcf_unfiltered'] ],
+	// "junctionfilter": [ inputs: ['vcf_unfiltered'], outputs: ['vcf'] ],
+	// "retiered_filtered_junctions": [ inputs: ['vcf'], outputs: ['sv_retier'] ], // ?
 	"gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
     "amber": [ inputs: ['bam'], outputs: ['hets', 'amber_dir'] ],
     "fragcounter": [ inputs: ['bam'], outputs: ['frag_cov'] ],
@@ -428,7 +431,14 @@ tool_input_output_map = [
     "sage": [ inputs: ['bam'], outputs: ['snv_somatic_vcf', 'snv_germline_vcf'] ],
     "cobalt": [ inputs: ['bam'], outputs: ['cobalt_dir'] ],
     "purple": [ inputs: ['cobalt_dir', 'amber_dir'], outputs: ['purity', 'ploidy'] ],
-    "jabba": [ inputs: ['vcf', 'hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
+	// "jabba": [ 
+	// 	inputs: [ 
+	// 		['vcf', 'sv_retier'], 
+	// 		['hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg']
+	// 	], 
+	// 	outputs: ['jabba_rds', 'jabba_gg'] 
+	// ],
+    "jabba": [ inputs: [ 'vcf', 'hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
     "non_integer_balance": [ inputs: ['jabba_gg'], outputs: ['ni_balanced_gg'] ],
     "lp_phased_balance": [ inputs: ['ni_balanced_gg'], outputs: ['lp_balanced_gg'] ],
     "events": [ inputs: ['ni_balanced_gg'], outputs: ['events'] ],
@@ -503,8 +513,11 @@ do {
 			def is_sage_tumor_only = tool == "sage" && params.tumor_only
 			def is_current_tool_qc = tools_qc.contains(tool)
 			def is_current_tool_qc_multiple_metrics = tool == "qc_multiple_metrics" // nested
+			// TODO: for later
+			def is_current_tool_jabba = tool == "jabba" // separate first input, (vcf or sv_retier) and remaining required inputs
 			def is_output_nested_list = io.outputs instanceof List && io.outputs.every { it instanceof List }
-			def is_generic_case = !is_sage_tumor_only && !is_current_tool_qc_multiple_metrics
+			def is_output_generic_case = !is_sage_tumor_only && !is_current_tool_qc_multiple_metrics
+			def is_input_generic_case = !is_current_tool_jabba
 			
 
 			selected_tools_map[tool] = inputs.filter { sample ->
@@ -514,9 +527,26 @@ do {
 				is_all_input_col_present = io.inputs.every { field -> 
 					! sample[field].isEmpty() // Tests if file exists and is nonzero file size
 				}
+
+				// if (is_input_generic_case) {
+				// 	is_all_input_col_present = io.inputs.every { field -> 
+				// 		! sample[field].isEmpty() // Tests if file exists and is nonzero file size
+				// 	}
+				// }
+				// if (is_current_tool_jabba) {
+				// 	is_any_sv_input_col_present = io.inputs[0].any { field -> 
+				// 		! sample[field].isEmpty() // Tests if file exists and is nonzero file size
+				// 	}
+				// 	is_all_remaining_input_col_present = io.inputs[1].every { field -> 
+				// 		! sample[field].isEmpty() // Tests if file exists and is nonzero file size
+				// 	}
+				// 	is_all_input_col_present = is_any_sv_input_col_present && is_all_remaining_input_col_present
+				// }
+
 				
-				// Generic case
-				if (is_generic_case) {
+				
+				// Generic output case
+				if (is_output_generic_case) {
 					is_any_output_col_empty = io.outputs.any { field ->
 						sample[field].isEmpty() // Tests if file exists and is nonzero file size
 					}	
@@ -801,42 +831,21 @@ versions = Channel.empty()
 ensemblvep_info = params.vep_cache    ? [] : Channel.of([ [ id:"${params.vep_cache_version}_${params.vep_genome}" ], params.vep_genome, params.vep_species, params.vep_cache_version ])
 snpeff_info     = params.snpeff_cache ? [] : Channel.of([ [ id:"${params.snpeff_genome}.${params.snpeff_db}" ], params.snpeff_genome, params.snpeff_db ])
 
-alignment_bams_final = inputs
+// alignment_bams_final = inputs
+//     .map { it -> [it.meta, it.bam, it.bai] }
+//     .filter { !it[1].isEmpty() }
+//     .map { it -> [it[0].id, it[0], it[1], it[2]] }
+
+alignment_bams_final = selected_tools_map["aligner"]
     .map { it -> [it.meta, it.bam, it.bai] }
-    .filter { !it[1].isEmpty() }
     .map { it -> [it[0].id, it[0], it[1], it[2]] }
 
-bam_qc_duplicates_inputs = inputs.filter {
-	def is_qc_dup_rate_all_absent = [
-		it.qc_dup_rate,
-		it.qc_dup_rate_tumor,
-		it.qc_dup_rate_normal
-	].every { field -> field.isEmpty() }
-	return is_qc_dup_rate_all_absent
-}.map { it -> [it.meta.sample] }
+bam_qc_duplicates_inputs = selected_tools_map["qc_duplicates"]
+	.map { it -> [it.meta.sample] }
 
-bam_qc_multiple_metrics_inputs = inputs.filter {
-	def is_qc_aln_all_absent = [
-		it.qc_alignment_summary,
-		it.qc_alignment_summary_tumor,
-		it.qc_alignment_summary_normal
-	].every { field -> field.isEmpty() }
-	def is_qc_insert_all_absent = [
-		it.qc_insert_size,
-		it.qc_insert_size_tumor,
-		it.qc_insert_size_normal
-	].every { field -> field.isEmpty() }
-	return is_qc_aln_all_absent || is_qc_insert_all_absent
-}.map { it -> [it.meta.sample] }
+bam_qc_multiple_metrics_inputs = selected_tools_map["qc_multiple_metrics"].map { it -> [it.meta.sample] }
 
-bam_qc_coverage_inputs = inputs.filter {
-	def is_qc_coverage_all_absent = [
-		it.qc_coverage_metrics,
-		it.qc_coverage_metrics_tumor,
-		it.qc_coverage_metrics_normal
-	].every { field -> field.isEmpty() }
-	return is_qc_coverage_all_absent
-}.map { it -> [it.meta.sample] }
+bam_qc_coverage_inputs = selected_tools_map["qc_coverage_metrics"].map { it -> [it.meta.sample] }
 
 final_filtered_sv_rds_for_merge = inputs
     .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
