@@ -98,148 +98,6 @@ toolParamMap.each { tool, params ->
     }
 }
 
-tool_input_output_map = [
-    "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
-	"qc_coverage": [ 
-		inputs: ['bam'], 
-		outputs: ['qc_coverage_metrics', 'qc_coverage_metrics_tumor', 'qc_coverage_metrics_normal'] 
-	],
-	"qc_multiple_metrics": [ 
-		inputs: ['bam'], 
-		outputs: [
-			['qc_alignment_summary', 'qc_alignment_summary_tumor', 'qc_alignment_summary_normal'],
-			['qc_insert_size', 'qc_insert_size_tumor', 'qc_insert_size_normal']
-		] 
-	],
-	"qc_duplicates": [ inputs: ['bam'], outputs: ['qc_dup_rate', 'qc_dup_rate_tumor', 'qc_dup_rate_normal'] ],
-    // "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics', "estimate_library_complexity"] ],
-	"postprocessing": [ inputs: ['bam'], outputs: [] ], // FIXME: Postprocessing will never be selected as a tool given the current set of inputs/outputs, empty output means tool will not be selected. postprocessing tool must be controlled by params.is_run_post_processing.
-    "msisensorpro": [ inputs: ['bam'], outputs: ['msi', 'msi_germline'] ],
-    // "gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
-	"gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
-    "amber": [ inputs: ['bam'], outputs: ['hets', 'amber_dir'] ],
-    "fragcounter": [ inputs: ['bam'], outputs: ['frag_cov'] ],
-    "dryclean": [ inputs: ['frag_cov'], outputs: ['dryclean_cov'] ],
-    "cbs": [ inputs: ['dryclean_cov'], outputs: ['seg', 'nseg'] ],
-    "sage": [ inputs: ['bam'], outputs: ['snv_somatic_vcf', 'snv_germline_vcf'] ],
-    "cobalt": [ inputs: ['bam'], outputs: ['cobalt_dir'] ],
-    "purple": [ inputs: ['cobalt_dir', 'amber_dir'], outputs: ['purity', 'ploidy'] ],
-    "jabba": [ inputs: ['vcf', 'hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
-    "non_integer_balance": [ inputs: ['jabba_gg'], outputs: ['ni_balanced_gg'] ],
-    "lp_phased_balance": [ inputs: ['ni_balanced_gg'], outputs: ['lp_balanced_gg'] ],
-    "events": [ inputs: ['ni_balanced_gg'], outputs: ['events'] ],
-    "fusions": [ inputs: ['ni_balanced_gg'], outputs: ['fusions'] ],
-    "snpeff": [ inputs: ['snv_somatic_vcf'], outputs: ['variant_somatic_ann', 'variant_somatic_bcf'] ],
-    "snv_multiplicity": [ inputs: ['jabba_gg', 'variant_somatic_ann'], outputs: ['snv_multiplicity'] ],
-    "oncokb": [ inputs: ['variant_somatic_ann', 'snv_multiplicity', 'jabba_gg', 'fusions'], outputs: ['oncokb_maf', 'oncokb_fusions', 'oncokb_cna'] ],
-    "signatures": [ inputs: ['snv_somatic_vcf'], outputs: ['sbs_signatures', 'indel_signatures', 'signatures_matrix'] ],
-    "hrdetect": [ inputs: ['hets', 'vcf', 'jabba_gg', 'snv_somatic_vcf'], outputs: ['hrdetect'] ],
-    "onenesstwoness": [ inputs: ['events', 'hrdetect'], outputs: ['onenesstwoness'] ]
-]
-
-def samplesheetToList(String filePath) {
-    def sampleList = []
-    def lines = new File(filePath).readLines()
-
-    if (lines.isEmpty()) {
-        return sampleList // Return an empty list if the file is empty
-    }
-
-    // Assume the first line contains the headers
-    def headers = lines[0].split(',')
-
-    // Process each subsequent line as a data row
-    lines.drop(1).each { line ->
-        def values = line.split(',')
-        def rowMap = [:]
-
-        headers.eachWithIndex { header, index ->
-            if (index < values.size()) {
-                rowMap[header] = values[index]
-            } else {
-                rowMap[header] = null // Handle missing values
-            }
-        }
-
-        sampleList.add(rowMap)
-    }
-
-    return sampleList
-}
-
-def sampleList = samplesheetToList(params.input)
-def available_inputs = new HashSet()
-sampleList.each { input_map ->
-    input_map.each { key, value ->
-        if (value && !(value instanceof Collection && value.empty)) {
-            available_inputs.add(key)
-        }
-    }
-}
-
-println "Provided inputs: ${available_inputs}"
-
-// Iteratively select tools based on available inputs
-def skip_tools = params.skip_tools ? params.skip_tools.split(',').collect { it.trim() } : []
-println "Skipping tools: ${skip_tools}"
-// TODO: if GRIDSS - skip if vcf is found, but not if vcf_unfiltered is present.
-def selected_tools = []
-def tools_qc = ["qc_coverage", "qc_multiple_metrics", "qc_duplicates"]
-boolean changed
-do {
-    changed = false
-    tool_input_output_map.each { tool, io ->
-        if (!selected_tools.contains(tool) && !skip_tools.contains(tool)) {
-            def inputsRequired = io.inputs
-            def inputsPresent = inputsRequired.every { available_inputs.contains(it) }
-            def outputsNeeded = io.outputs.any { !available_inputs.contains(it) }
-
-			// Treat special cases
-			if (tool == "sage" && params.tumor_only) {
-				outputsNeeded = !available_inputs.contains("snv_somatic_vcf")
-			}
-
-			is_current_tool_qc = tools_qc.contains(tool)
-			is_current_tool_qc_multiple_metrics = tool == "qc_multiple_metrics"
-			if (is_current_tool_qc) {
-				if (is_current_tool_qc_multiple_metrics) {
-					is_any_alignment_summary_present = io.outputs[0].any { it in available_inputs }
-					is_any_insert_size_present = io.outputs[1].any { it in available_inputs }
-					outputsPresent = is_any_alignment_summary_present && is_any_insert_size_present
-				} else if (! is_current_tool_qc_multiple_metrics) {
-					outputsPresent = io.outputs.any { available_inputs.contains(it) }
-				}
-				outputsNeeded = ! outputsPresent
-			}
-			// End Treat special cases
-			
-            if (inputsPresent && outputsNeeded) {
-                selected_tools.add(tool)
-                available_inputs.addAll(io.outputs)
-                changed = true
-            }
-        }
-    }
-} while (changed)
-
-tools_used = selected_tools
-
-println "Tools that will be run based on your inputs: ${tools_used}"
-
-is_run_qc_duplicates = params.is_run_qc_duplicates ?: false // if parameter doesn't exist, set to false
-do_qc_coverage = tools_used.contains("qc_coverage")
-do_qc_multiple_metrics = tools_used.contains("qc_multiple_metrics")
-do_qc_duplicates = tools_used.contains("qc_duplicates") || is_run_qc_duplicates
-do_bamqc = do_qc_coverage || do_qc_multiple_metrics || do_qc_duplicates
-
-if (!params.dbsnp && !params.known_indels) {
-    if (!params.skip_tools || (params.skip_tools && !params.skip_tools.contains('baserecalibrator'))) {
-        log.warn "Base quality score recalibration requires at least one resource file. Please provide at least one of `--dbsnp` or `--known_indels`\nYou can skip this step in the workflow by adding `--skip_tools baserecalibrator` to the command."
-    }
-    if (params.skip_tools && (!params.skip_tools.contains('haplotypecaller') || !params.skip_tools.contains('sentieon_haplotyper'))) {
-        log.warn "If GATK's Haplotypecaller or Sentieon's Haplotyper is specified, without `--dbsnp` or `--known_indels no filtering will be done. For filtering, please provide at least one of `--dbsnp` or `--known_indels`.\nFor more information see FilterVariantTranches (single-sample, default): https://gatk.broadinstitute.org/hc/en-us/articles/5358928898971-FilterVariantTranches\nFor more information see VariantRecalibration (--joint_germline): https://gatk.broadinstitute.org/hc/en-us/articles/5358906115227-VariantRecalibrator\nFor more information on GATK Best practice germline variant calling: https://gatk.broadinstitute.org/hc/en-us/articles/360035535932-Germline-short-variant-discovery-SNPs-Indels-"
-    }
-}
 
 if ((params.download_cache) && (params.snpeff_cache || params.vep_cache)) {
     error("Please specify either `--download_cache` or `--snpeff_cache`, `--vep_cache`.")
@@ -541,6 +399,183 @@ inputs = inputs
 
         ch_items
     }
+
+
+
+tool_input_output_map = [
+    "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
+	"qc_coverage": [ 
+		inputs: ['bam'], 
+		outputs: ['qc_coverage_metrics'] 
+	],
+	"qc_multiple_metrics": [ 
+		inputs: ['bam'], 
+		outputs: [
+			['qc_alignment_summary'],
+			['qc_insert_size']
+		] 
+	],
+	"qc_duplicates": [ inputs: ['bam'], outputs: ['qc_dup_rate'] ],
+    // "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics', "estimate_library_complexity"] ],
+	"postprocessing": [ inputs: ['bam'], outputs: [] ], // FIXME: Postprocessing will never be selected as a tool given the current set of inputs/outputs, empty output means tool will not be selected. postprocessing tool must be controlled by params.is_run_post_processing.
+    "msisensorpro": [ inputs: ['bam'], outputs: ['msi', 'msi_germline'] ],
+    // "gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
+	"gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
+    "amber": [ inputs: ['bam'], outputs: ['hets', 'amber_dir'] ],
+    "fragcounter": [ inputs: ['bam'], outputs: ['frag_cov'] ],
+    "dryclean": [ inputs: ['frag_cov'], outputs: ['dryclean_cov'] ],
+    "cbs": [ inputs: ['dryclean_cov'], outputs: ['seg', 'nseg'] ],
+    "sage": [ inputs: ['bam'], outputs: ['snv_somatic_vcf', 'snv_germline_vcf'] ],
+    "cobalt": [ inputs: ['bam'], outputs: ['cobalt_dir'] ],
+    "purple": [ inputs: ['cobalt_dir', 'amber_dir'], outputs: ['purity', 'ploidy'] ],
+    "jabba": [ inputs: ['vcf', 'hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
+    "non_integer_balance": [ inputs: ['jabba_gg'], outputs: ['ni_balanced_gg'] ],
+    "lp_phased_balance": [ inputs: ['ni_balanced_gg'], outputs: ['lp_balanced_gg'] ],
+    "events": [ inputs: ['ni_balanced_gg'], outputs: ['events'] ],
+    "fusions": [ inputs: ['ni_balanced_gg'], outputs: ['fusions'] ],
+    "snpeff": [ inputs: ['snv_somatic_vcf'], outputs: ['variant_somatic_ann', 'variant_somatic_bcf'] ],
+    "snv_multiplicity": [ inputs: ['jabba_gg', 'variant_somatic_ann'], outputs: ['snv_multiplicity'] ],
+    "oncokb": [ inputs: ['variant_somatic_ann', 'snv_multiplicity', 'jabba_gg', 'fusions'], outputs: ['oncokb_maf', 'oncokb_fusions', 'oncokb_cna'] ],
+    "signatures": [ inputs: ['snv_somatic_vcf'], outputs: ['sbs_signatures', 'indel_signatures', 'signatures_matrix'] ],
+    "hrdetect": [ inputs: ['hets', 'vcf', 'jabba_gg', 'snv_somatic_vcf'], outputs: ['hrdetect'] ],
+    "onenesstwoness": [ inputs: ['events', 'hrdetect'], outputs: ['onenesstwoness'] ]
+]
+
+def samplesheetToList(String filePath) {
+    def sampleList = []
+    def lines = new File(filePath).readLines()
+
+    if (lines.isEmpty()) {
+        return sampleList // Return an empty list if the file is empty
+    }
+
+    // Assume the first line contains the headers
+    def headers = lines[0].split(',')
+
+    // Process each subsequent line as a data row
+    lines.drop(1).each { line ->
+        def values = line.split(',')
+        def rowMap = [:]
+
+        headers.eachWithIndex { header, index ->
+            if (index < values.size()) {
+                rowMap[header] = values[index]
+            } else {
+                rowMap[header] = null // Handle missing values
+            }
+        }
+
+        sampleList.add(rowMap)
+    }
+
+    return sampleList
+}
+
+def sampleList = samplesheetToList(params.input)
+def available_inputs = new HashSet()
+sampleList.each { input_map ->
+    input_map.each { key, value ->
+        if (value && !(value instanceof Collection && value.empty)) {
+            available_inputs.add(key)
+        }
+    }
+}
+
+println "Provided inputs: ${available_inputs}"
+
+// Iteratively select tools based on available inputs
+def skip_tools = params.skip_tools ? params.skip_tools.split(',').collect { it.trim() } : []
+println "Skipping tools: ${skip_tools}"
+// TODO: if GRIDSS - skip if vcf is found, but not if vcf_unfiltered is present.
+def selected_tools = []
+def tools_qc = ["qc_coverage", "qc_multiple_metrics", "qc_duplicates"]
+def selected_tools_map = [:]
+boolean changed
+do {
+    changed = false
+    tool_input_output_map.each { tool, io ->
+        if (!selected_tools.contains(tool) && !skip_tools.contains(tool)) {
+            def inputsRequired = io.inputs
+            def inputsPresent = inputsRequired.every { available_inputs.contains(it) }
+            def outputsNeeded = io.outputs.any { !available_inputs.contains(it) }
+			
+			// special cases
+			def is_sage_tumor_only = tool == "sage" && params.tumor_only
+			def is_current_tool_qc = tools_qc.contains(tool)
+			def is_current_tool_qc_multiple_metrics = tool == "qc_multiple_metrics" // nested
+			def is_output_nested_list = io.outputs instanceof List && io.outputs.every { it instanceof List }
+			def is_generic_case = !is_sage_tumor_only && !is_current_tool_qc_multiple_metrics
+			
+
+			selected_tools_map[tool] = inputs.filter { sample ->
+				def is_all_input_col_present = false
+				def is_any_output_col_empty = false
+
+				is_all_input_col_present = io.inputs.every { field -> 
+					! sample[field].isEmpty() // Tests if file exists and is nonzero file size
+				}
+				
+				// Generic case
+				if (is_generic_case) {
+					is_any_output_col_empty = io.outputs.any { field ->
+						sample[field].isEmpty() // Tests if file exists and is nonzero file size
+					}	
+				}
+
+				// Treat special cases
+				if (is_sage_tumor_only) {
+					is_any_output_col_empty = sample["snv_somatic_vcf"].isEmpty()
+				}
+
+				if (is_current_tool_qc_multiple_metrics) {
+					is_any_alignment_summary_absent = io.outputs[0].any { field ->
+						sample[field].isEmpty() // Tests if file exists and is nonzero file size
+					}
+					def is_any_insert_size_absent = io.outputs[1].any { field ->
+						sample[field].isEmpty() // Tests if file exists and is nonzero file size
+					}
+					is_any_output_col_empty = is_any_alignment_summary_absent || is_any_insert_size_absent
+				}
+				// End Treat special cases
+				
+				
+				return is_any_output_col_empty && is_all_input_col_present
+			}.map { sample ->
+				def input_values = io.inputs.collectEntries { key -> [key, sample[key]] }
+				def output_values = io.outputs.collectEntries { key -> [key, sample[key]] }
+				tuple(sample.meta, input_values, output_values)
+			}
+			// .store()
+
+			def tool_channel_list = selected_tools_map[tool].toList()
+			def has_samples = tool_channel_list && !tool_channel_list.isEmpty()
+			if (has_samples) {
+				selected_tools[tool] = tool
+				changed = true
+			}
+        }
+    }
+} while (changed)
+
+tools_used = selected_tools
+
+println "Tools that will be run based on your inputs: ${tools_used}"
+
+is_run_qc_duplicates = params.is_run_qc_duplicates ?: false // if parameter doesn't exist, set to false
+do_qc_coverage = tools_used.contains("qc_coverage")
+do_qc_multiple_metrics = tools_used.contains("qc_multiple_metrics")
+do_qc_duplicates = tools_used.contains("qc_duplicates") || is_run_qc_duplicates
+do_bamqc = do_qc_coverage || do_qc_multiple_metrics || do_qc_duplicates
+
+if (!params.dbsnp && !params.known_indels) {
+    if (!params.skip_tools || (params.skip_tools && !params.skip_tools.contains('baserecalibrator'))) {
+        log.warn "Base quality score recalibration requires at least one resource file. Please provide at least one of `--dbsnp` or `--known_indels`\nYou can skip this step in the workflow by adding `--skip_tools baserecalibrator` to the command."
+    }
+    if (params.skip_tools && (!params.skip_tools.contains('haplotypecaller') || !params.skip_tools.contains('sentieon_haplotyper'))) {
+        log.warn "If GATK's Haplotypecaller or Sentieon's Haplotyper is specified, without `--dbsnp` or `--known_indels no filtering will be done. For filtering, please provide at least one of `--dbsnp` or `--known_indels`.\nFor more information see FilterVariantTranches (single-sample, default): https://gatk.broadinstitute.org/hc/en-us/articles/5358928898971-FilterVariantTranches\nFor more information see VariantRecalibration (--joint_germline): https://gatk.broadinstitute.org/hc/en-us/articles/5358906115227-VariantRecalibrator\nFor more information on GATK Best practice germline variant calling: https://gatk.broadinstitute.org/hc/en-us/articles/360035535932-Germline-short-variant-discovery-SNPs-Indels-"
+    }
+}
+
 
 // Fails when missing sex information for CNV tools
 // is_missing_sex = false
