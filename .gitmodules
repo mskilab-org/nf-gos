@@ -1,0 +1,3 @@
+[submodule "gos-assets"]
+	path = gos-assets
+	url = https://github.com/mskilab-org/gos-assets.git
