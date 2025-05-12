@@ -20,5 +20,5 @@ trim_trailing_whitespace = unset
 indent_style = unset
 indent_size = unset
 
-[/assets/email*]
+[/gos-assets/nf-gos/assets/email*]
 indent_size = unset
