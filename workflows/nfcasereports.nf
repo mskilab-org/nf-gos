@@ -157,8 +157,9 @@ def sampleList = samplesheetToList(params.input)
 def available_inputs = new HashSet()
 sampleList.each { input_map ->
     input_map.each { key, value ->
-        if (value && !(value instanceof Collection && value.empty)) {
-            available_inputs.add(key)
+        available_inputs.add(key)
+        if (!value || (value instanceof Collection && value.empty)) {
+            available_inputs.remove(key)
         }
     }
 }
