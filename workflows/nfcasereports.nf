@@ -711,12 +711,12 @@ alignment_bams_final = inputs
 
 final_filtered_sv_rds_for_merge = inputs
     .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
-    .filter { 
+    .filter {
 		def vcf_or_rds = it[1]
 		def is_rds = vcf_or_rds =~ /\.rds$/
 		def is_vcf_or_rds_filesize_zero_or_nonexistent = vcf_or_rds.isEmpty()
 		! is_vcf_or_rds_filesize_zero_or_nonexistent && is_rds }
-    .map { 
+    .map {
 		it -> [ it[0].patient, it[1] ] } // meta.patient, vcf_or_rds
 
 vcf_from_sv_calling_for_merge = inputs
@@ -893,6 +893,10 @@ snv_multiplicity_for_merge = inputs
     .filter { !it[1].isEmpty() }
     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, snv_multiplicity
 
+hrdetect_rds_for_merge = inputs
+    .map { it -> [it.meta, it.hrdetect] }
+    .filter { !it[1].isEmpty() }
+    .map { it -> [ it[0].patient, it[1] ] } // meta.patient, hrdetect rds
 
 workflow NFCASEREPORTS {
 
@@ -1082,7 +1086,7 @@ workflow NFCASEREPORTS {
 	do_post_processing_bc_aligner_not_fq2bam = (tools_used.contains("all") || tools_used.contains("aligner")) && params.aligner != "fq2bam"
 	do_post_processing_bc_of_tool_or_flag = tools_used.contains("all") || tools_used.contains("postprocessing") || params.is_run_post_processing // FIXME: If bam is provided as input, tools_used currently will never contain postprocessing and only controlled by params, but leaving here as a reminder.
     if (do_post_processing_bc_aligner_not_fq2bam || do_post_processing_bc_of_tool_or_flag) { // fq2bam does not need postprocessing
-		
+
 		bam_mapped = alignment_bams_final
             .map { id, meta, bam, bai -> [meta + [data_type: "bam"], bam] }
         cram_markduplicates_no_spark = Channel.empty()
@@ -1257,14 +1261,14 @@ workflow NFCASEREPORTS {
     if (tools_used.contains("all") || tools_used.contains("gridss") || params.is_run_junction_filter) {
 
         // Filter out bams for which SV calling has already been done
-        
+
 		bam_sv_inputs = inputs.filter { it.vcf.isEmpty() }.map { it -> [it.meta.sample] }
         bam_sv_calling = alignment_bams_final
             .join(bam_sv_inputs)
             .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
-        
+
 		// gridss_existing_outputs = inputs.map { it -> [it.meta, it.vcf, it.vcf_tbi] }.filter { !it[1].isEmpty() && !it[2].isEmpty() }
-		gridss_existing_outputs = inputs.map { 
+		gridss_existing_outputs = inputs.map {
 			it -> [it.meta, it.vcf, it.vcf_tbi] }
 			.filter { !it[1].isEmpty() && !it[2].isEmpty() }
 
