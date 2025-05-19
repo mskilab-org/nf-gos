@@ -735,11 +735,15 @@
                 "exists": true
             },
             "sbs_signatures": {
-                "errorMessage": "SBS Signatures file cannot have spaces and must have extension '.txt'",
+                "errorMessage": "SBS Signatures file cannot have spaces and must have extension '.txt' or '.all'",
                 "anyOf": [
                     {
                         "type": "string",
                         "pattern": "^\\S+\\.txt$"
+                    },
+					{
+                        "type": "string",
+                        "pattern": "^\\S+\\.all$"
                     },
                     {
                         "type": "string",
@@ -758,11 +762,15 @@
                 "exists": true
             },
             "indel_signatures": {
-                "errorMessage": "SBS Signatures file cannot have spaces and must have extension '.txt'",
+                "errorMessage": "Indel Signatures file cannot have spaces and must have extension '.txt' or '.all'",
                 "anyOf": [
                     {
                         "type": "string",
                         "pattern": "^\\S+\\.txt$"
+                    },
+					{
+                        "type": "string",
+                        "pattern": "^\\S+\\.all$"
                     },
                     {
                         "type": "string",
@@ -781,11 +789,15 @@
                 "exists": true
             },
             "signatures_matrix": {
-                "errorMessage": "SBS Signatures file cannot have spaces and must have extension '.txt'",
+                "errorMessage": "SBS Signatures Matrix file cannot have spaces and must have extension '.txt' or '.all'",
                 "anyOf": [
                     {
                         "type": "string",
                         "pattern": "^\\S+\\.txt$"
+                    },
+					{
+                        "type": "string",
+                        "pattern": "^\\S+\\.all$"
                     },
                     {
                         "type": "string",

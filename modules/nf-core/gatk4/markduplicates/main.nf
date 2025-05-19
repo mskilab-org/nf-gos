@@ -44,19 +44,21 @@ process GATK4_MARKDUPLICATES {
     // Using samtools and not Markduplicates to compress to CRAM speeds up computation:
     // https://medium.com/@acarroll.dna/looking-at-trade-offs-in-compression-levels-for-genomics-tools-eec2834e8b94
     """
-    gatk --java-options "-Xmx${avail_mem}M -XX:-UsePerfData" \\
-        MarkDuplicates \\
-        $input_list \\
-        --OUTPUT ${prefix_bam} \\
-        --METRICS_FILE ${prefix}.metrics \\
-        --TMP_DIR . \\
-        --OPTICAL_DUPLICATE_PIXEL_DISTANCE ${optical_duplicate_pixel_distance} \\
-        ${reference} \\
-        $args
+    if [[ ! -f ${prefix}.metrics ]]; then
+        gatk --java-options "-Xmx${avail_mem}M -XX:-UsePerfData" \\
+            MarkDuplicates \\
+            $input_list \\
+            --OUTPUT ${prefix_bam} \\
+            --METRICS_FILE ${prefix}.metrics \\
+            --TMP_DIR . \\
+            --OPTICAL_DUPLICATE_PIXEL_DISTANCE ${optical_duplicate_pixel_distance} \\
+            ${reference} \\
+            $args
+    fi
 
     # If cram files are wished as output, the run samtools for conversion
     if [[ ${prefix} == *.cram ]]; then
-        samtools view -Ch -T ${fasta} -o ${prefix} ${prefix_bam}
+        samtools view -@ ${task.cpus} -Ch -T ${fasta} -o ${prefix} ${prefix_bam}
         rm ${prefix_bam}
         samtools index ${prefix}
     fi

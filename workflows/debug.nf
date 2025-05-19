@@ -184,3 +184,39 @@ do {
 tools_used = selected_tools
 
 println "Tools that will be run based on your inputs: ${tools_used}"
+
+
+final_filtered_sv_rds_for_merge = inputs
+    .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
+	.map { 
+		def vcf = it[1]
+		// def is_vcf = vcf =~ /\.vcf(\.gz|\.bgz)?$/
+		def is_rds = vcf =~ /\.rds$/
+		// println it[1]
+		// println it[1].getClass()
+		// println it[1].isEmpty()
+		// println it[1].exists()
+		// println is_vcf
+		// println is_rds
+		// println "tbi"
+		// println it[2]
+		// println it[2].getClass()
+		// println it[2].isEmpty()
+		// println it[2].exists()
+		return it 
+	}
+    .filter { 
+		def vcf it[1]
+		!it[1].isEmpty() && !it[2].isEmpty() }
+	.map {
+		println "after filter"
+		println it[0].patient
+		println it[1]
+		println it[2]
+		return it 
+	}
+    .map { 
+		it -> [ it[0].patient, it[1] ] 
+	} // meta.patient, vcf
+
+println "${final_filtered_sv_rds_for_merge.view()}"

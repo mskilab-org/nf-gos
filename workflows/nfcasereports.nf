@@ -101,8 +101,10 @@ toolParamMap.each { tool, params ->
 tool_input_output_map = [
     "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
     "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics'] ],
+	"postprocessing": [ inputs: ['bam'], outputs: [] ], // FIXME: Postprocessing will never be selected as a tool given the current set of inputs/outputs, empty output means tool will not be selected. postprocessing tool must be controlled by params.is_run_post_processing.
     "msisensorpro": [ inputs: ['bam'], outputs: ['msi', 'msi_germline'] ],
-    "gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
+    // "gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
+	"gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
     "amber": [ inputs: ['bam'], outputs: ['hets', 'amber_dir'] ],
     "fragcounter": [ inputs: ['bam'], outputs: ['frag_cov'] ],
     "dryclean": [ inputs: ['frag_cov'], outputs: ['dryclean_cov'] ],
@@ -169,6 +171,7 @@ println "Provided inputs: ${available_inputs}"
 // Iteratively select tools based on available inputs
 def skip_tools = params.skip_tools ? params.skip_tools.split(',').collect { it.trim() } : []
 println "Skipping tools: ${skip_tools}"
+// TODO: if GRIDSS - skip if vcf is found, but not if vcf_unfiltered is present.
 def selected_tools = []
 boolean changed
 do {
@@ -178,6 +181,9 @@ do {
             def inputsRequired = io.inputs
             def inputsPresent = inputsRequired.every { available_inputs.contains(it) }
             def outputsNeeded = io.outputs.any { !available_inputs.contains(it) }
+			if (tool == "sage" && params.tumor_only) {
+				outputsNeeded = !available_inputs.contains("snv_somatic_vcf")
+			}
             if (inputsPresent && outputsNeeded) {
                 selected_tools.add(tool)
                 available_inputs.addAll(io.outputs)
@@ -705,18 +711,23 @@ alignment_bams_final = inputs
 
 final_filtered_sv_rds_for_merge = inputs
     .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
-    .filter { !it[1].isEmpty() && !it[2].isEmpty() }
-    .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
+    .filter { 
+		def vcf_or_rds = it[1]
+		def is_rds = vcf_or_rds =~ /\.rds$/
+		def is_vcf_or_rds_filesize_zero_or_nonexistent = vcf_or_rds.isEmpty()
+		! is_vcf_or_rds_filesize_zero_or_nonexistent && is_rds }
+    .map { 
+		it -> [ it[0].patient, it[1] ] } // meta.patient, vcf_or_rds
 
 vcf_from_sv_calling_for_merge = inputs
     .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
     .filter { !it[1].isEmpty() && !it[2].isEmpty() }
-    .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
+    .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf_or_rds, tbi
 
 unfiltered_som_sv_for_merge = inputs
     .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
     .filter { !it[1].isEmpty() && !it[2].isEmpty() }
-    .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
+    .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf_or_rds
 
 tumor_frag_cov_for_merge = inputs
     .map { it -> [it.meta, it.frag_cov] }
@@ -1068,7 +1079,12 @@ workflow NFCASEREPORTS {
 
     // BAM Postprocessing
     // ##############################
-    if ((tools_used.contains("all") || tools_used.contains("aligner")) && params.aligner != "fq2bam") { // fq2bam does not need postprocessing
+	do_post_processing_bc_aligner_not_fq2bam = (tools_used.contains("all") || tools_used.contains("aligner")) && params.aligner != "fq2bam"
+	do_post_processing_bc_of_tool_or_flag = tools_used.contains("all") || tools_used.contains("postprocessing") || params.is_run_post_processing // FIXME: If bam is provided as input, tools_used currently will never contain postprocessing and only controlled by params, but leaving here as a reminder.
+    if (do_post_processing_bc_aligner_not_fq2bam || do_post_processing_bc_of_tool_or_flag) { // fq2bam does not need postprocessing
+		
+		bam_mapped = alignment_bams_final
+            .map { id, meta, bam, bai -> [meta + [data_type: "bam"], bam] }
         cram_markduplicates_no_spark = Channel.empty()
 
         // STEP 2: markduplicates (+QC) + convert to CRAM
@@ -1238,15 +1254,19 @@ workflow NFCASEREPORTS {
 
     // SV Calling
     // ##############################
-
-    if (tools_used.contains("all") || tools_used.contains("gridss")) {
+    if (tools_used.contains("all") || tools_used.contains("gridss") || params.is_run_junction_filter) {
 
         // Filter out bams for which SV calling has already been done
-        bam_sv_inputs = inputs.filter { it.vcf.isEmpty() }.map { it -> [it.meta.sample] }
+        
+		bam_sv_inputs = inputs.filter { it.vcf.isEmpty() }.map { it -> [it.meta.sample] }
         bam_sv_calling = alignment_bams_final
             .join(bam_sv_inputs)
             .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
-        gridss_existing_outputs = inputs.map { it -> [it.meta, it.vcf, it.vcf_tbi] }.filter { !it[1].isEmpty() && !it[2].isEmpty() }
+        
+		// gridss_existing_outputs = inputs.map { it -> [it.meta, it.vcf, it.vcf_tbi] }.filter { !it[1].isEmpty() && !it[2].isEmpty() }
+		gridss_existing_outputs = inputs.map { 
+			it -> [it.meta, it.vcf, it.vcf_tbi] }
+			.filter { !it[1].isEmpty() && !it[2].isEmpty() }
 
         if (params.tumor_only) {
             bam_sv_calling_status = bam_sv_calling.branch{
@@ -2246,7 +2266,7 @@ workflow NFCASEREPORTS {
 
     // Oncokb
     // ##############################
-    if ((tools_used.contains("all") || tools_used.contains("oncokb"))) {
+    if ((tools_used.contains ("all") || tools_used.contains("oncokb"))) {
         oncokb_inputs = inputs
             .filter { it.oncokb_maf.isEmpty() || it.oncokb_fusions.isEmpty() || it.oncokb_cna.isEmpty() }
             .map { it -> [it.meta.patient, it.meta] }

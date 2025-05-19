@@ -28,6 +28,7 @@ echo $TUMOR_TYPE
 set +x
 
 
+export TMPDIR=/tmp # as definied in the singularity container
 export PATH=/root:scripts:${PATH}
 
 ## This should be the sample directory.
