@@ -62,7 +62,7 @@ process PURPLE {
     purple \\
         -Xmx${Math.round(task.memory.bytes * 0.95)} \\
         ${args} \\
-        -tumor ${meta.tumor_id} \\
+        -tumor ${meta.sample} \\
         ${reference_arg} \\
         -amber ${amber} \\
         -cobalt ${cobalt} \\
