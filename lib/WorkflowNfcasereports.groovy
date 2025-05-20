@@ -142,33 +142,106 @@ class WorkflowNfcasereports {
         }
     }
 
-     public static String retrieveInput(params, log){
-        def input = null
-            if (!params.input && !params.build_only_index) {
-                switch (params.step) {
-                    case 'alignment':                 Nextflow.error("Can't start with step $params.step without samplesheet")
-                                                    break
-                    case 'markduplicates':          log.warn("Using file ${params.outdir}/csv/mapped.csv");
-                                                    input = params.outdir + "/csv/mapped.csv"
-                                                    break
-                    case 'prepare_recalibration':   log.warn("Using file ${params.outdir}/csv/markduplicates_no_table.csv");
-                                                    input = params.outdir + "/csv/markduplicates_no_table.csv"
-                                                    break
-                    case 'recalibrate':             log.warn("Using file ${params.outdir}/csv/markduplicates.csv");
-                                                    input = params.outdir + "/csv/markduplicates.csv"
-                                                    break
-                    case 'variant_calling':         log.warn("Using file ${params.outdir}/csv/recalibrated.csv");
-                                                    input = params.outdir + "/csv/recalibrated.csv"
-                                                    break
-                    // case 'controlfreec':         csv_file = file("${params.outdir}/variant_calling/csv/control-freec_mpileup.csv", checkIfExists: true); break
-                    case 'annotate':                log.warn("Using file ${params.outdir}/csv/variantcalled.csv");
-                                                    input = params.outdir + "/csv/variantcalled.csv"
-                                                    break
-                    default:                        log.warn("Please provide an input samplesheet to the pipeline e.g. '--input samplesheet.csv'")
-                                                    Nextflow.error("Unknown step $params.step")
+    private static def samplesheetToList(String filePath) {
+        def sampleList = []
+        if (!filePath || filePath.trim().isEmpty()) {
+            return sampleList
+        }
+        def lines = new File(filePath).readLines()
+
+        if (lines.isEmpty()) {
+            return sampleList
+        }
+
+        def headers = lines[0].split(',')
+        lines.drop(1).each { line ->
+            def values = line.split(',')
+            def rowMap = [:]
+            headers.eachWithIndex { header, index ->
+                if (index < values.size()) {
+                    rowMap[header] = values[index]
+                } else {
+                    rowMap[header] = null
                 }
             }
-            return input
+            sampleList.add(rowMap)
+        }
+        return sampleList
+    }
 
+    public static List determineToolsToRun(params) {
+        def tool_input_output_map = [
+            "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
+            "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics'] ],
+            "postprocessing": [ inputs: ['bam'], outputs: [] ],
+            "msisensorpro": [ inputs: ['bam'], outputs: ['msi', 'msi_germline'] ],
+            "gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
+            "amber": [ inputs: ['bam'], outputs: ['hets', 'amber_dir'] ],
+            "fragcounter": [ inputs: ['bam'], outputs: ['frag_cov'] ],
+            "dryclean": [ inputs: ['frag_cov'], outputs: ['dryclean_cov'] ],
+            "cbs": [ inputs: ['dryclean_cov'], outputs: ['seg', 'nseg'] ],
+            "sage": [ inputs: ['bam'], outputs: ['snv_somatic_vcf', 'snv_germline_vcf'] ],
+            "cobalt": [ inputs: ['bam'], outputs: ['cobalt_dir'] ],
+            "purple": [ inputs: ['cobalt_dir', 'amber_dir'], outputs: ['purity', 'ploidy'] ],
+            "jabba": [ inputs: ['vcf', 'hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
+            "non_integer_balance": [ inputs: ['jabba_gg'], outputs: ['ni_balanced_gg'] ],
+            "lp_phased_balance": [ inputs: ['ni_balanced_gg'], outputs: ['lp_balanced_gg'] ],
+            "events": [ inputs: ['ni_balanced_gg'], outputs: ['events'] ],
+            "fusions": [ inputs: ['ni_balanced_gg'], outputs: ['fusions'] ],
+            "snpeff": [ inputs: ['snv_somatic_vcf'], outputs: ['variant_somatic_ann', 'variant_somatic_bcf'] ],
+            "snv_multiplicity": [ inputs: ['jabba_gg', 'variant_somatic_ann'], outputs: ['snv_multiplicity'] ],
+            "oncokb": [ inputs: ['variant_somatic_ann', 'snv_multiplicity', 'jabba_gg', 'fusions'], outputs: ['oncokb_maf', 'oncokb_fusions', 'oncokb_cna'] ],
+            "signatures": [ inputs: ['snv_somatic_vcf'], outputs: ['sbs_signatures', 'indel_signatures', 'signatures_matrix'] ],
+            "hrdetect": [ inputs: ['hets', 'vcf', 'jabba_gg', 'snv_somatic_vcf'], outputs: ['hrdetect'] ],
+            "onenesstwoness": [ inputs: ['events', 'hrdetect'], outputs: ['onenesstwoness'] ]
+        ]
+
+        def sampleList = samplesheetToList(params.input)
+        def available_inputs = new HashSet()
+        sampleList.each { input_map ->
+            input_map.each { key, value ->
+                available_inputs.add(key)
+                if (!value || (value instanceof Collection && value.empty)) {
+                    available_inputs.remove(key)
+                }
+            }
+        }
+
+        println "Provided inputs: ${available_inputs}"
+
+        def skip_tools = params.skip_tools ? params.skip_tools.split(',')
+            .collect {
+            def tool = it.trim()
+            if (!tool_input_output_map.containsKey(tool)) {
+                println "Tool ${tool} not found in tool_input_output_map. Skipping."
+            } else { return tool }
+        } : []
+
+        // remove null entries from skip_tools
+        skip_tools = skip_tools.findAll { it != null }
+
+        println "Skipping tools: ${skip_tools}"
+        // TODO: if GRIDSS - skip if vcf is found, but not if vcf_unfiltered is present.
+        def selected_tools = []
+        boolean changed
+        do {
+            changed = false
+            tool_input_output_map.each { tool, io ->
+                if (!selected_tools.contains(tool) && !skip_tools.contains(tool)) {
+                    def inputsRequired = io.inputs
+                    def inputsPresent = inputsRequired.every { available_inputs.contains(it) }
+                    def outputsNeeded = io.outputs.any { !available_inputs.contains(it) }
+                    if (tool == "sage" && params.tumor_only) {
+                        outputsNeeded = !available_inputs.contains("snv_somatic_vcf")
+                    }
+                    if (inputsPresent && outputsNeeded) {
+                        selected_tools.add(tool)
+                        available_inputs.addAll(io.outputs)
+                        changed = true
+                    }
+                }
+            }
+        } while (changed)
+        return selected_tools
     }
 }

@@ -98,102 +98,7 @@ toolParamMap.each { tool, params ->
     }
 }
 
-tool_input_output_map = [
-    "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
-    "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics'] ],
-	"postprocessing": [ inputs: ['bam'], outputs: [] ], // FIXME: Postprocessing will never be selected as a tool given the current set of inputs/outputs, empty output means tool will not be selected. postprocessing tool must be controlled by params.is_run_post_processing.
-    "msisensorpro": [ inputs: ['bam'], outputs: ['msi', 'msi_germline'] ],
-    // "gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
-	"gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
-    "amber": [ inputs: ['bam'], outputs: ['hets', 'amber_dir'] ],
-    "fragcounter": [ inputs: ['bam'], outputs: ['frag_cov'] ],
-    "dryclean": [ inputs: ['frag_cov'], outputs: ['dryclean_cov'] ],
-    "cbs": [ inputs: ['dryclean_cov'], outputs: ['seg', 'nseg'] ],
-    "sage": [ inputs: ['bam'], outputs: ['snv_somatic_vcf', 'snv_germline_vcf'] ],
-    "cobalt": [ inputs: ['bam'], outputs: ['cobalt_dir'] ],
-    "purple": [ inputs: ['cobalt_dir', 'amber_dir'], outputs: ['purity', 'ploidy'] ],
-    "jabba": [ inputs: ['vcf', 'hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
-    "non_integer_balance": [ inputs: ['jabba_gg'], outputs: ['ni_balanced_gg'] ],
-    "lp_phased_balance": [ inputs: ['ni_balanced_gg'], outputs: ['lp_balanced_gg'] ],
-    "events": [ inputs: ['ni_balanced_gg'], outputs: ['events'] ],
-    "fusions": [ inputs: ['ni_balanced_gg'], outputs: ['fusions'] ],
-    "snpeff": [ inputs: ['snv_somatic_vcf'], outputs: ['variant_somatic_ann', 'variant_somatic_bcf'] ],
-    "snv_multiplicity": [ inputs: ['jabba_gg', 'variant_somatic_ann'], outputs: ['snv_multiplicity'] ],
-    "oncokb": [ inputs: ['variant_somatic_ann', 'snv_multiplicity', 'jabba_gg', 'fusions'], outputs: ['oncokb_maf', 'oncokb_fusions', 'oncokb_cna'] ],
-    "signatures": [ inputs: ['snv_somatic_vcf'], outputs: ['sbs_signatures', 'indel_signatures', 'signatures_matrix'] ],
-    "hrdetect": [ inputs: ['hets', 'vcf', 'jabba_gg', 'snv_somatic_vcf'], outputs: ['hrdetect'] ],
-    "onenesstwoness": [ inputs: ['events', 'hrdetect'], outputs: ['onenesstwoness'] ]
-]
-
-def samplesheetToList(String filePath) {
-    def sampleList = []
-    def lines = new File(filePath).readLines()
-
-    if (lines.isEmpty()) {
-        return sampleList // Return an empty list if the file is empty
-    }
-
-    // Assume the first line contains the headers
-    def headers = lines[0].split(',')
-
-    // Process each subsequent line as a data row
-    lines.drop(1).each { line ->
-        def values = line.split(',')
-        def rowMap = [:]
-
-        headers.eachWithIndex { header, index ->
-            if (index < values.size()) {
-                rowMap[header] = values[index]
-            } else {
-                rowMap[header] = null // Handle missing values
-            }
-        }
-
-        sampleList.add(rowMap)
-    }
-
-    return sampleList
-}
-
-def sampleList = samplesheetToList(params.input)
-def available_inputs = new HashSet()
-sampleList.each { input_map ->
-    input_map.each { key, value ->
-        available_inputs.add(key)
-        if (!value || (value instanceof Collection && value.empty)) {
-            available_inputs.remove(key)
-        }
-    }
-}
-
-println "Provided inputs: ${available_inputs}"
-
-// Iteratively select tools based on available inputs
-def skip_tools = params.skip_tools ? params.skip_tools.split(',').collect { it.trim() } : []
-println "Skipping tools: ${skip_tools}"
-// TODO: if GRIDSS - skip if vcf is found, but not if vcf_unfiltered is present.
-def selected_tools = []
-boolean changed
-do {
-    changed = false
-    tool_input_output_map.each { tool, io ->
-        if (!selected_tools.contains(tool) && !skip_tools.contains(tool)) {
-            def inputsRequired = io.inputs
-            def inputsPresent = inputsRequired.every { available_inputs.contains(it) }
-            def outputsNeeded = io.outputs.any { !available_inputs.contains(it) }
-			if (tool == "sage" && params.tumor_only) {
-				outputsNeeded = !available_inputs.contains("snv_somatic_vcf")
-			}
-            if (inputsPresent && outputsNeeded) {
-                selected_tools.add(tool)
-                available_inputs.addAll(io.outputs)
-                changed = true
-            }
-        }
-    }
-} while (changed)
-
-tools_used = selected_tools
+tools_used = WorkflowNfcasereports.determineToolsToRun(params)
 
 println "Tools that will be run based on your inputs: ${tools_used}"
 
@@ -1801,16 +1706,13 @@ workflow NFCASEREPORTS {
         // need a channel with patient and meta for merging with rest
         purple_inputs_for_merge = inputs.filter { it.ploidy.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
 
-        meta = purple_inputs_for_merge
+        meta_purple = purple_inputs_for_merge
             .branch{
                 normal: it[1].status == 0
                 tumor:  it[1].status == 1
             }
             .tumor
-            .map {
-            patient, meta -> meta.tumor_id = meta.id
-            [patient, meta]
-        }
+            .map { patient, meta -> [patient, meta + [tumor_id: meta.sample]] }
 
         purple_inputs_snv_germline = Channel.empty()
         if (!params.tumor_only) {
@@ -1841,7 +1743,7 @@ workflow NFCASEREPORTS {
                 .map { it -> [ it[0], it[2], it[3] ] } // patient, vcf, tbi
         }
 
-        purple_inputs = meta
+        purple_inputs = meta_purple
             .join(purple_inputs_amber_dir)
             .join(purple_inputs_cobalt_dir)
             .map { patient, meta, amber_dir, cobalt_dir ->
@@ -1850,7 +1752,7 @@ workflow NFCASEREPORTS {
 
         if (params.tumor_only) {
             if (params.use_svs && params.use_smlvs) {
-                purple_inputs = meta
+                purple_inputs = meta_purple
                 .join(purple_inputs_amber_dir)
                 .join(purple_inputs_cobalt_dir)
                 .join(purple_inputs_sv)
@@ -1861,7 +1763,7 @@ workflow NFCASEREPORTS {
             }
         } else {
             if (params.use_svs && params.use_smlvs) {
-                purple_inputs = meta
+                purple_inputs = meta_purple
                     .join(purple_inputs_amber_dir)
                     .join(purple_inputs_cobalt_dir)
                     .join(purple_inputs_sv)
