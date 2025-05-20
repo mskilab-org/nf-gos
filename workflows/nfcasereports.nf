@@ -436,6 +436,8 @@ inputs = ch_from_samplesheet.map {
     ]
 }
 
+// inputs.view { log.info "inputs pre fastq: $it"}
+
 inputs = inputs
     .map {it -> [
             it.meta.patient + it.meta.sample, // create a patient_sample key
@@ -481,6 +483,16 @@ inputs = inputs
 
         ch_items
     }
+
+
+// inputs = inputs.map { sample ->
+//     if (sample.meta instanceof Map) {
+//         sample.meta.remove('tumor_id')
+//     }
+//     return sample
+// }
+
+// inputs.view { log.info "inputs post fastq: $it"}
 
 // Fails when missing sex information for CNV tools
 // is_missing_sex = false
@@ -703,6 +715,14 @@ versions = Channel.empty()
 ensemblvep_info = params.vep_cache    ? [] : Channel.of([ [ id:"${params.vep_cache_version}_${params.vep_genome}" ], params.vep_genome, params.vep_species, params.vep_cache_version ])
 snpeff_info     = params.snpeff_cache ? [] : Channel.of([ [ id:"${params.snpeff_genome}.${params.snpeff_db}" ], params.snpeff_genome, params.snpeff_db ])
 
+
+input_fastq = inputs.filter { it.bam.isEmpty() }.map { it -> [it.meta, [it.fastq_1, it.fastq_2]] }
+
+alignment_existing_outputs = inputs.map { it -> [it.meta, it.bam] }.filter { !it[1].isEmpty() }
+
+// alignment_bams_final = some_map["aligner"]
+// 	.map { it -> [it[0].id, it[0], it[1], it[2]] }
+
 alignment_bams_final = inputs
     .map { it -> [it.meta, it.bam, it.bai] }
     .filter { !it[1].isEmpty() }
@@ -710,12 +730,12 @@ alignment_bams_final = inputs
 
 final_filtered_sv_rds_for_merge = inputs
     .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
-    .filter { 
+    .filter {
 		def vcf_or_rds = it[1]
 		def is_rds = vcf_or_rds =~ /\.rds$/
 		def is_vcf_or_rds_filesize_zero_or_nonexistent = vcf_or_rds.isEmpty()
 		! is_vcf_or_rds_filesize_zero_or_nonexistent && is_rds }
-    .map { 
+    .map {
 		it -> [ it[0].patient, it[1] ] } // meta.patient, vcf_or_rds
 
 vcf_from_sv_calling_for_merge = inputs
@@ -807,6 +827,20 @@ snv_germline_annotations_for_merge = inputs
 	.map { it -> [it.meta, it.variant_somatic_bcf] }
 	.filter { !it[1].isEmpty() }
 	.map { it -> [ it[0].patient, it[1] ] } // meta.patient, annotated germline snv vcf
+
+
+purple_inputs_for_merge = inputs.filter { it.ploidy.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
+
+meta_purple = purple_inputs_for_merge
+	.branch{
+		normal: it[1].status == 0
+		tumor:  it[1].status == 1
+	}
+	.tumor
+	.map { patient, meta -> meta.tumor_id = meta.id
+	[patient, meta]
+	// patient, meta -> [ patient, meta + [tumor_id: meta.sample] ]
+}
 
 purity_for_merge = inputs
 	.map { it -> [it.meta, it.purity] }
@@ -967,10 +1001,7 @@ workflow NFCASEREPORTS {
 
     // Alignment
     // ##############################
-
     if (tools_used.contains("all") || tools_used.contains("aligner")) {
-        input_fastq = inputs.filter { it.bam.isEmpty() }.map { it -> [it.meta, [it.fastq_1, it.fastq_2]] }
-        alignment_existing_outputs = inputs.map { it -> [it.meta, it.bam] }.filter { !it[1].isEmpty() }
 
         // inputs.view { log.info "Input samples: ${it.meta} is empty? ${it.bam.isEmpty()}" }
         // input_fastq.view { log.info "Input FASTQ files: $it" }
@@ -1017,7 +1048,7 @@ workflow NFCASEREPORTS {
             reads_for_alignment = reads_for_fastp
         }
 
-        // STEP 1: MAPPING READS TO REFERENCE GENOME
+        // STEP 1: MAPPING READS TO REFERENCE genome
         // reads will be sorted
         reads_for_alignment = reads_for_alignment
             .map{ meta, reads ->
@@ -1044,6 +1075,8 @@ workflow NFCASEREPORTS {
             bam_mapped = alignment_existing_outputs.mix(FASTQ_ALIGN_BWAMEM_MEM2.out.bam)
         }
 
+		// inputs.view{ log.info "inputs: $it" }
+		// FASTQ_PARABRICKS_FQ2BAM.out.bam.view{ log.info "fq2bam output: $it" }
 
         // Grouping the bams from the same samples not to stall the workflow
         bam_mapped = bam_mapped
@@ -1063,9 +1096,12 @@ workflow NFCASEREPORTS {
 
                 // Use groupKey to make sure that the correct group can advance as soon as it is complete
                 // and not stall the workflow until all reads from all channels are mapped
-                [ groupKey( meta - meta.subMap('num_lanes', 'read_group', 'size') + [ id:meta.sample ], numReads), bam ]
+                [ groupKey( meta - meta.subMap('num_lanes', 'read_group', 'size', 'tumor_id') + [ id:meta.sample ], numReads), bam ]
             }
         .groupTuple()
+
+		// log.info "bam_mapped post grouping:"
+		// bam_mapped.view { log.info "bam_mapped outputs: $it" }
 
         // bams are merged (when multiple lanes from the same sample) and indexed
         BAM_MERGE_INDEX_SAMTOOLS(bam_mapped)
@@ -1081,7 +1117,7 @@ workflow NFCASEREPORTS {
 	do_post_processing_bc_aligner_not_fq2bam = (tools_used.contains("all") || tools_used.contains("aligner")) && params.aligner != "fq2bam"
 	do_post_processing_bc_of_tool_or_flag = tools_used.contains("all") || tools_used.contains("postprocessing") || params.is_run_post_processing // FIXME: If bam is provided as input, tools_used currently will never contain postprocessing and only controlled by params, but leaving here as a reminder.
     if (do_post_processing_bc_aligner_not_fq2bam || do_post_processing_bc_of_tool_or_flag) { // fq2bam does not need postprocessing
-		
+
 		bam_mapped = alignment_bams_final
             .map { id, meta, bam, bai -> [meta + [data_type: "bam"], bam] }
         cram_markduplicates_no_spark = Channel.empty()
@@ -1256,14 +1292,14 @@ workflow NFCASEREPORTS {
     if (tools_used.contains("all") || tools_used.contains("gridss") || params.is_run_junction_filter) {
 
         // Filter out bams for which SV calling has already been done
-        
+
 		bam_sv_inputs = inputs.filter { it.vcf.isEmpty() }.map { it -> [it.meta.sample] }
         bam_sv_calling = alignment_bams_final
             .join(bam_sv_inputs)
             .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
-        
+
 		// gridss_existing_outputs = inputs.map { it -> [it.meta, it.vcf, it.vcf_tbi] }.filter { !it[1].isEmpty() && !it[2].isEmpty() }
-		gridss_existing_outputs = inputs.map { 
+		gridss_existing_outputs = inputs.map {
 			it -> [it.meta, it.vcf, it.vcf_tbi] }
 			.filter { !it[1].isEmpty() && !it[2].isEmpty() }
 
@@ -1395,6 +1431,7 @@ workflow NFCASEREPORTS {
         BAM_AMBER(bam_amber_pair)
         versions = versions.mix(BAM_AMBER.out.versions)
 
+		// FIXME: Something is wrong with this when it's instantiated.
         amber_dir = Channel.empty()
             .mix(BAM_AMBER.out.amber_dir)
             .mix(amber_existing_outputs_amber_dirs)
@@ -1794,18 +1831,9 @@ workflow NFCASEREPORTS {
 
     if (tools_used.contains("all") || tools_used.contains("purple")) {
         // need a channel with patient and meta for merging with rest
-        purple_inputs_for_merge = inputs.filter { it.ploidy.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
 
-        meta = purple_inputs_for_merge
-            .branch{
-                normal: it[1].status == 0
-                tumor:  it[1].status == 1
-            }
-            .tumor
-            .map {
-            patient, meta -> meta.tumor_id = meta.id
-            [patient, meta]
-        }
+
+        // meta.view { log.info "meta: ${it}" }
 
         purple_inputs_snv_germline = Channel.empty()
         if (!params.tumor_only) {
@@ -1836,7 +1864,7 @@ workflow NFCASEREPORTS {
                 .map { it -> [ it[0], it[2], it[3] ] } // patient, vcf, tbi
         }
 
-        purple_inputs = meta
+        purple_inputs = meta_purple
             .join(purple_inputs_amber_dir)
             .join(purple_inputs_cobalt_dir)
             .map { patient, meta, amber_dir, cobalt_dir ->
@@ -1845,7 +1873,7 @@ workflow NFCASEREPORTS {
 
         if (params.tumor_only) {
             if (params.use_svs && params.use_smlvs) {
-                purple_inputs = meta
+                purple_inputs = meta_purple
                 .join(purple_inputs_amber_dir)
                 .join(purple_inputs_cobalt_dir)
                 .join(purple_inputs_sv)
@@ -1856,7 +1884,7 @@ workflow NFCASEREPORTS {
             }
         } else {
             if (params.use_svs && params.use_smlvs) {
-                purple_inputs = meta
+                purple_inputs = meta_purple
                     .join(purple_inputs_amber_dir)
                     .join(purple_inputs_cobalt_dir)
                     .join(purple_inputs_sv)
