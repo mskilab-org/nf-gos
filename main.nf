@@ -132,7 +132,7 @@ WorkflowMain.initialise(workflow, params, log)
 include { NFCASEREPORTS } from './workflows/nfcasereports'
 
 //
-// WORKFLOW: Run main mskilab-org/nf-jabba analysis pipeline
+// WORKFLOW: Run main mskilab-org/nf-gos analysis pipeline
 //
 workflow MSKILABORG_NFCASEREPORTS {
     NFCASEREPORTS ()

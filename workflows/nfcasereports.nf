@@ -12,6 +12,41 @@ def summary_params = paramsSummaryMap(workflow)
 // Print parameter summary log to screen
 log.info logo + paramsSummaryLog(workflow) + citation
 
+def tool_input_output_map = [
+    "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
+    "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics'] ],
+    // "collect_wgs_metrics": [ inputs: ['bam'], outputs: ['qc_coverage_metrics'] ],
+    // "collect_multiple_metrics": [ inputs: ['bam'], outputs: ['qc_alignment_summary', 'qc_insert_size'] ],
+    // "estimate_library_complexity": [ inputs: ['bam'], outputs: ['qc_dup_rate'] ],
+    "postprocessing": [ inputs: ['bam'], outputs: [] ],
+    "msisensorpro": [ inputs: ['bam'], outputs: ['msi', 'msi_germline'] ],
+    "gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
+    "amber": [ inputs: ['bam'], outputs: ['hets', 'amber_dir'] ],
+    "fragcounter": [ inputs: ['bam'], outputs: ['frag_cov'] ],
+    "dryclean": [ inputs: ['frag_cov'], outputs: ['dryclean_cov'] ],
+    "cbs": [ inputs: ['dryclean_cov'], outputs: ['seg', 'nseg'] ],
+    "sage": [ inputs: ['bam'], outputs: ['snv_somatic_vcf', 'snv_germline_vcf'] ],
+    "cobalt": [ inputs: ['bam'], outputs: ['cobalt_dir'] ],
+    "purple": [ inputs: ['cobalt_dir', 'amber_dir'], outputs: ['purity', 'ploidy'] ],
+    "jabba": [ inputs: ['vcf', 'hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
+    "non_integer_balance": [ inputs: ['jabba_gg'], outputs: ['ni_balanced_gg'] ],
+    "lp_phased_balance": [ inputs: ['ni_balanced_gg'], outputs: ['lp_balanced_gg'] ],
+    "events": [ inputs: ['ni_balanced_gg'], outputs: ['events'] ],
+    "fusions": [ inputs: ['ni_balanced_gg'], outputs: ['fusions'] ],
+    "snpeff": [ inputs: ['snv_somatic_vcf'], outputs: ['variant_somatic_ann', 'variant_somatic_bcf'] ],
+    "snv_multiplicity": [ inputs: ['jabba_gg', 'variant_somatic_ann'], outputs: ['snv_multiplicity'] ],
+    "oncokb": [ inputs: ['variant_somatic_ann', 'snv_multiplicity', 'jabba_gg', 'fusions'], outputs: ['oncokb_maf', 'oncokb_fusions', 'oncokb_cna'] ],
+    "signatures": [ inputs: ['snv_somatic_vcf'], outputs: ['sbs_signatures', 'indel_signatures', 'signatures_matrix'] ],
+    "hrdetect": [ inputs: ['hets', 'vcf', 'jabba_gg', 'snv_somatic_vcf'], outputs: ['hrdetect'] ],
+    "onenesstwoness": [ inputs: ['events', 'hrdetect'], outputs: ['onenesstwoness'] ]
+]
+
+
+tools_to_run = WorkflowNfcasereports.determineToolsToRun(params, tool_input_output_map)
+
+println "Tools that will be run based on your inputs: ${tools_to_run}"
+
+
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     VALIDATE INPUTS
@@ -43,48 +78,30 @@ def checkPathParamList = [
 ]
 
 def toolParamMap = [
-    "msisensorpro": [
-        params.msisensorpro_list
-    ],
+    "msisensorpro": [ params.msisensorpro_list ],
     "gridss": [
         params.blacklist_gridss,
         params.pon_gridss
     ],
-    "hetpileups" : [
-        params.hapmap_sites
-    ],
-    "fragcounter": [
-        params.gcmapdir_frag
-    ],
-    "dryclean": [
-        params.pon_dryclean,
-    ],
-    "fusions"    : [
-        params.gencode_fusions
-    ],
-    "non_integer_balance" : [
-        params.mask_non_integer_balance
-    ],
-    "lp_phased_balance" : [
-        params.mask_lp_phased_balance
-    ],
-    "vep"        : [
-        params.vep_cache
-    ],
-    "snpeff"     : [
-        params.snpeff_cache
-    ],
-    "sage"       : [
+    "hetpileups": [ params.hapmap_sites ],
+    "fragcounter": [ params.gcmapdir_frag ],
+    "dryclean": [ params.pon_dryclean, ],
+    "fusions": [ params.gencode_fusions ],
+    "non_integer_balance": [ params.mask_non_integer_balance ],
+    "lp_phased_balance": [ params.mask_lp_phased_balance ],
+    "vep": [ params.vep_cache ],
+    "snpeff": [ params.snpeff_cache ],
+    "sage": [
         params.ensembl_data_dir,
         params.somatic_hotspots,
         params.panel_bed,
         params.high_confidence_bed
     ],
-    "cobalt"    : [
+    "cobalt": [
         params.gc_profile,
         params.diploid_bed
     ],
-    "purple"    : [
+    "purple": [
         params.het_sites_amber,
         params.gc_profile,
     ],
@@ -97,32 +114,6 @@ toolParamMap.each { tool, params ->
         }
     }
 }
-
-tools_used = WorkflowNfcasereports.determineToolsToRun(params)
-
-println "Tools that will be run based on your inputs: ${tools_used}"
-
-if (!params.dbsnp && !params.known_indels) {
-    if (!params.skip_tools || (params.skip_tools && !params.skip_tools.contains('baserecalibrator'))) {
-        log.warn "Base quality score recalibration requires at least one resource file. Please provide at least one of `--dbsnp` or `--known_indels`\nYou can skip this step in the workflow by adding `--skip_tools baserecalibrator` to the command."
-    }
-    if (params.skip_tools && (!params.skip_tools.contains('haplotypecaller') || !params.skip_tools.contains('sentieon_haplotyper'))) {
-        log.warn "If GATK's Haplotypecaller or Sentieon's Haplotyper is specified, without `--dbsnp` or `--known_indels no filtering will be done. For filtering, please provide at least one of `--dbsnp` or `--known_indels`.\nFor more information see FilterVariantTranches (single-sample, default): https://gatk.broadinstitute.org/hc/en-us/articles/5358928898971-FilterVariantTranches\nFor more information see VariantRecalibration (--joint_germline): https://gatk.broadinstitute.org/hc/en-us/articles/5358906115227-VariantRecalibrator\nFor more information on GATK Best practice germline variant calling: https://gatk.broadinstitute.org/hc/en-us/articles/360035535932-Germline-short-variant-discovery-SNPs-Indels-"
-    }
-}
-
-if ((params.download_cache) && (params.snpeff_cache || params.vep_cache)) {
-    error("Please specify either `--download_cache` or `--snpeff_cache`, `--vep_cache`.")
-}
-
-// Initialise the workflow
-WorkflowNfcasereports.initialise(params, log)
-
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    Check mandatory parameters
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
 
 // Check if the path parameters exist
 @Grab(group='org.codehaus.gpars', module='gpars', version='1.2.1')
@@ -192,7 +183,6 @@ def expandBraces(String path) {
 GParsPool.withPool(numThreads) {
     checkPathParamList.eachParallel { param ->
         if (param == null) {
-            println "Skipping null path"
             return
         }
 
@@ -205,7 +195,7 @@ GParsPool.withPool(numThreads) {
                         if (checkS3PathExists(s3Path)) {
                             println "Path exists: ${s3Path}"
                         } else {
-                            println "Path does not exist: ${s3Path}"
+                            log.warn "Path does not exist: ${s3Path}"
                         }
                     }
                 } else {
@@ -222,6 +212,15 @@ GParsPool.withPool(numThreads) {
         }
     }
 }
+
+// Initialise the workflow
+WorkflowNfcasereports.initialise(params, log)
+
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    CREATE INPUT CHANNELS
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
 
 // Parse first line of a FASTQ file, return the flowcell id and lane number.
 def flowcellLaneFromFastq(path) {
@@ -251,8 +250,7 @@ def flowcellLaneFromFastq(path) {
     return fcid
 }
 
-def inputType = params.input ? "input" : "input_restart"
-def ch_from_samplesheet = params.build_only_index ? Channel.empty() : Channel.fromSamplesheet(inputType)
+def ch_from_samplesheet = Channel.fromSamplesheet('input')
 
 inputs = ch_from_samplesheet.map {
     meta,
@@ -356,7 +354,6 @@ inputs = inputs
     }
     .combine(ch_with_patient_sample, by: 0) // for each entry add numLanes
     .map { patient_sample, num_lanes, ch_items ->
-
         if (ch_items.meta.lane && ch_items.fastq_2) {
             ch_items.meta   = ch_items.meta + [id: "${ch_items.meta.sample}-${ch_items.meta.lane}".toString()]
             def CN         = params.seq_center ? "CN:${params.seq_center}\\t" : ''
@@ -388,15 +385,7 @@ inputs = inputs
         ch_items
     }
 
-// Fails when missing sex information for CNV tools
-// is_missing_sex = false
-// inputs.map{
-//     if (it.meta.sex == 'NA') {
-//         is_missing_sex = true
-//     }
-// }
-//
-// if (is_missing_sex && tools_used.includes('amber')){log.warn('Please include sex information for samples if using Amber')}
+inputs = WorkflowNfcasereports.addTumorNormalIds(inputs)
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -878,7 +867,7 @@ workflow NFCASEREPORTS {
     // Alignment
     // ##############################
 
-    if (tools_used.contains("all") || tools_used.contains("aligner")) {
+    if (tools_to_run.contains("all") || tools_to_run.contains("aligner")) {
         input_fastq = inputs.filter { it.bam.isEmpty() }.map { it -> [it.meta, [it.fastq_1, it.fastq_2]] }
         alignment_existing_outputs = inputs.map { it -> [it.meta, it.bam] }.filter { !it[1].isEmpty() }
 
@@ -988,8 +977,8 @@ workflow NFCASEREPORTS {
 
     // BAM Postprocessing
     // ##############################
-	do_post_processing_bc_aligner_not_fq2bam = (tools_used.contains("all") || tools_used.contains("aligner")) && params.aligner != "fq2bam"
-	do_post_processing_bc_of_tool_or_flag = tools_used.contains("all") || tools_used.contains("postprocessing") || params.is_run_post_processing // FIXME: If bam is provided as input, tools_used currently will never contain postprocessing and only controlled by params, but leaving here as a reminder.
+	do_post_processing_bc_aligner_not_fq2bam = (tools_to_run.contains("all") || tools_to_run.contains("aligner")) && params.aligner != "fq2bam"
+	do_post_processing_bc_of_tool_or_flag = tools_to_run.contains("all") || tools_to_run.contains("postprocessing") || params.is_run_post_processing // FIXME: If bam is provided as input, tools_to_run currently will never contain postprocessing and only controlled by params, but leaving here as a reminder.
     if (do_post_processing_bc_aligner_not_fq2bam || do_post_processing_bc_of_tool_or_flag) { // fq2bam does not need postprocessing
 
 		bam_mapped = alignment_bams_final
@@ -1082,7 +1071,7 @@ workflow NFCASEREPORTS {
     }
 
     // Post-alignment QC
-    if (tools_used.contains("all") || tools_used.contains("bamqc")) {
+    if (tools_to_run.contains("all") || tools_to_run.contains("bamqc")) {
         bam_qc_inputs = inputs.map { it -> [it.meta.sample] }
         bam_qc_calling = bam_qc_inputs
             .join(alignment_bams_final)
@@ -1099,7 +1088,8 @@ workflow NFCASEREPORTS {
 
     // MSISensorPro
     // ##############################
-    if (tools_used.contains("all") || tools_used.contains("msisensorpro") && !params.tumor_only) {
+    // MSI(inputs, alignment_bams_final, msisensorpro_scan)
+    if (tools_to_run.contains("all") || tools_to_run.contains("msisensorpro") && !params.tumor_only) {
 
         bam_msi_inputs = inputs.filter { it.msi.isEmpty() }.map { it -> [it.meta.sample] }
         bam_msi = alignment_bams_final
@@ -1163,7 +1153,7 @@ workflow NFCASEREPORTS {
 
     // SV Calling
     // ##############################
-    if (tools_used.contains("all") || tools_used.contains("gridss") || params.is_run_junction_filter) {
+    if (tools_to_run.contains("all") || tools_to_run.contains("gridss") || params.is_run_junction_filter) {
 
         // Filter out bams for which SV calling has already been done
 
@@ -1249,7 +1239,7 @@ workflow NFCASEREPORTS {
 
     // AMBER
     // ##############################
-    if (tools_used.contains("all") || tools_used.contains("amber")) {
+    if (tools_to_run.contains("all") || tools_to_run.contains("amber")) {
         bam_amber_inputs = inputs.filter { it.hets.isEmpty() && it.amber_dir.isEmpty() }.map { it -> [it.meta.sample] }
         alignment_bams_final = alignment_bams_final
             bam_amber_calling = alignment_bams_final
@@ -1323,7 +1313,7 @@ workflow NFCASEREPORTS {
     // FRAGCOUNTER
     // ##############################
 
-    if (tools_used.contains("all") || tools_used.contains("fragcounter")) {
+    if (tools_to_run.contains("all") || tools_to_run.contains("fragcounter")) {
         bam_fragcounter_inputs = inputs.filter { it.frag_cov.isEmpty() }.map { it -> [it.meta.sample] }
         bam_fragcounter_calling = alignment_bams_final
             .join(bam_fragcounter_inputs)
@@ -1367,8 +1357,7 @@ workflow NFCASEREPORTS {
     // Dryclean
     // ##############################
 
-
-    if (tools_used.contains("all") || tools_used.contains("dryclean")) {
+    if (tools_to_run.contains("all") || tools_to_run.contains("dryclean")) {
         cov_dryclean_inputs = inputs
             .filter { it.dryclean_cov.isEmpty() }
             .map { it -> [it.meta.sample, it.meta] }
@@ -1419,7 +1408,7 @@ workflow NFCASEREPORTS {
 
     // CBS
     // ##############################
-    if (tools_used.contains("all") || tools_used.contains("cbs")) {
+    if (tools_to_run.contains("all") || tools_to_run.contains("cbs")) {
         cbs_inputs = inputs
             .filter { it.seg.isEmpty() || it.nseg.isEmpty() }
             .map { it -> [it.meta.patient, it.meta] }
@@ -1482,7 +1471,7 @@ workflow NFCASEREPORTS {
     // SNV Calling
     // ##############################
 
-    if (tools_used.contains("all") || tools_used.contains("sage")) {
+    if (tools_to_run.contains("all") || tools_to_run.contains("sage")) {
         // Filter out bams for which SNV calling has already been done
         if (params.tumor_only) {
             bam_snv_inputs = inputs
@@ -1580,7 +1569,7 @@ workflow NFCASEREPORTS {
     // Variant Annotation
     // ##############################
 
-    if (tools_used.contains("all") || tools_used.contains("snpeff")) {
+    if (tools_to_run.contains("all") || tools_to_run.contains("snpeff")) {
         variant_somatic_ann_inputs = inputs
             .filter { it.variant_somatic_ann.isEmpty() || it.variant_somatic_bcf.isEmpty() }
             .map { it -> [it.meta.patient, it.meta] }
@@ -1641,7 +1630,7 @@ workflow NFCASEREPORTS {
 
     // COBALT
     // ##############################
-    if (tools_used.contains("all") || tools_used.contains("cobalt")) {
+    if (tools_to_run.contains("all") || tools_to_run.contains("cobalt")) {
         bam_cobalt_inputs = inputs.filter { it.cobalt_dir.isEmpty() }.map { it -> [it.meta.sample] }
         alignment_bams_final = alignment_bams_final
             bam_cobalt_calling = alignment_bams_final
@@ -1702,7 +1691,7 @@ workflow NFCASEREPORTS {
     // PURPLE
     // ##############################
 
-    if (tools_used.contains("all") || tools_used.contains("purple")) {
+    if (tools_to_run.contains("all") || tools_to_run.contains("purple")) {
         // need a channel with patient and meta for merging with rest
         purple_inputs_for_merge = inputs.filter { it.ploidy.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
 
@@ -1801,7 +1790,7 @@ workflow NFCASEREPORTS {
     // JaBbA
     // ##############################
 
-    if (tools_used.contains("all") || tools_used.contains("jabba")) {
+    if (tools_to_run.contains("all") || tools_to_run.contains("jabba")) {
         jabba_inputs = inputs.filter { (it.jabba_gg.isEmpty() || it.jabba_rds.isEmpty()) && it.meta.status == 1}.map { it -> [it.meta.patient, it.meta] }
 
 		// Dev block to retier either vcf or filtered retiered junctions
@@ -1941,7 +1930,7 @@ workflow NFCASEREPORTS {
     // Non-integer balance
     // ##############################
 
-    if (tools_used.contains("all") || tools_used.contains("non_integer_balance")) {
+    if (tools_to_run.contains("all") || tools_to_run.contains("non_integer_balance")) {
         non_integer_balance_inputs = inputs.filter { it.ni_balanced_gg.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
 
         non_integer_balance_inputs_jabba_gg = jabba_gg_for_merge
@@ -1985,7 +1974,7 @@ workflow NFCASEREPORTS {
     // LP Phased Balance
     // ##############################
 
-    if (tools_used.contains("all") || tools_used.contains("lp_phased_balance")) {
+    if (tools_to_run.contains("all") || tools_to_run.contains("lp_phased_balance")) {
         lp_phased_balance_inputs = inputs.filter { it.lp_balanced_gg.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
         lp_phased_balance_inputs_ni_balanced_gg = non_integer_balance_balanced_gg_for_merge
             .join(lp_phased_balance_inputs)
@@ -2010,7 +1999,7 @@ workflow NFCASEREPORTS {
 
     // Events
     // ##############################
-    if (tools_used.contains("all") || tools_used.contains("events")) {
+    if (tools_to_run.contains("all") || tools_to_run.contains("events")) {
         events_inputs = inputs.filter { it.events.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
         events_input_non_integer_balance = non_integer_balance_balanced_gg_for_merge
             .join(events_inputs)
@@ -2034,10 +2023,10 @@ workflow NFCASEREPORTS {
 
     // Fusions
     // ##############################
-    if (tools_used.contains("all") || tools_used.contains("fusions")) {
+    if (tools_to_run.contains("all") || tools_to_run.contains("fusions")) {
         fusions_inputs = inputs.filter { it.fusions.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
 
-        if (tools_used.contains("non_integer_balance") || tools_used.contains("all")) {
+        if (tools_to_run.contains("non_integer_balance") || tools_to_run.contains("all")) {
             fusions_input_non_integer_balance = non_integer_balance_balanced_gg_for_merge
                 .join(fusions_inputs)
                 .map { it -> [ it[0], it[1] ] } // meta.patient, balanced_gg
@@ -2071,7 +2060,7 @@ workflow NFCASEREPORTS {
 
     // SNV Multiplicity
     // ##############################
-    if (tools_used.contains("all") || tools_used.contains("snv_multiplicity")) {
+    if (tools_to_run.contains("all") || tools_to_run.contains("snv_multiplicity")) {
         snv_multiplicity_inputs = inputs.filter { it.snv_multiplicity.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
 
         snv_multiplicity_inputs_somatic_vcf = snv_somatic_annotations_for_merge
@@ -2172,7 +2161,7 @@ workflow NFCASEREPORTS {
 
     // Oncokb
     // ##############################
-    if ((tools_used.contains ("all") || tools_used.contains("oncokb"))) {
+    if ((tools_to_run.contains ("all") || tools_to_run.contains("oncokb"))) {
         oncokb_inputs = inputs
             .filter { it.oncokb_maf.isEmpty() || it.oncokb_fusions.isEmpty() || it.oncokb_cna.isEmpty() }
             .map { it -> [it.meta.patient, it.meta] }
@@ -2224,7 +2213,7 @@ workflow NFCASEREPORTS {
 
     // Signatures
     // ##############################
-    if (tools_used.contains("all") || tools_used.contains("signatures")) {
+    if (tools_to_run.contains("all") || tools_to_run.contains("signatures")) {
         signatures_inputs = inputs
             .filter { it.sbs_signatures.isEmpty() || it.indel_signatures.isEmpty() || it.signatures_matrix.isEmpty()}
             .map { it -> [it.meta.patient, it.meta] }
@@ -2252,7 +2241,7 @@ workflow NFCASEREPORTS {
 
     // HRDetect
     // ##############################
-    if ((tools_used.contains("all") || tools_used.contains("hrdetect"))) {
+    if ((tools_to_run.contains("all") || tools_to_run.contains("hrdetect"))) {
         hrdetect_inputs = inputs
             .filter { it.hrdetect.isEmpty() }
             .map { it -> [it.meta.patient, it.meta] }
@@ -2303,7 +2292,7 @@ workflow NFCASEREPORTS {
 
     // OnenessTwoness
     // ##############################
-    if ((tools_used.contains("all") || tools_used.contains("onenesstwoness"))) {
+    if ((tools_to_run.contains("all") || tools_to_run.contains("onenesstwoness"))) {
         onenesstwoness_inputs = inputs
             .filter { it.onenesstwoness.isEmpty() }
             .map { it -> [it.meta.patient, it.meta] }

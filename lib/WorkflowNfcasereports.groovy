@@ -65,7 +65,7 @@ class WorkflowNfcasereports {
                 summary_section += "    <p style=\"font-size:110%\"><b>$group</b></p>\n"
                 summary_section += "    <dl class=\"dl-horizontal\">\n"
                 for (param in group_params.keySet()) {
-                    summary_section += "        <dt>$param</dt><dd><samp>${group_params.get(param) ?: '<span style=\"color:#999999;\">N/A</a>'}</samp></dd>\n"
+                    summary_section += "        <dt>$param</dt><dd><samp>${group_params.get(param) ?: '<span style=\"color:#999999;\">N/A</span>'}</samp></dd>\n"
                 }
                 summary_section += "    </dl>\n"
             }
@@ -181,33 +181,7 @@ class WorkflowNfcasereports {
         return sampleList
     }
 
-    public static List determineToolsToRun(params) {
-        def tool_input_output_map = [
-            "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
-            "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics'] ],
-            "postprocessing": [ inputs: ['bam'], outputs: [] ],
-            "msisensorpro": [ inputs: ['bam'], outputs: ['msi', 'msi_germline'] ],
-            "gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
-            "amber": [ inputs: ['bam'], outputs: ['hets', 'amber_dir'] ],
-            "fragcounter": [ inputs: ['bam'], outputs: ['frag_cov'] ],
-            "dryclean": [ inputs: ['frag_cov'], outputs: ['dryclean_cov'] ],
-            "cbs": [ inputs: ['dryclean_cov'], outputs: ['seg', 'nseg'] ],
-            "sage": [ inputs: ['bam'], outputs: ['snv_somatic_vcf', 'snv_germline_vcf'] ],
-            "cobalt": [ inputs: ['bam'], outputs: ['cobalt_dir'] ],
-            "purple": [ inputs: ['cobalt_dir', 'amber_dir'], outputs: ['purity', 'ploidy'] ],
-            "jabba": [ inputs: ['vcf', 'hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
-            "non_integer_balance": [ inputs: ['jabba_gg'], outputs: ['ni_balanced_gg'] ],
-            "lp_phased_balance": [ inputs: ['ni_balanced_gg'], outputs: ['lp_balanced_gg'] ],
-            "events": [ inputs: ['ni_balanced_gg'], outputs: ['events'] ],
-            "fusions": [ inputs: ['ni_balanced_gg'], outputs: ['fusions'] ],
-            "snpeff": [ inputs: ['snv_somatic_vcf'], outputs: ['variant_somatic_ann', 'variant_somatic_bcf'] ],
-            "snv_multiplicity": [ inputs: ['jabba_gg', 'variant_somatic_ann'], outputs: ['snv_multiplicity'] ],
-            "oncokb": [ inputs: ['variant_somatic_ann', 'snv_multiplicity', 'jabba_gg', 'fusions'], outputs: ['oncokb_maf', 'oncokb_fusions', 'oncokb_cna'] ],
-            "signatures": [ inputs: ['snv_somatic_vcf'], outputs: ['sbs_signatures', 'indel_signatures', 'signatures_matrix'] ],
-            "hrdetect": [ inputs: ['hets', 'vcf', 'jabba_gg', 'snv_somatic_vcf'], outputs: ['hrdetect'] ],
-            "onenesstwoness": [ inputs: ['events', 'hrdetect'], outputs: ['onenesstwoness'] ]
-        ]
-
+    public static List determineToolsToRun(params, tool_input_output_map) {
         def sampleList = samplesheetToList(params.input)
         def available_inputs = new HashSet()
         sampleList.each { input_map ->
@@ -255,5 +229,37 @@ class WorkflowNfcasereports {
             }
         } while (changed)
         return selected_tools
+    }
+
+    public static addTumorNormalIds(input_channel) {
+        def processed_channel = input_channel
+            .map { item ->
+                def patient_id = item.meta.patient
+                [patient_id, item]
+            }
+            .groupTuple() // Groups by patient_id (at index 0)
+            .flatMap { patient_id, items_for_patient_list ->
+                // items_for_patient_list is a list of original item maps for the same patient.
+                // Find the normal sample's meta information for this patient.
+                def normal_sample_meta_for_patient = items_for_patient_list.find { it.meta.status == 0 }?.meta
+
+                return items_for_patient_list.collect { item ->
+                    def new_meta = item.meta
+
+                    if (new_meta.status == 1) { // Tumor sample
+                        new_meta = new_meta + [tumor_id: new_meta.sample]
+                        if (normal_sample_meta_for_patient) {
+                            new_meta = new_meta + [normal_id: normal_sample_meta_for_patient.sample]
+                        }
+                    } else if (new_meta.status == 0) { // Normal sample
+                        new_meta = new_meta + [normal_id: new_meta.sample]
+                    }
+
+                    // Return the original item structure with the updated meta.
+                    def updated_item = item + [meta: new_meta]
+                    return updated_item
+                }
+            }
+        return processed_channel
     }
 }
