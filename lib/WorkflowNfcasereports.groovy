@@ -8,6 +8,8 @@ import groovy.text.SimpleTemplateEngine
 
 class WorkflowNfcasereports {
 
+    public static List toolsToRun = []
+
     //
     // Check and validate parameters
     //
@@ -32,6 +34,8 @@ class WorkflowNfcasereports {
         if ((params.download_cache) && (params.snpeff_cache || params.vep_cache)) {
             error("Please specify either `--download_cache` or `--snpeff_cache`, `--vep_cache`.")
         }
+
+        WorkflowNfcasereports.toolsToRun = determineToolsToRun(params)
     }
 
     public static create_file_channel(parameter, else_part = Channel.empty()) {
@@ -181,7 +185,34 @@ class WorkflowNfcasereports {
         return sampleList
     }
 
-    public static List determineToolsToRun(params, tool_input_output_map) {
+    public static List determineToolsToRun(params) {
+        def tool_input_output_map = [
+            "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
+            "collect_wgs_metrics": [ inputs: ['bam'], outputs: ['qc_coverage_metrics'] ],
+            "collect_multiple_metrics": [ inputs: ['bam'], outputs: ['qc_alignment_summary', 'qc_insert_size'] ],
+            "estimate_library_complexity": [ inputs: ['bam'], outputs: ['qc_dup_rate'] ],
+            "postprocessing": [ inputs: ['bam'], outputs: [] ],
+            "msisensorpro": [ inputs: ['bam'], outputs: ['msi', 'msi_germline'] ],
+            "gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
+            "amber": [ inputs: ['bam'], outputs: ['hets', 'amber_dir'] ],
+            "fragcounter": [ inputs: ['bam'], outputs: ['frag_cov'] ],
+            "dryclean": [ inputs: ['frag_cov'], outputs: ['dryclean_cov'] ],
+            "cbs": [ inputs: ['dryclean_cov'], outputs: ['seg', 'nseg'] ],
+            "sage": [ inputs: ['bam'], outputs: ['snv_somatic_vcf', 'snv_germline_vcf'] ],
+            "cobalt": [ inputs: ['bam'], outputs: ['cobalt_dir'] ],
+            "purple": [ inputs: ['cobalt_dir', 'amber_dir'], outputs: ['purity', 'ploidy'] ],
+            "jabba": [ inputs: ['vcf', 'hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
+            "non_integer_balance": [ inputs: ['jabba_gg'], outputs: ['ni_balanced_gg'] ],
+            "lp_phased_balance": [ inputs: ['ni_balanced_gg'], outputs: ['lp_balanced_gg'] ],
+            "events": [ inputs: ['ni_balanced_gg'], outputs: ['events'] ],
+            "fusions": [ inputs: ['ni_balanced_gg'], outputs: ['fusions'] ],
+            "snpeff": [ inputs: ['snv_somatic_vcf'], outputs: ['variant_somatic_ann', 'variant_somatic_bcf'] ],
+            "snv_multiplicity": [ inputs: ['jabba_gg', 'variant_somatic_ann'], outputs: ['snv_multiplicity'] ],
+            "oncokb": [ inputs: ['variant_somatic_ann', 'snv_multiplicity', 'jabba_gg', 'fusions'], outputs: ['oncokb_maf', 'oncokb_fusions', 'oncokb_cna'] ],
+            "signatures": [ inputs: ['snv_somatic_vcf'], outputs: ['sbs_signatures', 'indel_signatures', 'signatures_matrix'] ],
+            "hrdetect": [ inputs: ['hets', 'vcf', 'jabba_gg', 'snv_somatic_vcf'], outputs: ['hrdetect'] ],
+            "onenesstwoness": [ inputs: ['events', 'hrdetect'], outputs: ['onenesstwoness'] ]
+        ]
         def sampleList = samplesheetToList(params.input)
         def available_inputs = new HashSet()
         sampleList.each { input_map ->

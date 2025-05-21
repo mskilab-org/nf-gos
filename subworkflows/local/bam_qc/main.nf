@@ -11,6 +11,8 @@ fasta = WorkflowNfcasereports.create_file_channel(params.fasta)
 fai = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
 intervals = WorkflowNfcasereports.create_file_channel(params.intervals)
 
+tools_to_run = WorkflowNfcasereports.toolsToRun
+
 workflow BAM_QC {
     take:
     bam                         // channel: [mandatory] [ meta, bam, bai ]
@@ -24,34 +26,41 @@ workflow BAM_QC {
 	// on NYU: "/gpfs/data/imielinskilab/DB/references/hg19/human_g1k_v37_decoy.fasta.subsampled_0.33.interval_list"
 	intervals_file = params.subsample_interval ?: []
 
-    PICARD_COLLECTWGSMETRICS(
-        bam,
-        fasta.map{ it -> [ [ id:'fasta' ], it ] },
-        fai.map{ it -> [ [ id:'fai' ], it ] },
-        intervals_file
-    )
+    if (tools_to_run.contains("collect_wgs_metrics")) {
+        PICARD_COLLECTWGSMETRICS(
+            bam,
+            fasta.map{ it -> [ [ id:'fasta' ], it ] },
+            fai.map{ it -> [ [ id:'fai' ], it ] },
+            intervals_file
+        )
+    }
 
-    PICARD_COLLECTMULTIPLEMETRICS(
-        bam,
-        fasta.map{ it -> [ [ id:'fasta' ], it ] },
-        fai.map{ it -> [ [ id:'fai' ], it ] }
-    )
 
-    // Subsample BAMs for faster estimation of library complexity
-	SAMTOOLS_SUBSAMPLE(
-		bam,
-		fasta.map{ it -> [ [ id:'fasta' ], it ] },
-        []
-	)
-	bams_subsampled = SAMTOOLS_SUBSAMPLE.out.bam_subsampled
+    if (tools_to_run.contains("collect_multiple_metrics")) {
+        PICARD_COLLECTMULTIPLEMETRICS(
+            bam,
+            fasta.map{ it -> [ [ id:'fasta' ], it ] },
+            fai.map{ it -> [ [ id:'fai' ], it ] }
+        )
+    }
 
-	bam_only = bams_subsampled.map{ meta, bam, bai -> [ meta, bam ] }
-    GATK4_ESTIMATELIBRARYCOMPLEXITY(
-        bam_only,
-        fasta,
-        fai,
-        dict
-    )
+    if (tools_to_run.contains("estimate_library_complexity")) {
+        // Subsample BAMs for faster estimation of library complexity
+        SAMTOOLS_SUBSAMPLE(
+            bam,
+            fasta.map{ it -> [ [ id:'fasta' ], it ] },
+            []
+        )
+        bams_subsampled = SAMTOOLS_SUBSAMPLE.out.bam_subsampled
+
+        bam_only = bams_subsampled.map{ meta, bam, bai -> [ meta, bam ] }
+        GATK4_ESTIMATELIBRARYCOMPLEXITY(
+            bam_only,
+            fasta,
+            fai,
+            dict
+        )
+    }
 
     // Gather all reports generated
     reports = reports.mix(PICARD_COLLECTWGSMETRICS.out.metrics)

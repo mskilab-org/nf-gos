@@ -12,41 +12,6 @@ def summary_params = paramsSummaryMap(workflow)
 // Print parameter summary log to screen
 log.info logo + paramsSummaryLog(workflow) + citation
 
-def tool_input_output_map = [
-    "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
-    "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics'] ],
-    // "collect_wgs_metrics": [ inputs: ['bam'], outputs: ['qc_coverage_metrics'] ],
-    // "collect_multiple_metrics": [ inputs: ['bam'], outputs: ['qc_alignment_summary', 'qc_insert_size'] ],
-    // "estimate_library_complexity": [ inputs: ['bam'], outputs: ['qc_dup_rate'] ],
-    "postprocessing": [ inputs: ['bam'], outputs: [] ],
-    "msisensorpro": [ inputs: ['bam'], outputs: ['msi', 'msi_germline'] ],
-    "gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
-    "amber": [ inputs: ['bam'], outputs: ['hets', 'amber_dir'] ],
-    "fragcounter": [ inputs: ['bam'], outputs: ['frag_cov'] ],
-    "dryclean": [ inputs: ['frag_cov'], outputs: ['dryclean_cov'] ],
-    "cbs": [ inputs: ['dryclean_cov'], outputs: ['seg', 'nseg'] ],
-    "sage": [ inputs: ['bam'], outputs: ['snv_somatic_vcf', 'snv_germline_vcf'] ],
-    "cobalt": [ inputs: ['bam'], outputs: ['cobalt_dir'] ],
-    "purple": [ inputs: ['cobalt_dir', 'amber_dir'], outputs: ['purity', 'ploidy'] ],
-    "jabba": [ inputs: ['vcf', 'hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
-    "non_integer_balance": [ inputs: ['jabba_gg'], outputs: ['ni_balanced_gg'] ],
-    "lp_phased_balance": [ inputs: ['ni_balanced_gg'], outputs: ['lp_balanced_gg'] ],
-    "events": [ inputs: ['ni_balanced_gg'], outputs: ['events'] ],
-    "fusions": [ inputs: ['ni_balanced_gg'], outputs: ['fusions'] ],
-    "snpeff": [ inputs: ['snv_somatic_vcf'], outputs: ['variant_somatic_ann', 'variant_somatic_bcf'] ],
-    "snv_multiplicity": [ inputs: ['jabba_gg', 'variant_somatic_ann'], outputs: ['snv_multiplicity'] ],
-    "oncokb": [ inputs: ['variant_somatic_ann', 'snv_multiplicity', 'jabba_gg', 'fusions'], outputs: ['oncokb_maf', 'oncokb_fusions', 'oncokb_cna'] ],
-    "signatures": [ inputs: ['snv_somatic_vcf'], outputs: ['sbs_signatures', 'indel_signatures', 'signatures_matrix'] ],
-    "hrdetect": [ inputs: ['hets', 'vcf', 'jabba_gg', 'snv_somatic_vcf'], outputs: ['hrdetect'] ],
-    "onenesstwoness": [ inputs: ['events', 'hrdetect'], outputs: ['onenesstwoness'] ]
-]
-
-
-tools_to_run = WorkflowNfcasereports.determineToolsToRun(params, tool_input_output_map)
-
-println "Tools that will be run based on your inputs: ${tools_to_run}"
-
-
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     VALIDATE INPUTS
@@ -215,6 +180,8 @@ GParsPool.withPool(numThreads) {
 
 // Initialise the workflow
 WorkflowNfcasereports.initialise(params, log)
+tools_to_run = WorkflowNfcasereports.toolsToRun
+println "Tools that will be run based on your inputs: ${tools_to_run}"
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -384,8 +351,6 @@ inputs = inputs
 
         ch_items
     }
-
-inputs = WorkflowNfcasereports.addTumorNormalIds(inputs)
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -601,7 +566,7 @@ snpeff_info     = params.snpeff_cache ? [] : Channel.of([ [ id:"${params.snpeff_
 alignment_bams_final = inputs
     .map { it -> [it.meta, it.bam, it.bai] }
     .filter { !it[1].isEmpty() }
-    .map { it -> [it[0].id, it[0], it[1], it[2]] }
+    .map { it -> [it[0].sample, it[0], it[1], it[2]] }
 
 final_filtered_sv_rds_for_merge = inputs
     .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
@@ -1088,7 +1053,6 @@ workflow NFCASEREPORTS {
 
     // MSISensorPro
     // ##############################
-    // MSI(inputs, alignment_bams_final, msisensorpro_scan)
     if (tools_to_run.contains("all") || tools_to_run.contains("msisensorpro") && !params.tumor_only) {
 
         bam_msi_inputs = inputs.filter { it.msi.isEmpty() }.map { it -> [it.meta.sample] }
