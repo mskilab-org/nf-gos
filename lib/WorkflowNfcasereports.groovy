@@ -20,6 +20,18 @@ class WorkflowNfcasereports {
             Nextflow.error "Genome fasta file not specified with e.g. '--fasta genome.fa' or via a detectable config file."
         }
 
+        if (!params.dbsnp && !params.known_indels) {
+            if (!params.skip_tools || (params.skip_tools && !params.skip_tools.contains('baserecalibrator'))) {
+                log.warn "Base quality score recalibration requires at least one resource file. Please provide at least one of `--dbsnp` or `--known_indels`\nYou can skip this step in the workflow by adding `--skip_tools baserecalibrator` to the command."
+            }
+            if (params.skip_tools && (!params.skip_tools.contains('haplotypecaller') || !params.skip_tools.contains('sentieon_haplotyper'))) {
+                log.warn "If GATK's Haplotypecaller or Sentieon's Haplotyper is specified, without `--dbsnp` or `--known_indels no filtering will be done. For filtering, please provide at least one of `--dbsnp` or `--known_indels`.\nFor more information see FilterVariantTranches (single-sample, default): https://gatk.broadinstitute.org/hc/en-us/articles/5358928898971-FilterVariantTranches\nFor more information see VariantRecalibration (--joint_germline): https://gatk.broadinstitute.org/hc/en-us/articles/5358906115227-VariantRecalibrator\nFor more information on GATK Best practice germline variant calling: https://gatk.broadinstitute.org/hc/en-us/articles/360035535932-Germline-short-variant-discovery-SNPs-Indels-"
+            }
+        }
+
+        if ((params.download_cache) && (params.snpeff_cache || params.vep_cache)) {
+            error("Please specify either `--download_cache` or `--snpeff_cache`, `--vep_cache`.")
+        }
     }
 
     public static create_file_channel(parameter, else_part = Channel.empty()) {
