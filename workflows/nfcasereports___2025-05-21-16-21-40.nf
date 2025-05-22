@@ -4,7 +4,6 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { test_robust_absence; test_robust_presence } from "${workflow.projectDir}/lib/NfUtils"
 include { paramsSummaryLog; paramsSummaryMap; fromSamplesheet } from 'plugin/nf-validation'
 def logo = NfcoreTemplate.logo(workflow, params.monochrome_logs)
 def citation = '\n' + WorkflowMain.citation(workflow) + '\n'
@@ -569,6 +568,28 @@ def missing_outputs = requiredFields.findAll { field ->
 }
 println "Outputs MISSING from at least one sample: $missing_outputs"
 
+def test_robust_absence(val, test_file = true) {
+	def is_absent = ( ! val || (val instanceof Collection && val.empty) )
+	def is_present = ! is_absent && val != null
+	def is_present_but_fileabsent = is_present && val?.isEmpty()
+	if (!test_file) {
+		is_present_but_fileabsent = is_absent
+	}
+	def is_empty = is_absent || is_present_but_fileabsent // Tests if file exists and is nonzero file size
+	return is_empty
+}
+
+def test_robust_presence(val, test_file = true) {
+	def is_absent = ( ! val || (val instanceof Collection && val.empty) )
+	def is_present = ! is_absent && val != null
+	def is_present_and_filepresent = is_present && ! val?.isEmpty()
+	if (!test_file) {
+		is_present_and_filepresent = is_present
+	}
+	return is_present_and_filepresent
+}
+
+
 // Iteratively select tools based on available inputs
 def skip_tools = params.skip_tools ? params.skip_tools.split(',').collect { it.trim() } : []
 println "Skipping tools: ${skip_tools}"
@@ -616,70 +637,70 @@ tool_input_output_map.each { tool, io ->
 
 		
 
-		// selected_tools_map[tool] = inputs.filter { sample ->
-		// 	def is_all_input_col_present = false
-		// 	def is_any_output_col_empty = false
+		selected_tools_map[tool] = inputs.filter { sample ->
+			def is_all_input_col_present = false
+			def is_any_output_col_empty = false
 
-		// 	is_all_input_col_present = io.inputs.every { field -> 
-		// 		test_robust_presence(sample[field], test_file = false) // Tests if file exists and is nonzero file size
-		// 	}
+			is_all_input_col_present = io.inputs.every { field -> 
+				test_robust_presence(sample[field], test_file = false) // Tests if file exists and is nonzero file size
+			}
 
-		// 	// if (is_input_generic_case) {
-		// 	// 	is_all_input_col_present = io.inputs.every { field -> 
-		// 	// 		! sample[field].isEmpty() // Tests if file exists and is nonzero file size
-		// 	// 	}
-		// 	// }
-		// 	// if (is_current_tool_jabba) {
-		// 	// 	is_any_sv_input_col_present = io.inputs[0].any { field -> 
-		// 	// 		! sample[field].isEmpty() // Tests if file exists and is nonzero file size
-		// 	// 	}
-		// 	// 	is_all_remaining_input_col_present = io.inputs[1].every { field -> 
-		// 	// 		! sample[field].isEmpty() // Tests if file exists and is nonzero file size
-		// 	// 	}
-		// 	// 	is_all_input_col_present = is_any_sv_input_col_present && is_all_remaining_input_col_present
-		// 	// }
+			// if (is_input_generic_case) {
+			// 	is_all_input_col_present = io.inputs.every { field -> 
+			// 		! sample[field].isEmpty() // Tests if file exists and is nonzero file size
+			// 	}
+			// }
+			// if (is_current_tool_jabba) {
+			// 	is_any_sv_input_col_present = io.inputs[0].any { field -> 
+			// 		! sample[field].isEmpty() // Tests if file exists and is nonzero file size
+			// 	}
+			// 	is_all_remaining_input_col_present = io.inputs[1].every { field -> 
+			// 		! sample[field].isEmpty() // Tests if file exists and is nonzero file size
+			// 	}
+			// 	is_all_input_col_present = is_any_sv_input_col_present && is_all_remaining_input_col_present
+			// }
 
 
 			
-		// 	// Generic output case
-		// 	if (is_output_generic_case) {
-		// 		is_any_output_col_empty = io.outputs.any { field ->
-		// 			test_robust_absence(sample[field], test_file = false)
-		// 		}	
-		// 	}
+			// Generic output case
+			if (is_output_generic_case) {
+				is_any_output_col_empty = io.outputs.any { field ->
+					test_robust_absence(sample[field], test_file = false)
+				}	
+			}
 
 
-		// 	def is_any_output_empty_test = io.outputs.any { field ->
-		// 		value = sample[field]
-		// 		def is_absent = test_robust_absence(sample[field], test_file = false)
-		// 		is_absent
-		// 	}
+			def is_any_output_empty_test = io.outputs.any { field ->
+				value = sample[field]
+				def is_absent = test_robust_absence(sample[field], test_file = false)
+				is_absent
+			}
 
-		// 	def is_all_input_present_test = io.inputs.every { field ->
-		// 		value = sample[field]
-		// 		def is_present = test_robust_presence(sample[field], test_file = false)
-		// 		is_present
-		// 	}
+			def is_all_input_present_test = io.inputs.every { field ->
+				value = sample[field]
+				def is_present = test_robust_presence(sample[field], test_file = false)
+				is_present
+			}
 
-		// 	// Treat special cases
-		// 	if (is_sage_tumor_only) {
-		// 		is_any_output_col_empty = test_robust_absence(sample["snv_somatic_vcf"], test_file = false)
-		// 	}
+			// Treat special cases
+			if (is_sage_tumor_only) {
+				is_any_output_col_empty = test_robust_absence(sample["snv_somatic_vcf"], test_file = false)
+			}
 
-		// 	if (is_current_tool_qc_multiple_metrics) {
-		// 		is_any_alignment_summary_absent = io.outputs[0].any { field ->
-		// 			test_robust_absence(sample[field], test_file = false)  // Tests if file exists and is nonzero file size
-		// 		}
-		// 		def is_any_insert_size_absent = io.outputs[1].any { field ->
-		// 			test_robust_absence(sample[field], test_file = false)  // Tests if file exists and is nonzero file size
-		// 		}
-		// 		is_any_output_col_empty = is_any_alignment_summary_absent || is_any_insert_size_absent
-		// 	}
-		// 	// End Treat special cases
+			if (is_current_tool_qc_multiple_metrics) {
+				is_any_alignment_summary_absent = io.outputs[0].any { field ->
+					test_robust_absence(sample[field], test_file = false)  // Tests if file exists and is nonzero file size
+				}
+				def is_any_insert_size_absent = io.outputs[1].any { field ->
+					test_robust_absence(sample[field], test_file = false)  // Tests if file exists and is nonzero file size
+				}
+				is_any_output_col_empty = is_any_alignment_summary_absent || is_any_insert_size_absent
+			}
+			// End Treat special cases
 			
-		// 	return is_any_output_col_empty && is_all_input_col_present
-		// 	// return [tool, is_any_output_col_empty && is_all_input_col_present, sample]
-		// }
+			return is_any_output_col_empty && is_all_input_col_present
+			// return [tool, is_any_output_col_empty && is_all_input_col_present, sample]
+		}
 		
 		
 	}
@@ -778,55 +799,55 @@ include { PREPARE_GENOME } from '../subworkflows/local/prepare_genome/main'
 // Build intervals if needed
 include { PREPARE_INTERVALS } from '../subworkflows/local/prepare_intervals/main'
 
-// // Convert BAM files to FASTQ files
-// include { BAM_CONVERT_SAMTOOLS as CONVERT_FASTQ_INPUT } from '../subworkflows/local/bam_convert_samtools/main'
+// Convert BAM files to FASTQ files
+include { BAM_CONVERT_SAMTOOLS as CONVERT_FASTQ_INPUT } from '../subworkflows/local/bam_convert_samtools/main'
 
-// // Run FASTQC
-// include { FASTQC } from '../modules/nf-core/fastqc/main'
+// Run FASTQC
+include { FASTQC } from '../modules/nf-core/fastqc/main'
 
-// // TRIM/SPLIT FASTQ Files
-// include { FASTP } from '../modules/nf-core/fastp/main'
+// TRIM/SPLIT FASTQ Files
+include { FASTP } from '../modules/nf-core/fastp/main'
 
-// // Loading the MULTIQC module
-// include { MULTIQC } from '../modules/nf-core/multiqc/main'
+// Loading the MULTIQC module
+include { MULTIQC } from '../modules/nf-core/multiqc/main'
 
-// // Loading the module that dumps the versions of software being used
-// include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../modules/nf-core/custom/dumpsoftwareversions/main'
+// Loading the module that dumps the versions of software being used
+include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 
-// // Map input reads to reference genome
-// include { FASTQ_ALIGN_BWAMEM_MEM2 } from '../subworkflows/local/fastq_align_bwamem_mem2/main'
+// Map input reads to reference genome
+include { FASTQ_ALIGN_BWAMEM_MEM2 } from '../subworkflows/local/fastq_align_bwamem_mem2/main'
 // include { FASTQ_PARABRICKS_FQ2BAM } from '../subworkflows/local/fastq_parabricks_fq2bam/main'
 
-// // Merge and index BAM files (optional)
-// include { BAM_MERGE_INDEX_SAMTOOLS } from '../subworkflows/local/bam_merge_index_samtools/main'
+// Merge and index BAM files (optional)
+include { BAM_MERGE_INDEX_SAMTOOLS } from '../subworkflows/local/bam_merge_index_samtools/main'
 
-// // Convert BAM files
-// include { SAMTOOLS_CONVERT as BAM_TO_CRAM } from '../modules/nf-core/samtools/convert/main'
-// include { SAMTOOLS_CONVERT as BAM_TO_CRAM_MAPPING } from '../modules/nf-core/samtools/convert/main'
+// Convert BAM files
+include { SAMTOOLS_CONVERT as BAM_TO_CRAM } from '../modules/nf-core/samtools/convert/main'
+include { SAMTOOLS_CONVERT as BAM_TO_CRAM_MAPPING } from '../modules/nf-core/samtools/convert/main'
 
-// // Convert CRAM files (optional)
-// include { SAMTOOLS_CONVERT as CRAM_TO_BAM } from '../modules/nf-core/samtools/convert/main'
-// include { SAMTOOLS_CONVERT as CRAM_TO_BAM_RECAL } from '../modules/nf-core/samtools/convert/main'
-// include { SAMTOOLS_CONVERT as CRAM_TO_BAM_FINAL } from '../modules/nf-core/samtools/convert/main'
+// Convert CRAM files (optional)
+include { SAMTOOLS_CONVERT as CRAM_TO_BAM } from '../modules/nf-core/samtools/convert/main'
+include { SAMTOOLS_CONVERT as CRAM_TO_BAM_RECAL } from '../modules/nf-core/samtools/convert/main'
+include { SAMTOOLS_CONVERT as CRAM_TO_BAM_FINAL } from '../modules/nf-core/samtools/convert/main'
 
-// // Mark Duplicates (+QC)
-// include { BAM_MARKDUPLICATES } from '../subworkflows/local/bam_markduplicates/main'
+// Mark Duplicates (+QC)
+include { BAM_MARKDUPLICATES } from '../subworkflows/local/bam_markduplicates/main'
 
-// // QC on CRAM
-// include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_NO_MD } from '../subworkflows/local/cram_qc_mosdepth_samtools/main'
-// include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_RECAL } from '../subworkflows/local/cram_qc_mosdepth_samtools/main'
+// QC on CRAM
+include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_NO_MD } from '../subworkflows/local/cram_qc_mosdepth_samtools/main'
+include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_RECAL } from '../subworkflows/local/cram_qc_mosdepth_samtools/main'
 
-// // BAM Picard QC
-// include { BAM_QC } from '../subworkflows/local/bam_qc/main'
-// include { BAM_QC_PICARD_COLLECTMULTIPLEMETRICS } from '../subworkflows/local/bam_qc/main'
-// include { BAM_QC_PICARD_COLLECTWGSMETRICS } from '../subworkflows/local/bam_qc/main'
-// include { BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY } from '../subworkflows/local/bam_qc/main'
+// BAM Picard QC
+include { BAM_QC } from '../subworkflows/local/bam_qc/main'
+include { BAM_QC_PICARD_COLLECTMULTIPLEMETRICS } from '../subworkflows/local/bam_qc/main'
+include { BAM_QC_PICARD_COLLECTWGSMETRICS } from '../subworkflows/local/bam_qc/main'
+include { BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY } from '../subworkflows/local/bam_qc/main'
 
-// // Create recalibration tables
-// include { BAM_BASERECALIBRATOR } from '../subworkflows/local/bam_baserecalibrator/main'
+// Create recalibration tables
+include { BAM_BASERECALIBRATOR } from '../subworkflows/local/bam_baserecalibrator/main'
 
-// // Create recalibrated cram files to use for variant calling (+QC)
-// include { BAM_APPLYBQSR } from '../subworkflows/local/bam_applybqsr/main'
+// Create recalibrated cram files to use for variant calling (+QC)
+include { BAM_APPLYBQSR } from '../subworkflows/local/bam_applybqsr/main'
 
 // Svaba
 include { BAM_SVCALLING_SVABA } from '../subworkflows/local/bam_svcalling_svaba/main'
@@ -938,37 +959,19 @@ snpeff_info     = params.snpeff_cache ? [] : Channel.of([ [ id:"${params.snpeff_
 
 alignment_bams_final = inputs
     .map { it -> [it.meta, it.bam, it.bai] }
-    .filter { ! it[1].isEmpty() }
+    .filter { !it[1].isEmpty() }
     .map { it -> [it[0].id, it[0], it[1], it[2]] }
 
 // alignment_bams_final = selected_tools_map["aligner"]
 //     .map { it -> [it.meta, it.bam, it.bai] }
 //     .map { it -> [it[0].id, it[0], it[1], it[2]] }
 
-// bam_qc_duplicates_inputs = selected_tools_map["qc_duplicates"]
-// 	.map { it -> [it.meta.sample] }
+bam_qc_duplicates_inputs = selected_tools_map["qc_duplicates"]
+	.map { it -> [it.meta.sample] }
 
-// bam_qc_duplicates_inputs = inputs
-// 	.map { it -> [it.meta, it.qc_dup_rate] }
-// 	.filter { test_robust_presence(it[1]) }
-// 	.map { it -> [it[0].sample] } // meta.sample
+bam_qc_multiple_metrics_inputs = selected_tools_map["qc_multiple_metrics"].map { it -> [it.meta.sample] }
 
-// // bam_qc_multiple_metrics_inputs = selected_tools_map["qc_multiple_metrics"].map { it -> [it.meta.sample] }
-
-// bam_qc_multiple_metrics_inputs = inputs
-// 	.map { it -> [it.meta, it.qc_alignment_summary, it.qc_insert_size] }
-// 	.filter { 
-// 		test_robust_presence(it[1]) 
-// 		&& test_robust_presence(it[2])
-// 	}
-// 	.map { it -> [it[0].sample] } // meta.sample
-
-// // bam_qc_coverage_inputs = selected_tools_map["qc_coverage_metrics"].map { it -> [it.meta.sample] }
-
-// bam_qc_coverage_inputs = inputs
-// 	.map { it -> [it.meta, it.qc_coverage_metrics] }
-// 	.filter { !it[1].isEmpty() }
-// 	.map { it -> [it[0].sample] } // meta.sample
+bam_qc_coverage_inputs = selected_tools_map["qc_coverage_metrics"].map { it -> [it.meta.sample] }
 
 final_filtered_sv_rds_for_merge = inputs
     .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
@@ -1210,15 +1213,15 @@ workflow NFCASEREPORTS {
         intervals_bed_combined.map{it -> [ [ id:it.baseName ], it ]}.collect() :
         Channel.value([ [ id:'null' ], [] ])
 
-    intervals            = PREPARE_INTERVALS.out.intervals_bed        // [ interval, num_intervals ] multiple interval.bed files, divided by useful intervals for scatter/gather
+     PREPARE_INTERVALS.out.intervals_bed        // [ interval, num_intervals ] multiple interval.bed files, divided by useful intervals for scatter/gather
     intervals_bed_gz_tbi = PREPARE_INTERVALS.out.intervals_bed_gz_tbi // [ interval_bed, tbi, num_intervals ] multiple interval.bed.gz/.tbi files, divided by useful intervals for scatter/gather
 
-    intervals_and_num_intervals = intervals.map{ interval, num_intervals ->
+    intervals_and_num_ intervals.map{ interval, num_intervals ->
         if ( num_intervals < 1 ) [ [], num_intervals ]
         else [ interval, num_intervals ]
     }
 
-    intervals_bed_gz_tbi_and_num_intervals = intervals_bed_gz_tbi.map{ intervals, num_intervals ->
+    intervals_bed_gz_tbi_and_num_ intervals_bed_gz_tbi.map{ intervals, num_intervals ->
         if ( num_intervals < 1 ) [ [], [], num_intervals ]
         else [ intervals[0], intervals[1], num_intervals ]
     }
@@ -1227,24 +1230,287 @@ workflow NFCASEREPORTS {
     versions = versions.mix(PREPARE_GENOME.out.versions)
     versions = versions.mix(PREPARE_INTERVALS.out.versions)
 
-	ALIGNMENT_STEP(
+    // Alignment
+    // ##############################
+
+    // if (tools_used.contains("all") || tools_used.contains("aligner")) {
+    //     input_fastq = inputs.filter { it.bam.isEmpty() }.map { it -> [it.meta, [it.fastq_1, it.fastq_2]] }
+    //     alignment_existing_outputs = inputs.map { it -> [it.meta, it.bam] }.filter { !it[1].isEmpty() }
+
+    //     // inputs.view { log.info "Input samples: ${it.meta} is empty? ${it.bam.isEmpty()}" }
+    //     // input_fastq.view { log.info "Input FASTQ files: $it" }
+    //     // alignment_existing_outputs.view { log.info "Alignment existing outputs: $it" }
+
+    //     // QC
+    //     FASTQC(input_fastq)
+
+    //     reports = reports.mix(FASTQC.out.zip.collect{ meta, logs -> logs })
+    //     versions = versions.mix(FASTQC.out.versions.first())
+
+    //     //skipping the UMI Conscensus calling step for now
+    //     reads_for_fastp = input_fastq
+
+    //     // Trimming and/or splitting
+    //     if (params.trim_fastq || params.split_fastq > 0) {
+    //         if (params.trim_fastq) {
+    //             log.warn "You have mentioned trim_fastq to `$params.trim_fastq`, will do trimming"
+    //         }
+    //         save_trimmed_fail = false
+    //         save_merged = false
+    //         FASTP(
+    //             reads_for_fastp,
+    //             [], // we are not using any adapter fastas at the moment
+    //             save_trimmed_fail,
+    //             save_merged
+    //         )
+
+    //         reports = reports.mix(FASTP.out.json.collect{ meta, json -> json })
+    //         reports = reports.mix(FASTP.out.html.collect{ meta, html -> html })
+
+    //         if (params.split_fastq) {
+    //             log.warn "You have mentioned split_fastq to `$params.split_fastq`, will do splitting"
+    //             reads_for_alignment = FASTP.out.reads.map{ meta, reads ->
+    //                 read_files = reads.sort(false) { a,b -> a.getName().tokenize('.')[0] <=> b.getName().tokenize('.')[0] }.collate(2)
+    //                 [ meta + [ size:read_files.size() ], read_files ]
+    //             }.transpose()
+    //         } else reads_for_alignment = FASTP.out.reads
+
+    //         versions = versions.mix(FASTP.out.versions)
+
+    //     } else {
+    //         println "Skipping fastp since trim_fastq and split_fastq are false"
+    //         reads_for_alignment = reads_for_fastp
+    //     }
+
+    //     // STEP 1: MAPPING READS TO REFERENCE GENOME
+    //     // reads will be sorted
+    //     reads_for_alignment = reads_for_alignment
+    //         .map{ meta, reads ->
+    //         // Update meta.id to meta.sample if no multiple lanes or splitted fastqs
+    //         if (meta.num_lanes == null || meta.size * meta.num_lanes == 1) [ meta + [ id:meta.sample ], reads ]
+    //         else [ meta, reads ]
+    //     }
+
+    //     // GPU Alignment
+    //     if (params.aligner == "fq2bam") {
+    //         FASTQ_PARABRICKS_FQ2BAM(
+    //             reads_for_alignment,
+    //             known_sites_indels,
+    //             known_sites_indels_tbi
+    //         )
+    //         // merge existing BAMs with newly mapped ones
+    //         bam_mapped = alignment_existing_outputs.mix(FASTQ_PARABRICKS_FQ2BAM.out.bam)
+    //     } else {
+    //         FASTQ_ALIGN_BWAMEM_MEM2(
+    //             reads_for_alignment,
+    //             index_alignment
+    //         )
+    //         // merge existing BAMs with newly mapped ones
+    //         bam_mapped = alignment_existing_outputs.mix(FASTQ_ALIGN_BWAMEM_MEM2.out.bam)
+    //     }
+
+
+    //     // Grouping the bams from the same samples not to stall the workflow
+    //     bam_mapped = bam_mapped
+    //         .map { meta, bam ->
+
+    //             // Update meta.id to be meta.sample, ditching sample-lane that is not needed anymore
+    //             // Update meta.data_type
+    //             // Remove no longer necessary fields:
+    //             //   read_group: Now in the BAM header
+    //             //    num_lanes: only needed for mapping
+    //             //         size: only needed for mapping
+
+    //             // Ensure meta.size and meta.num_lanes are integers and handle null values
+    //             int numLanes = (meta.num_lanes != null && meta.num_lanes > 1 ? meta.num_lanes : 1) as int
+    //             int numSplits = (meta.size ?: 1) as int
+    //             int numReads = numLanes * numSplits
+
+    //             // Use groupKey to make sure that the correct group can advance as soon as it is complete
+    //             // and not stall the workflow until all reads from all channels are mapped
+    //             [ groupKey( meta - meta.subMap('num_lanes', 'read_group', 'size') + [ id:meta.sample ], numReads), bam ]
+    //         }
+    //     .groupTuple()
+
+    //     // bams are merged (when multiple lanes from the same sample) and indexed
+    //     BAM_MERGE_INDEX_SAMTOOLS(bam_mapped)
+
+    //     // Gather used softwares versions
+    //     versions = versions.mix(BAM_MERGE_INDEX_SAMTOOLS.out.versions)
+
+    //     alignment_bams_final = BAM_MERGE_INDEX_SAMTOOLS.out.bam_bai.map({ meta, bam, bai -> [ meta.id, meta, bam, bai ] })
+    // }
+
+    // // BAM Postprocessing
+    // // ##############################
+	// do_post_processing_bc_aligner_not_fq2bam = (tools_used.contains("all") || tools_used.contains("aligner")) && params.aligner != "fq2bam"
+	// do_post_processing_bc_of_tool_or_flag = tools_used.contains("all") || tools_used.contains("postprocessing") || params.is_run_post_processing // FIXME: If bam is provided as input, tools_used currently will never contain postprocessing and only controlled by params, but leaving here as a reminder.
+    // if (do_post_processing_bc_aligner_not_fq2bam || do_post_processing_bc_of_tool_or_flag) { // fq2bam does not need postprocessing
+		
+	// 	bam_mapped = alignment_bams_final
+    //         .map { id, meta, bam, bai -> [meta + [data_type: "bam"], bam] }
+    //     cram_markduplicates_no_spark = Channel.empty()
+
+    //     // STEP 2: markduplicates (+QC) + convert to CRAM
+
+    //     BAM_MARKDUPLICATES(
+    //         bam_mapped,
+    //         fasta,
+    //         fasta_fai,
+    //         intervals_for_preprocessing
+    //     )
+
+    //     cram_markduplicates_no_spark = BAM_MARKDUPLICATES.out.cram
+
+    //     // Gather QC reports
+    //     reports = reports.mix(BAM_MARKDUPLICATES.out.reports.collect{ meta, report -> report })
+
+    //     // Gather used softwares versions
+    //     versions = versions.mix(BAM_MARKDUPLICATES.out.versions)
+
+    //     // STEP 3: BASE RECALIBRATION
+    //     ch_cram_for_bam_baserecalibrator = Channel.empty().mix(cram_markduplicates_no_spark)
+    //         // Make sure correct data types are carried through
+    //         .map{ meta, cram, crai -> [ meta + [data_type: "cram"], cram, crai ] }
+
+    //     ch_table_bqsr_tab    = Channel.empty()
+
+    //     BAM_BASERECALIBRATOR(
+    //         ch_cram_for_bam_baserecalibrator,
+    //         dict,
+    //         fasta,
+    //         fasta_fai,
+    //         intervals_and_num_intervals,
+    //         known_sites_indels,
+    //         known_sites_indels_tbi
+    //         )
+
+    //     ch_table_bqsr_tab = BAM_BASERECALIBRATOR.out.table_bqsr
+
+    //     versions = versions.mix(BAM_BASERECALIBRATOR.out.versions)
+
+    //     // ch_table_bqsr contains table from baserecalibrator
+    //     ch_table_bqsr = Channel.empty().mix(ch_table_bqsr_tab)
+
+    //     reports = reports.mix(ch_table_bqsr.collect{ meta, table -> table })
+    //     cram_applybqsr = ch_cram_for_bam_baserecalibrator.join(ch_table_bqsr, failOnDuplicate: true, failOnMismatch: true)
+
+    //     // STEP 4: RECALIBRATING
+
+    //     cram_variant_calling = Channel.empty()
+
+    //     BAM_APPLYBQSR(
+    //         cram_applybqsr,
+    //         dict,
+    //         fasta,
+    //         fasta_fai,
+    //         intervals_and_num_intervals
+    //     )
+
+    //     cram_variant_calling = BAM_APPLYBQSR.out.cram
+
+    //     // Gather used softwares versions
+    //     versions = versions.mix(BAM_APPLYBQSR.out.versions)
+
+    //     CRAM_QC_RECAL(
+    //         cram_variant_calling,
+    //         fasta,
+    //         intervals_for_preprocessing
+    //     )
+
+    //     // Gather QC
+    //     reports = reports.mix(CRAM_QC_RECAL.out.reports.collect{ meta, report -> report })
+
+    //     // Gather software versions
+    //     versions = versions.mix(CRAM_QC_RECAL.out.versions)
+
+    //     // convert CRAM files to BAM for downstream processes
+    //     CRAM_TO_BAM_RECAL(cram_variant_calling, fasta, fasta_fai)
+    //     versions = versions.mix(CRAM_TO_BAM_RECAL.out.versions)
+
+    //     CRAM_TO_BAM_FINAL(cram_variant_calling, fasta, fasta_fai)
+    //     versions = versions.mix(CRAM_TO_BAM_FINAL.out.versions)
+
+    //     alignment_bams_final = Channel.empty()
+    //         .mix(CRAM_TO_BAM_FINAL.out.alignment_index)
+    //         .map{ meta, bam, bai -> [ meta.id, meta + [data_type: "bam"], bam, bai ] }
+    // }
+
+    // // Post-alignment QC
+    // // if (tools_used.contains("all") || tools_used.contains("bamqc")) {
+    // //     bam_qc_inputs = inputs.map { it -> [it.meta.sample] }
+    // //     bam_qc_calling = bam_qc_inputs
+    // //         .join(alignment_bams_final)
+    // //         .map { id, meta, bam, bai -> [ meta, bam, bai ] }
+
+    // //     // omit meta since it is not used in the BAM_QC
+    // //     dict_path = dict.map{ meta, dict -> [dict] }
+    // //     BAM_QC(bam_qc_calling, dict_path)
+
+    // //     // Gather QC
+    // //     reports = reports.mix(BAM_QC.out.reports.collect{ meta, report -> report })
+    // //     versions = versions.mix(BAM_QC.out.versions)
+    // // }
+
+	// // Post-alignment QC Draft
+    // if (tools_used.contains("all") || do_bamqc) {
+
+    //     // bam_qc_calling = bam_qc_inputs
+    //     //     .join(alignment_bams_final)
+    //     //     .map { id, meta, bam, bai -> [ meta, bam, bai ] }
+		
+	// 	// bam_qc_calling = bam_qc_calling.broadcast()
+
+	// 	bam_qc_duplicates_calling = bam_qc_duplicates_inputs
+    //         .join(alignment_bams_final)
+    //         .map { id, meta, bam, bai -> [ meta, bam, bai ] }
+	// 		.broadcast()
+
+	// 	bam_qc_multiple_metrics_calling = bam_qc_multiple_metrics_inputs
+    //         .join(alignment_bams_final)
+    //         .map { id, meta, bam, bai -> [ meta, bam, bai ] }
+	// 		.broadcast()
+		
+	// 	bam_qc_coverage_calling = bam_qc_coverage_inputs
+    //         .join(alignment_bams_final)
+    //         .map { id, meta, bam, bai -> [ meta, bam, bai ] }
+	// 		.broadcast()
+
+    //     // omit meta since it is not used in the BAM_QC
+    //     dict_path = dict.map{ meta, dict -> [dict] }
+	// 	dict_path = dict_path.broadcast()
+    //     // BAM_QC(bam_qc_calling, dict_path)
+
+	// 	if (do_qc_multiple_metrics) {
+	// 		BAM_QC_PICARD_COLLECTMULTIPLEMETRICS(bam_qc_multiple_metrics_calling, dict_path)
+	// 		reports = reports.mix(BAM_QC_PICARD_COLLECTMULTIPLEMETRICS.out.reports.collect{ meta, report -> report })
+	// 		versions = versions.mix(BAM_QC_PICARD_COLLECTMULTIPLEMETRICS.out.versions)
+	// 	}
+	// 	if (do_qc_wgs_metrics) {
+	// 		BAM_QC_PICARD_COLLECTWGSMETRICS(bam_qc_coverage_calling, dict_path)
+	// 		reports = reports.mix(BAM_QC_PICARD_COLLECTWGSMETRICS.out.reports.collect{ meta, report -> report })
+	// 		versions = versions.mix(BAM_QC_PICARD_COLLECTWGSMETRICS.out.versions)
+	// 	}
+	// 	if (do_qc_duplicates) {
+	// 		BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY(bam_qc_duplicates_calling, dict_path)
+	// 		reports = reports.mix(BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY.out.reports.collect{ meta, report -> report })
+	// 		versions = versions.mix(BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY.out.versions)
+	// 	}
+        
+    // }
+
+	ALIGNMENT_STEP_OUTPUT = ALIGNMENT_STEP(
 		inputs,
 		selected_tools_map,
-		tools_used,
-		known_sites_indels,
-		known_sites_indels_tbi,
-		index_alignment,
-		fasta,
-		fasta_fai,
-		dict,
-		intervals_for_preprocessing,
-		intervals_and_num_intervals
+		tools_used
 	)
 
-	alignment_bams_final = alignment_bams_final.mix(ALIGNMENT_STEP.out.alignment_bams_final)
+	
+
+	alignment_bams_final = alignment_bams_final.mix(ALIGNMENT_STEP_OUTPUT.out.alignment_bams_final)
 	alignment_bams_final = alignment_bams_final.map{ meta, bam, bai -> [ meta.id, meta + [data_type: "bam"], bam, bai ] }
-	reports = reports.mix(ALIGNMENT_STEP.out.reports.collect{ meta, report -> report })
-	versions = versions.mix(ALIGNMENT_STEP.out.versions)
+	reports = reports.mix(ALIGNMENT_STEP_OUTPUT.out.reports.collect{ meta, report -> report })
+	versions = versions.mix(ALIGNMENT_STEP_OUTPUT.out.versions)
 
     // MSISensorPro
     // ##############################

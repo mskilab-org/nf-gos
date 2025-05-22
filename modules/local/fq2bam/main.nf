@@ -6,7 +6,7 @@ process PARABRICKS_FQ2BAM {
     containerOptions "${ workflow.containerEngine == "singularity" ? '--nv': ( workflow.containerEngine == "docker" ? '--gpus all': null ) }"
 
     input:
-    tuple val(meta), path(reads)
+	tuple val(meta), path(fq1), path(fq2), val(read_group)
     path fasta
     path fasta_fai
     path interval_file
@@ -34,7 +34,25 @@ process PARABRICKS_FQ2BAM {
     }
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
-    def in_fq_command = meta.single_end ? "--in-se-fq $reads" : "--in-fq $reads"
+    // def in_fq_command = meta.single_end ? "--in-se-fq $reads" : "--in-fq $reads"
+	// Handle reads input: can be multiple lanes, each as a pair (or single) with optional read group
+	// Compose the input FASTQ command for fq2bam
+	def in_fq_command = ""
+	if (fq1 instanceof List && fq2 instanceof List) {
+		// Multiple lanes: fq1 and fq2 are lists of files
+		fq1.eachWithIndex { f1, idx ->
+			def f2 = fq2[idx]
+			def rg = (read_group instanceof List) ? read_group[idx] : read_group
+			in_fq_command += "--in-fq ${f1} ${f2} ${rg} "
+		}
+		in_fq_command = in_fq_command.trim()
+	} else {
+		// Single lane
+		def rg = (read_group instanceof List) ? read_group[0] : read_group
+		in_fq_command = "--in-fq ${fq1} ${fq2} ${rg}"
+	}
+	// in_fq_command = meta.single_end ? "--in-se-fq $fastq_files" : "--in-fq $fastq_files"
+	// Handle reads input: can be multiple lanes, each as a pair (or single) with optional read group
     def known_sites_command = known_sites ? known_sites.collect{"--knownSites $it"}.join(' ') : ""
     def known_sites_output = known_sites ? "--out-recal-file ${prefix}.table" : ""
     def interval_file_command = interval_file ? interval_file.collect{"--interval-file $it"}.join(' ') : ""
@@ -57,7 +75,7 @@ process PARABRICKS_FQ2BAM {
         fq2bam \\
         --ref $fasta \\
         $in_fq_command \\
-        --read-group-sm $meta.id \\
+        `# --read-group-sm $meta.id` \\
         --out-bam ${prefix}.bam \\
         $known_sites_command \\
         $known_sites_output \\
