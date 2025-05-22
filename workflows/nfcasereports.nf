@@ -941,36 +941,6 @@ alignment_bams_final = inputs
     .filter { ! it[1].isEmpty() }
     .map { it -> [it[0].id, it[0], it[1], it[2]] }
 
-alignment_bams_final.view{ log.info("Alignment bams final init: ${it}") }
-
-// alignment_bams_final = selected_tools_map["aligner"]
-//     .map { it -> [it.meta, it.bam, it.bai] }
-//     .map { it -> [it[0].id, it[0], it[1], it[2]] }
-
-// bam_qc_duplicates_inputs = selected_tools_map["qc_duplicates"]
-// 	.map { it -> [it.meta.sample] }
-
-// bam_qc_duplicates_inputs = inputs
-// 	.map { it -> [it.meta, it.qc_dup_rate] }
-// 	.filter { test_robust_presence(it[1]) }
-// 	.map { it -> [it[0].sample] } // meta.sample
-
-// // bam_qc_multiple_metrics_inputs = selected_tools_map["qc_multiple_metrics"].map { it -> [it.meta.sample] }
-
-// bam_qc_multiple_metrics_inputs = inputs
-// 	.map { it -> [it.meta, it.qc_alignment_summary, it.qc_insert_size] }
-// 	.filter { 
-// 		test_robust_presence(it[1]) 
-// 		&& test_robust_presence(it[2])
-// 	}
-// 	.map { it -> [it[0].sample] } // meta.sample
-
-// // bam_qc_coverage_inputs = selected_tools_map["qc_coverage_metrics"].map { it -> [it.meta.sample] }
-
-// bam_qc_coverage_inputs = inputs
-// 	.map { it -> [it.meta, it.qc_coverage_metrics] }
-// 	.filter { !it[1].isEmpty() }
-// 	.map { it -> [it[0].sample] } // meta.sample
 
 final_filtered_sv_rds_for_merge = inputs
     .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
@@ -1864,7 +1834,7 @@ workflow NFCASEREPORTS {
             .tumor
             .map {
             patient, meta ->
-            [patient, meta + [tumor_id: meta.id] ]
+            [patient, meta + [tumor_id: meta.sample] ]
         }
 
         purple_inputs_snv_germline = Channel.empty()

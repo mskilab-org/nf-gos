@@ -108,7 +108,7 @@ workflow ALIGNMENT_STEP {
         // alignment_existing_outputs.view { log.info "Alignment existing outputs: $it" }
 
         // // QC
-        // FASTQC(input_fastq_qc)
+        FASTQC(input_fastq_qc)
 
         // reports = reports.mix(FASTQC.out.zip.collect{ meta, logs -> logs })
         // versions = versions.mix(FASTQC.out.versions.first())
@@ -239,8 +239,6 @@ workflow ALIGNMENT_STEP {
             }
         .groupTuple()
 
-		bam_mapped.view{ log.info "bam_mapped after: $it" }
-
 		
 
         // bams are merged (when multiple lanes from the same sample) and indexed
@@ -364,50 +362,45 @@ workflow ALIGNMENT_STEP {
     //     versions = versions.mix(BAM_QC.out.versions)
     // }
 
-	// // Post-alignment QC Draft
-    // if (tools_used.contains("all") || do_bamqc) {
-		
-	// 	bam_qc_multiple_metrics_inputs.view { log.info "bam_qc_multiple_metrics_inputs: $it" }
-	// 	dict.view { log.info "dict: $it" }
+	// Post-alignment QC Draft
+    if (tools_used.contains("all") || do_bamqc) {
 
-	// 	bam_qc_duplicates_calling = bam_qc_duplicates_inputs
-    //         .join(alignment_bams_final)
-    //         .map { id, meta, bam, bai -> [ meta, bam, bai ] }
+		bam_qc_duplicates_calling = bam_qc_duplicates_inputs
+            .join(alignment_bams_final)
+            .map { id, meta, bam, bai -> [ meta, bam, bai ] }
 
 		
 
-	// 	bam_qc_multiple_metrics_calling = bam_qc_multiple_metrics_inputs
-    //         .join(alignment_bams_final)
-    //         .map { id, meta, bam, bai -> [ meta, bam, bai ] }
-
-	// 	bam_qc_multiple_metrics_calling.view { log.info "bam_qc_multiple_metrics_calling: $it" }
+		bam_qc_multiple_metrics_calling = bam_qc_multiple_metrics_inputs
+            .join(alignment_bams_final)
+            .map { id, meta, bam, bai -> [ meta, bam, bai ] }
 		
-	// 	bam_qc_coverage_calling = bam_qc_coverage_inputs
-    //         .join(alignment_bams_final)
-    //         .map { id, meta, bam, bai -> [ meta, bam, bai ] }
+		bam_qc_coverage_calling = bam_qc_coverage_inputs
+            .join(alignment_bams_final)
+            .map { id, meta, bam, bai -> [ meta, bam, bai ] }
 
-    //     // omit meta since it is not used in the BAM_QC
+        // omit meta since it is not used in the BAM_QC
 
-    //     dict_path = dict.map{ meta, dict -> [dict] }
-    //     // BAM_QC(bam_qc_calling, dict_path)
+        dict_path = dict.map{ meta, dict -> [dict] }
+        // BAM_QC(bam_qc_calling, dict_path)
 
-	// 	if (do_qc_multiple_metrics) {
-	// 		BAM_QC_PICARD_COLLECTMULTIPLEMETRICS(bam_qc_multiple_metrics_calling)
-	// 		reports = reports.mix(BAM_QC_PICARD_COLLECTMULTIPLEMETRICS.out.reports.collect{ meta, report -> report })
-	// 		versions = versions.mix(BAM_QC_PICARD_COLLECTMULTIPLEMETRICS.out.versions)
-	// 	}
-	// 	if (do_qc_coverage) {
-	// 		BAM_QC_PICARD_COLLECTWGSMETRICS(bam_qc_coverage_calling)
-	// 		reports = reports.mix(BAM_QC_PICARD_COLLECTWGSMETRICS.out.reports.collect{ meta, report -> report })
-	// 		versions = versions.mix(BAM_QC_PICARD_COLLECTWGSMETRICS.out.versions)
-	// 	}
-	// 	if (do_qc_duplicates) {
-	// 		// BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY(bam_qc_duplicates_calling, dict_path)
-	// 		// reports = reports.mix(BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY.out.reports.collect{ meta, report -> report })
-	// 		// versions = versions.mix(BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY.out.versions)
-	// 		null
-	// 	}
-	// }
+		if (do_qc_multiple_metrics) {
+			BAM_QC_PICARD_COLLECTMULTIPLEMETRICS(bam_qc_multiple_metrics_calling)
+			// reports = reports.mix(BAM_QC_PICARD_COLLECTMULTIPLEMETRICS.out.reports.collect{ meta, report -> report })
+			// versions = versions.mix(BAM_QC_PICARD_COLLECTMULTIPLEMETRICS.out.versions)
+		}
+		if (do_qc_coverage) {
+			BAM_QC_PICARD_COLLECTWGSMETRICS(bam_qc_coverage_calling)
+			// reports = reports.mix(BAM_QC_PICARD_COLLECTWGSMETRICS.out.reports.collect{ meta, report -> report })
+			// versions = versions.mix(BAM_QC_PICARD_COLLECTWGSMETRICS.out.versions)
+		}
+		if (do_qc_duplicates) {
+			// BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY(bam_qc_duplicates_calling, dict_path)
+			// reports = reports.mix(BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY.out.reports.collect{ meta, report -> report })
+			// versions = versions.mix(BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY.out.versions)
+			null
+		}
+	}
 
 	emit:
 	alignment_bams_final
