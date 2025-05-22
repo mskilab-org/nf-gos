@@ -72,6 +72,9 @@ workflow ALIGNMENT_STEP {
 	
 	input_fastq_qc = input_fastq.map { it -> [it[0], [it[1], it[2]]] }
 
+
+	// Inverse logic is used for QC
+	// Use of inner join downstream.
 	bam_qc_duplicates_inputs = inputs
 		.map { it -> [it.meta, it.qc_dup_rate] }
 		.filter { it[1].isEmpty() }
@@ -87,13 +90,13 @@ workflow ALIGNMENT_STEP {
 
 	bam_qc_coverage_inputs = inputs
 		.map { it -> [it.meta, it.qc_coverage_metrics] }
-		.filter { !it[1].isEmpty() }
+		.filter { it[1].isEmpty() }
 		.map { it -> [it[0].sample] } // meta.sample
 
 	is_run_qc_duplicates = params.is_run_qc_duplicates ?: false // if parameter doesn't exist, set to false
 	do_qc_coverage = tools_used.contains("qc_coverage")
 	do_qc_multiple_metrics = tools_used.contains("qc_multiple_metrics")
-	do_qc_duplicates = tools_used.contains("qc_duplicates") || is_run_qc_duplicates
+	do_qc_duplicates = tools_used.contains("qc_duplicates") && is_run_qc_duplicates
 	do_bamqc = do_qc_coverage || do_qc_multiple_metrics || do_qc_duplicates
 
 
@@ -130,8 +133,8 @@ workflow ALIGNMENT_STEP {
                 save_merged
             )
 
-            reports = reports.mix(FASTP.out.json.collect{ meta, json -> json })
-            reports = reports.mix(FASTP.out.html.collect{ meta, html -> html })
+            // reports = reports.mix(FASTP.out.json.collect{ meta, json -> json })
+            // reports = reports.mix(FASTP.out.html.collect{ meta, html -> html })
 
             if (params.split_fastq) {
                 log.warn "You have mentioned split_fastq to `$params.split_fastq`, will do splitting"
@@ -141,7 +144,7 @@ workflow ALIGNMENT_STEP {
                 }.transpose()
             } else reads_for_alignment = FASTP.out.reads
 
-            versions = versions.mix(FASTP.out.versions)
+            // versions = versions.mix(FASTP.out.versions)
 
         } else {
             println "Skipping fastp since trim_fastq and split_fastq are false"
@@ -245,7 +248,7 @@ workflow ALIGNMENT_STEP {
         BAM_MERGE_INDEX_SAMTOOLS(bam_mapped)
 
         // Gather used softwares versions
-        versions = versions.mix(BAM_MERGE_INDEX_SAMTOOLS.out.versions)
+        // versions = versions.mix(BAM_MERGE_INDEX_SAMTOOLS.out.versions)
 
         alignment_bams_final = BAM_MERGE_INDEX_SAMTOOLS.out.bam_bai.map({ meta, bam, bai -> [ meta.id, meta, bam, bai ] })
 		alignment_bams_final.view{ log.info "alignment_bams_final: $it" }
@@ -273,10 +276,10 @@ workflow ALIGNMENT_STEP {
         cram_markduplicates_no_spark = BAM_MARKDUPLICATES.out.cram
 
         // Gather QC reports
-        reports = reports.mix(BAM_MARKDUPLICATES.out.reports.collect{ meta, report -> report })
+        // reports = reports.mix(BAM_MARKDUPLICATES.out.reports.collect{ meta, report -> report })
 
         // Gather used softwares versions
-        versions = versions.mix(BAM_MARKDUPLICATES.out.versions)
+        // versions = versions.mix(BAM_MARKDUPLICATES.out.versions)
 
         // STEP 3: BASE RECALIBRATION
         ch_cram_for_bam_baserecalibrator = Channel.empty().mix(cram_markduplicates_no_spark)
@@ -297,12 +300,12 @@ workflow ALIGNMENT_STEP {
 
         ch_table_bqsr_tab = BAM_BASERECALIBRATOR.out.table_bqsr
 
-        versions = versions.mix(BAM_BASERECALIBRATOR.out.versions)
+        // versions = versions.mix(BAM_BASERECALIBRATOR.out.versions)
 
         // ch_table_bqsr contains table from baserecalibrator
         ch_table_bqsr = Channel.empty().mix(ch_table_bqsr_tab)
 
-        reports = reports.mix(ch_table_bqsr.collect{ meta, table -> table })
+        // reports = reports.mix(ch_table_bqsr.collect{ meta, table -> table })
         cram_applybqsr = ch_cram_for_bam_baserecalibrator.join(ch_table_bqsr, failOnDuplicate: true, failOnMismatch: true)
 
         // STEP 4: RECALIBRATING
@@ -320,7 +323,7 @@ workflow ALIGNMENT_STEP {
         cram_variant_calling = BAM_APPLYBQSR.out.cram
 
         // Gather used softwares versions
-        versions = versions.mix(BAM_APPLYBQSR.out.versions)
+        // versions = versions.mix(BAM_APPLYBQSR.out.versions)
 
         CRAM_QC_RECAL(
             cram_variant_calling,
@@ -329,17 +332,17 @@ workflow ALIGNMENT_STEP {
         )
 
         // Gather QC
-        reports = reports.mix(CRAM_QC_RECAL.out.reports.collect{ meta, report -> report })
+        // reports = reports.mix(CRAM_QC_RECAL.out.reports.collect{ meta, report -> report })
 
         // Gather software versions
-        versions = versions.mix(CRAM_QC_RECAL.out.versions)
+        // versions = versions.mix(CRAM_QC_RECAL.out.versions)
 
         // convert CRAM files to BAM for downstream processes
         CRAM_TO_BAM_RECAL(cram_variant_calling, fasta, fasta_fai)
-        versions = versions.mix(CRAM_TO_BAM_RECAL.out.versions)
+        // versions = versions.mix(CRAM_TO_BAM_RECAL.out.versions)
 
         CRAM_TO_BAM_FINAL(cram_variant_calling, fasta, fasta_fai)
-        versions = versions.mix(CRAM_TO_BAM_FINAL.out.versions)
+        // versions = versions.mix(CRAM_TO_BAM_FINAL.out.versions)
 
         alignment_bams_final = Channel.empty()
             .mix(CRAM_TO_BAM_FINAL.out.alignment_index)
@@ -369,8 +372,6 @@ workflow ALIGNMENT_STEP {
             .join(alignment_bams_final)
             .map { id, meta, bam, bai -> [ meta, bam, bai ] }
 
-		
-
 		bam_qc_multiple_metrics_calling = bam_qc_multiple_metrics_inputs
             .join(alignment_bams_final)
             .map { id, meta, bam, bai -> [ meta, bam, bai ] }
@@ -395,7 +396,7 @@ workflow ALIGNMENT_STEP {
 			// versions = versions.mix(BAM_QC_PICARD_COLLECTWGSMETRICS.out.versions)
 		}
 		if (do_qc_duplicates) {
-			// BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY(bam_qc_duplicates_calling, dict_path)
+			BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY(bam_qc_duplicates_calling, dict_path)
 			// reports = reports.mix(BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY.out.reports.collect{ meta, report -> report })
 			// versions = versions.mix(BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY.out.versions)
 			null

@@ -163,14 +163,14 @@ workflow BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY {
     reports = Channel.empty()
 
 
-	SUBSAMPLE_BAM(
-		bam,
-		fasta.map{ it -> [ [ id:'fasta' ], it ] },
-	)
-	bams_subsampled = SUBSAMPLE_BAM.out.bams_subsampled
+	// SUBSAMPLE_BAM(
+	// 	bam,
+	// 	fasta.map{ it -> [ [ id:'fasta' ], it ] },
+	// )
+	// bams_subsampled = SUBSAMPLE_BAM.out.bams_subsampled
 
-    // bam_only = bam.map{ meta, bam, bai -> [ meta, bam ] }
-	bam_only = bams_subsampled.map{ meta, bam, bai -> [ meta, bam ] }
+    bam_only = bam.map{ meta, bam, bai -> [ meta, bam ] }
+	// bam_only = bams_subsampled.map{ meta, bam, bai -> [ meta, bam ] }
     GATK4_ESTIMATELIBRARYCOMPLEXITY(
         bam_only,
         fasta,
