@@ -71,24 +71,23 @@ workflow ALIGNMENT_STEP {
 	
 	
 	input_fastq_qc = input_fastq.map { it -> [it[0], [it[1], it[2]]] }
-	input_fastq_qc.view { log.info "Input FASTQ files: $it" }
 
 	bam_qc_duplicates_inputs = inputs
 		.map { it -> [it.meta, it.qc_dup_rate] }
-		.filter { test_robust_presence(it[1]) }
+		.filter { it[1].isEmpty() }
 		.map { it -> [it[0].sample] } // meta.sample
 
 	bam_qc_multiple_metrics_inputs = inputs
 		.map { it -> [it.meta, it.qc_alignment_summary, it.qc_insert_size] }
 		.filter { 
-			test_robust_presence(it[1])
-			&& test_robust_presence(it[2])
+			it[1].isEmpty()
+			&& it[2].isEmpty()
 		}
 		.map { it -> [it[0].sample] } // meta.sample
 
 	bam_qc_coverage_inputs = inputs
 		.map { it -> [it.meta, it.qc_coverage_metrics] }
-		.filter { test_robust_presence(it[1]) }
+		.filter { !it[1].isEmpty() }
 		.map { it -> [it[0].sample] } // meta.sample
 
 	is_run_qc_duplicates = params.is_run_qc_duplicates ?: false // if parameter doesn't exist, set to false
@@ -102,8 +101,6 @@ workflow ALIGNMENT_STEP {
         
         alignment_existing_outputs = inputs.map { it -> [it.meta, it.bam] }.filter { !it[1].isEmpty() }
 
-		inputs.map { it -> [it.meta, it.bam] }.view { log.info "Input BAM files: $it" }
-
 		// alignment_existing_outputs.view { log.info "Alignment existing outputs: $it" }
 
         // inputs.view { log.info "Input samples: ${it.meta} is empty? ${it.bam.isEmpty()}" }
@@ -111,10 +108,10 @@ workflow ALIGNMENT_STEP {
         // alignment_existing_outputs.view { log.info "Alignment existing outputs: $it" }
 
         // // QC
-        FASTQC(input_fastq_qc)
+        // FASTQC(input_fastq_qc)
 
-        reports = reports.mix(FASTQC.out.zip.collect{ meta, logs -> logs })
-        versions = versions.mix(FASTQC.out.versions.first())
+        // reports = reports.mix(FASTQC.out.zip.collect{ meta, logs -> logs })
+        // versions = versions.mix(FASTQC.out.versions.first())
 
         //skipping the UMI Conscensus calling step for now
         reads_for_fastp = input_fastq
@@ -204,10 +201,6 @@ workflow ALIGNMENT_STEP {
             )
             // merge existing BAMs with newly mapped ones
             bam_mapped = alignment_existing_outputs.mix(FASTQ_PARABRICKS_FQ2BAM.out.bam)
-			FASTQ_PARABRICKS_FQ2BAM.out.bam.view{ log.info "FQ2BAM: $it" }
-			alignment_existing_outputs.view{ log.info "Alignment existing outputs: $it" }
-			bam_mapped.view{ log.info "bam_mapped: $it" }
-			// bam_mapped = alignment_existing_outputs.mix(FASTQ_PARABRICKS_FQ2BAM.out.bam)
 			// bam_mapped = FASTQ_PARABRICKS_FQ2BAM.out.bam}
         } else {
             FASTQ_ALIGN_BWAMEM_MEM2(
@@ -355,7 +348,7 @@ workflow ALIGNMENT_STEP {
             .map{ meta, bam, bai -> [ meta.id, meta + [data_type: "bam"], bam, bai ] }
     }
 
-    // Post-alignment QC
+    // // Post-alignment QC
     // if (tools_used.contains("all") || tools_used.contains("bamqc")) {
     //     bam_qc_inputs = inputs.map { it -> [it.meta.sample] }
     //     bam_qc_calling = bam_qc_inputs
@@ -366,55 +359,55 @@ workflow ALIGNMENT_STEP {
     //     dict_path = dict.map{ meta, dict -> [dict] }
     //     BAM_QC(bam_qc_calling, dict_path)
 
-    //     // Gather QC
+    //     Gather QC
     //     reports = reports.mix(BAM_QC.out.reports.collect{ meta, report -> report })
     //     versions = versions.mix(BAM_QC.out.versions)
     // }
 
-	// Post-alignment QC Draft
-    if (tools_used.contains("all") || do_bamqc) {
-
-        // bam_qc_calling = bam_qc_inputs
-        //     .join(alignment_bams_final)
-        //     .map { id, meta, bam, bai -> [ meta, bam, bai ] }
+	// // Post-alignment QC Draft
+    // if (tools_used.contains("all") || do_bamqc) {
 		
-		// bam_qc_calling = bam_qc_calling.broadcast()
+	// 	bam_qc_multiple_metrics_inputs.view { log.info "bam_qc_multiple_metrics_inputs: $it" }
+	// 	dict.view { log.info "dict: $it" }
 
-		bam_qc_duplicates_calling = bam_qc_duplicates_inputs
-            .join(alignment_bams_final)
-            .map { id, meta, bam, bai -> [ meta, bam, bai ] }
+	// 	bam_qc_duplicates_calling = bam_qc_duplicates_inputs
+    //         .join(alignment_bams_final)
+    //         .map { id, meta, bam, bai -> [ meta, bam, bai ] }
 
-		bam_qc_multiple_metrics_calling = bam_qc_multiple_metrics_inputs
-            .join(alignment_bams_final)
-            .map { id, meta, bam, bai -> [ meta, bam, bai ] }
 		
-		bam_qc_coverage_calling = bam_qc_coverage_inputs
-            .join(alignment_bams_final)
-            .map { id, meta, bam, bai -> [ meta, bam, bai ] }
 
-        // omit meta since it is not used in the BAM_QC
-        dict_path = dict.map{ meta, dict -> [dict] }
-		dict_path = dict_path
-        // BAM_QC(bam_qc_calling, dict_path)
+	// 	bam_qc_multiple_metrics_calling = bam_qc_multiple_metrics_inputs
+    //         .join(alignment_bams_final)
+    //         .map { id, meta, bam, bai -> [ meta, bam, bai ] }
 
-		if (do_qc_multiple_metrics) {
-			BAM_QC_PICARD_COLLECTMULTIPLEMETRICS(bam_qc_multiple_metrics_calling, dict_path)
-			reports = reports.mix(BAM_QC_PICARD_COLLECTMULTIPLEMETRICS.out.reports.collect{ meta, report -> report })
-			versions = versions.mix(BAM_QC_PICARD_COLLECTMULTIPLEMETRICS.out.versions)
-		}
-		if (do_qc_coverage) {
-			BAM_QC_PICARD_COLLECTWGSMETRICS(bam_qc_coverage_calling, dict_path)
-			reports = reports.mix(BAM_QC_PICARD_COLLECTWGSMETRICS.out.reports.collect{ meta, report -> report })
-			versions = versions.mix(BAM_QC_PICARD_COLLECTWGSMETRICS.out.versions)
-		}
-		if (do_qc_duplicates) {
-			// BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY(bam_qc_duplicates_calling, dict_path)
-			// reports = reports.mix(BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY.out.reports.collect{ meta, report -> report })
-			// versions = versions.mix(BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY.out.versions)
-			null
-		}
-        
-	}
+	// 	bam_qc_multiple_metrics_calling.view { log.info "bam_qc_multiple_metrics_calling: $it" }
+		
+	// 	bam_qc_coverage_calling = bam_qc_coverage_inputs
+    //         .join(alignment_bams_final)
+    //         .map { id, meta, bam, bai -> [ meta, bam, bai ] }
+
+    //     // omit meta since it is not used in the BAM_QC
+
+    //     dict_path = dict.map{ meta, dict -> [dict] }
+    //     // BAM_QC(bam_qc_calling, dict_path)
+
+	// 	if (do_qc_multiple_metrics) {
+	// 		BAM_QC_PICARD_COLLECTMULTIPLEMETRICS(bam_qc_multiple_metrics_calling)
+	// 		reports = reports.mix(BAM_QC_PICARD_COLLECTMULTIPLEMETRICS.out.reports.collect{ meta, report -> report })
+	// 		versions = versions.mix(BAM_QC_PICARD_COLLECTMULTIPLEMETRICS.out.versions)
+	// 	}
+	// 	if (do_qc_coverage) {
+	// 		BAM_QC_PICARD_COLLECTWGSMETRICS(bam_qc_coverage_calling)
+	// 		reports = reports.mix(BAM_QC_PICARD_COLLECTWGSMETRICS.out.reports.collect{ meta, report -> report })
+	// 		versions = versions.mix(BAM_QC_PICARD_COLLECTWGSMETRICS.out.versions)
+	// 	}
+	// 	if (do_qc_duplicates) {
+	// 		// BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY(bam_qc_duplicates_calling, dict_path)
+	// 		// reports = reports.mix(BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY.out.reports.collect{ meta, report -> report })
+	// 		// versions = versions.mix(BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY.out.versions)
+	// 		null
+	// 	}
+	// }
 
 	emit:
 	alignment_bams_final

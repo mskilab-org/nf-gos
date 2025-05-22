@@ -98,7 +98,6 @@ workflow BAM_QC {
 workflow BAM_QC_PICARD_COLLECTMULTIPLEMETRICS {
     take:
     bam                         // channel: [mandatory] [ meta, bam, bai ]
-    dict
 
     main:
     versions = Channel.empty()
@@ -125,7 +124,6 @@ workflow BAM_QC_PICARD_COLLECTMULTIPLEMETRICS {
 workflow BAM_QC_PICARD_COLLECTWGSMETRICS {
     take:
     bam                         // channel: [mandatory] [ meta, bam, bai ]
-    dict
 
     main:
     versions = Channel.empty()

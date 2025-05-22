@@ -941,6 +941,8 @@ alignment_bams_final = inputs
     .filter { ! it[1].isEmpty() }
     .map { it -> [it[0].id, it[0], it[1], it[2]] }
 
+alignment_bams_final.view{ log.info("Alignment bams final init: ${it}") }
+
 // alignment_bams_final = selected_tools_map["aligner"]
 //     .map { it -> [it.meta, it.bam, it.bai] }
 //     .map { it -> [it[0].id, it[0], it[1], it[2]] }
@@ -1242,7 +1244,6 @@ workflow NFCASEREPORTS {
 	)
 
 	alignment_bams_final = alignment_bams_final.mix(ALIGNMENT_STEP.out.alignment_bams_final)
-	alignment_bams_final = alignment_bams_final.map{ meta, bam, bai -> [ meta.id, meta + [data_type: "bam"], bam, bai ] }
 	reports = reports.mix(ALIGNMENT_STEP.out.reports.collect{ meta, report -> report })
 	versions = versions.mix(ALIGNMENT_STEP.out.versions)
 
@@ -1862,8 +1863,8 @@ workflow NFCASEREPORTS {
             }
             .tumor
             .map {
-            patient, meta -> meta.tumor_id = meta.id
-            [patient, meta]
+            patient, meta ->
+            [patient, meta + [tumor_id: meta.id] ]
         }
 
         purple_inputs_snv_germline = Channel.empty()
