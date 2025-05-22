@@ -1214,7 +1214,7 @@ workflow NFCASEREPORTS {
 	)
 
 	alignment_bams_final = alignment_bams_final.mix(ALIGNMENT_STEP.out.alignment_bams_final)
-	reports = reports.mix(ALIGNMENT_STEP.out.reports.collect{ meta, report -> report })
+	// reports = reports.mix(ALIGNMENT_STEP.out.reports.collect{ meta, report -> report })
 	versions = versions.mix(ALIGNMENT_STEP.out.versions)
 
     // MSISensorPro
