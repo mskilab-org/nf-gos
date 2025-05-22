@@ -15,7 +15,8 @@ tools_to_run = WorkflowNfcasereports.toolsToRun
 
 workflow BAM_QC {
     take:
-    bam                         // channel: [mandatory] [ meta, bam, bai ]
+    inputs
+    bam // channel: [mandatory] [ meta.sample, meta, bam, bai ]
     dict
 
     main:
@@ -27,27 +28,50 @@ workflow BAM_QC {
 	intervals_file = params.subsample_interval ?: []
 
     if (tools_to_run.contains("collect_wgs_metrics")) {
+        collect_wgs_metrics_inputs = inputs
+            .filter { it.qc_coverage_metrics.isEmpty() }
+            .map { it -> [it.meta.sample] }
+        collect_wgs_metrics_bam = collect_wgs_metrics_inputs
+            .join(bam)
+            .map { id, meta, bam, bai -> [ meta, bam, bai ] }
+
         PICARD_COLLECTWGSMETRICS(
-            bam,
+            collect_wgs_metrics_bam,
             fasta.map{ it -> [ [ id:'fasta' ], it ] },
             fai.map{ it -> [ [ id:'fai' ], it ] },
             intervals_file
         )
+        reports = reports.mix(PICARD_COLLECTWGSMETRICS.out.metrics)
+        versions = versions.mix(PICARD_COLLECTWGSMETRICS.out.versions)
     }
 
 
     if (tools_to_run.contains("collect_multiple_metrics")) {
+        collect_multiple_metrics_inputs = inputs
+            .filter { it.qc_alignment_summary.isEmpty() || it.qc_insert_size.isEmpty() }
+            .map { it -> [it.meta.sample] }
+        collect_multiple_metrics_bam = collect_multiple_metrics_inputs
+            .join(bam)
+            .map { id, meta, bam, bai -> [ meta, bam, bai ] }
         PICARD_COLLECTMULTIPLEMETRICS(
-            bam,
+            collect_multiple_metrics_bam,
             fasta.map{ it -> [ [ id:'fasta' ], it ] },
             fai.map{ it -> [ [ id:'fai' ], it ] }
         )
+        reports = reports.mix(PICARD_COLLECTMULTIPLEMETRICS.out.metrics)
+        versions = versions.mix(PICARD_COLLECTMULTIPLEMETRICS.out.versions)
     }
 
     if (tools_to_run.contains("estimate_library_complexity")) {
+        estimate_library_complexity_inputs = inputs
+            .filter { it.qc_dup_rate.isEmpty() }
+            .map { it -> [it.meta.sample] }
+        estimate_library_complexity_bam = estimate_library_complexity_inputs
+            .join(bam)
+            .map { id, meta, bam, bai -> [ meta, bam, bai ] }
         // Subsample BAMs for faster estimation of library complexity
         SAMTOOLS_SUBSAMPLE(
-            bam,
+            estimate_library_complexity_bam,
             fasta.map{ it -> [ [ id:'fasta' ], it ] },
             []
         )
@@ -60,17 +84,13 @@ workflow BAM_QC {
             fai,
             dict
         )
+        reports = reports.mix(GATK4_ESTIMATELIBRARYCOMPLEXITY.out.metrics)
+        versions = versions.mix(GATK4_ESTIMATELIBRARYCOMPLEXITY.out.versions)
     }
 
     // Gather all reports generated
-    reports = reports.mix(PICARD_COLLECTWGSMETRICS.out.metrics)
-    reports = reports.mix(PICARD_COLLECTMULTIPLEMETRICS.out.metrics)
-    reports = reports.mix(GATK4_ESTIMATELIBRARYCOMPLEXITY.out.metrics)
 
     // Gather versions of all tools used
-    versions = versions.mix(PICARD_COLLECTWGSMETRICS.out.versions)
-    versions = versions.mix(PICARD_COLLECTMULTIPLEMETRICS.out.versions)
-    versions = versions.mix(GATK4_ESTIMATELIBRARYCOMPLEXITY.out.versions)
 
     emit:
     reports

@@ -1044,20 +1044,14 @@ workflow NFCASEREPORTS {
     }
 
     // Post-alignment QC
-    if (tools_to_run.contains("all") || tools_to_run.contains("bamqc")) {
-        bam_qc_inputs = inputs.map { it -> [it.meta.sample] }
-        bam_qc_calling = bam_qc_inputs
-            .join(alignment_bams_final)
-            .map { id, meta, bam, bai -> [ meta, bam, bai ] }
 
-        // omit meta since it is not used in the BAM_QC
-        dict_path = dict.map{ meta, dict -> [dict] }
-        BAM_QC(bam_qc_calling, dict_path)
+    // omit meta since it is not used in the BAM_QC
+    dict_path = dict.map{ meta, dict -> [dict] }
+    BAM_QC(inputs, alignment_bams_final, dict_path)
 
-        // Gather QC
-        reports = reports.mix(BAM_QC.out.reports.collect{ meta, report -> report })
-        versions = versions.mix(BAM_QC.out.versions)
-    }
+    // Gather QC
+    reports = reports.mix(BAM_QC.out.reports.collect{ meta, report -> report })
+    versions = versions.mix(BAM_QC.out.versions)
 
     // MSISensorPro
     // ##############################
