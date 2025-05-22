@@ -355,6 +355,8 @@ inputs = ch_from_samplesheet.map {
     ]
 }
 
+// inputs.view { log.info "inputs pre fastq: $it"}
+
 inputs = inputs
     .map {it -> [
             it.meta.patient + it.meta.sample, // create a patient_sample key
@@ -936,6 +938,14 @@ versions = Channel.empty()
 ensemblvep_info = params.vep_cache    ? [] : Channel.of([ [ id:"${params.vep_cache_version}_${params.vep_genome}" ], params.vep_genome, params.vep_species, params.vep_cache_version ])
 snpeff_info     = params.snpeff_cache ? [] : Channel.of([ [ id:"${params.snpeff_genome}.${params.snpeff_db}" ], params.snpeff_genome, params.snpeff_db ])
 
+
+input_fastq = inputs.filter { it.bam.isEmpty() }.map { it -> [it.meta, [it.fastq_1, it.fastq_2]] }
+
+alignment_existing_outputs = inputs.map { it -> [it.meta, it.bam] }.filter { !it[1].isEmpty() }
+
+// alignment_bams_final = some_map["aligner"]
+// 	.map { it -> [it[0].id, it[0], it[1], it[2]] }
+
 alignment_bams_final = inputs
     .map { it -> [it.meta, it.bam, it.bai] }
     .filter { ! it[1].isEmpty() }
@@ -944,12 +954,12 @@ alignment_bams_final = inputs
 
 final_filtered_sv_rds_for_merge = inputs
     .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
-    .filter { 
+    .filter {
 		def vcf_or_rds = it[1]
 		def is_rds = vcf_or_rds =~ /\.rds$/
 		def is_vcf_or_rds_filesize_zero_or_nonexistent = vcf_or_rds.isEmpty()
 		! is_vcf_or_rds_filesize_zero_or_nonexistent && is_rds }
-    .map { 
+    .map {
 		it -> [ it[0].patient, it[1] ] } // meta.patient, vcf_or_rds
 
 vcf_from_sv_calling_for_merge = inputs
@@ -1286,14 +1296,14 @@ workflow NFCASEREPORTS {
     if (tools_used.contains("all") || tools_used.contains("gridss") || params.is_run_junction_filter) {
 
         // Filter out bams for which SV calling has already been done
-        
+
 		bam_sv_inputs = inputs.filter { it.vcf.isEmpty() }.map { it -> [it.meta.sample] }
         bam_sv_calling = alignment_bams_final
             .join(bam_sv_inputs)
             .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
-        
+
 		// gridss_existing_outputs = inputs.map { it -> [it.meta, it.vcf, it.vcf_tbi] }.filter { !it[1].isEmpty() && !it[2].isEmpty() }
-		gridss_existing_outputs = inputs.map { 
+		gridss_existing_outputs = inputs.map {
 			it -> [it.meta, it.vcf, it.vcf_tbi] }
 			.filter { !it[1].isEmpty() && !it[2].isEmpty() }
 
@@ -1425,6 +1435,7 @@ workflow NFCASEREPORTS {
         BAM_AMBER(bam_amber_pair)
         versions = versions.mix(BAM_AMBER.out.versions)
 
+		// FIXME: Something is wrong with this when it's instantiated.
         amber_dir = Channel.empty()
             .mix(BAM_AMBER.out.amber_dir)
             .mix(amber_existing_outputs_amber_dirs)
@@ -1831,7 +1842,7 @@ workflow NFCASEREPORTS {
 
 		purple_inputs_for_merge.view{ "purple_inputs_for_merge: $it" }
 
-        meta = purple_inputs_for_merge
+        meta_purple = purple_inputs_for_merge
             .branch{
                 normal: it[1].status == 0
                 tumor:  it[1].status == 1
@@ -1872,7 +1883,7 @@ workflow NFCASEREPORTS {
                 .map { it -> [ it[0], it[2], it[3] ] } // patient, vcf, tbi
         }
 
-        purple_inputs = meta
+        purple_inputs = meta_purple
             .join(purple_inputs_amber_dir)
             .join(purple_inputs_cobalt_dir)
             .map { patient, meta, amber_dir, cobalt_dir ->
@@ -1881,7 +1892,7 @@ workflow NFCASEREPORTS {
 
         if (params.tumor_only) {
             if (params.use_svs && params.use_smlvs) {
-                purple_inputs = meta
+                purple_inputs = meta_purple
                 .join(purple_inputs_amber_dir)
                 .join(purple_inputs_cobalt_dir)
                 .join(purple_inputs_sv)
@@ -1892,7 +1903,7 @@ workflow NFCASEREPORTS {
             }
         } else {
             if (params.use_svs && params.use_smlvs) {
-                purple_inputs = meta
+                purple_inputs = meta_purple
                     .join(purple_inputs_amber_dir)
                     .join(purple_inputs_cobalt_dir)
                     .join(purple_inputs_sv)

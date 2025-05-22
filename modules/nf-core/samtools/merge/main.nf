@@ -28,6 +28,29 @@ process SAMTOOLS_MERGE {
     def file_type = input_files instanceof List ? input_files[0].getExtension() : input_files.getExtension()
     def reference = fasta ? "--reference ${fasta}" : ""
     """
+	
+	are_all_inputs_complete=true
+	for input_file in $input_files; do
+		is_input_complete=\$(samtools quickcheck \$input_file && echo 'true' || echo 'false')
+		! \$is_input_complete && printf 'TRUNCATED INPUT: %s\n' \$input_file
+		are_all_inputs_complete=\$({ \$are_all_inputs_complete && \$is_input_complete; } && echo 'true' || echo 'false')
+	done
+
+	if ! \$are_all_inputs_complete; then
+		exit 1
+	fi
+
+	is_output_complete=\$(samtools quickcheck ${prefix}.${file_type} && echo 'true' || echo 'false')
+	is_output_existent=\$([ -e ${prefix}.${file_type} ] && echo 'true' || echo 'false')
+	is_output_done_but_completed=\$( { \$is_output_existent &&   \$is_output_complete; } && echo 'true' || echo 'false')
+	is_output_done_but_truncated=\$( { \$is_output_existent && ! \$is_output_complete; } && echo 'true' || echo 'false')
+
+	if \$is_output_done_but_truncated; then
+		printf "Merged output truncated!!!\n%s:\n" "${prefix}.${file_type}"
+		rm ${prefix}.${file_type}
+	fi
+
+	## FIXME: if samtools merge dies, the output should be deleted.
     samtools \\
         merge \\
         --threads ${task.cpus-1} \\
@@ -35,6 +58,15 @@ process SAMTOOLS_MERGE {
         ${reference} \\
         ${prefix}.${file_type} \\
         $input_files
+	
+	is_output_complete=\$(samtools quickcheck ${prefix}.${file_type} && echo 'true' || echo 'false')
+
+	if ! \$is_output_complete; then
+		printf "Merged output is truncated!!!\n"
+		rm ${prefix}.${file_type}
+		exit 1
+	fi
+
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
