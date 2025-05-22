@@ -5,6 +5,7 @@
 import nextflow.Nextflow
 import nextflow.Channel
 import groovy.text.SimpleTemplateEngine
+import groovy.json.JsonSlurper
 
 class WorkflowNfcasereports {
 
@@ -35,7 +36,19 @@ class WorkflowNfcasereports {
             error("Please specify either `--download_cache` or `--snpeff_cache`, `--vep_cache`.")
         }
 
-        WorkflowNfcasereports.toolsToRun = determineToolsToRun(params)
+        // Load and parse schema_input.json to create tool input/output map
+        def schemaFilePath = "${params.project_dir}/assets/schema_input.json"
+        def schemaFile = new File(schemaFilePath)
+        Map tool_input_output_map = [:]
+        if (schemaFile.exists()) {
+            def jsonSlurper = new JsonSlurper()
+            def schemaInput = jsonSlurper.parseText(schemaFile.text)
+            tool_input_output_map = WorkflowNfcasereports.createToolInputOutputMap(schemaInput)
+        } else {
+            println "Schema input file not found: ${schemaFilePath}. Cannot dynamically build tool map."
+        }
+
+        WorkflowNfcasereports.toolsToRun = determineToolsToRun(params, tool_input_output_map)
     }
 
     public static create_file_channel(parameter, else_part = Channel.empty()) {
@@ -185,34 +198,39 @@ class WorkflowNfcasereports {
         return sampleList
     }
 
-    public static List determineToolsToRun(params) {
-        def tool_input_output_map = [
-            "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
-            "collect_wgs_metrics": [ inputs: ['bam'], outputs: ['qc_coverage_metrics'] ],
-            "collect_multiple_metrics": [ inputs: ['bam'], outputs: ['qc_alignment_summary', 'qc_insert_size'] ],
-            "estimate_library_complexity": [ inputs: ['bam'], outputs: ['qc_dup_rate'] ],
-            "postprocessing": [ inputs: ['bam'], outputs: [] ],
-            "msisensorpro": [ inputs: ['bam'], outputs: ['msi', 'msi_germline'] ],
-            "gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
-            "amber": [ inputs: ['bam'], outputs: ['hets', 'amber_dir'] ],
-            "fragcounter": [ inputs: ['bam'], outputs: ['frag_cov'] ],
-            "dryclean": [ inputs: ['frag_cov'], outputs: ['dryclean_cov'] ],
-            "cbs": [ inputs: ['dryclean_cov'], outputs: ['seg', 'nseg'] ],
-            "sage": [ inputs: ['bam'], outputs: ['snv_somatic_vcf', 'snv_germline_vcf'] ],
-            "cobalt": [ inputs: ['bam'], outputs: ['cobalt_dir'] ],
-            "purple": [ inputs: ['cobalt_dir', 'amber_dir'], outputs: ['purity', 'ploidy'] ],
-            "jabba": [ inputs: ['vcf', 'hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
-            "non_integer_balance": [ inputs: ['jabba_gg'], outputs: ['ni_balanced_gg'] ],
-            "lp_phased_balance": [ inputs: ['ni_balanced_gg'], outputs: ['lp_balanced_gg'] ],
-            "events": [ inputs: ['ni_balanced_gg'], outputs: ['events'] ],
-            "fusions": [ inputs: ['ni_balanced_gg'], outputs: ['fusions'] ],
-            "snpeff": [ inputs: ['snv_somatic_vcf'], outputs: ['variant_somatic_ann', 'variant_somatic_bcf'] ],
-            "snv_multiplicity": [ inputs: ['jabba_gg', 'variant_somatic_ann'], outputs: ['snv_multiplicity'] ],
-            "oncokb": [ inputs: ['variant_somatic_ann', 'snv_multiplicity', 'jabba_gg', 'fusions'], outputs: ['oncokb_maf', 'oncokb_fusions', 'oncokb_cna'] ],
-            "signatures": [ inputs: ['snv_somatic_vcf'], outputs: ['sbs_signatures', 'indel_signatures', 'signatures_matrix'] ],
-            "hrdetect": [ inputs: ['hets', 'vcf', 'jabba_gg', 'snv_somatic_vcf'], outputs: ['hrdetect'] ],
-            "onenesstwoness": [ inputs: ['events', 'hrdetect'], outputs: ['onenesstwoness'] ]
-        ]
+    // use the assets/schema_input.json file to create a map of tool inputs and outputs
+    public static Map createToolInputOutputMap(Map schema_input) {
+        def toolMap = [:]
+
+        if (schema_input && schema_input.items && schema_input.items.properties) {
+            schema_input.items.properties.each { propertyName, propertyDetails ->
+                // Process 'input_of'
+                if (propertyDetails.input_of instanceof List) {
+                    propertyDetails.input_of.each { toolName ->
+                        toolMap.putIfAbsent(toolName, [inputs: [], outputs: [], paired_normal_outputs:
+[]])
+                        toolMap[toolName].inputs.add(propertyName)
+                    }
+                }
+
+                // Process 'output_of'
+                if (propertyDetails.output_of instanceof List) {
+                    propertyDetails.output_of.each { toolName ->
+                        toolMap.putIfAbsent(toolName, [inputs: [], outputs: [], paired_normal_outputs:
+[]])
+                        if (propertyDetails.is_paired_normal == true) {
+                            toolMap[toolName].paired_normal_outputs.add(propertyName)
+                        } else {
+                            toolMap[toolName].outputs.add(propertyName)
+                        }
+                    }
+                }
+            }
+        }
+        return toolMap
+    }
+
+    public static List determineToolsToRun(params, tool_input_output_map) {
         def sampleList = samplesheetToList(params.input)
         def available_inputs = new HashSet()
         sampleList.each { input_map ->
@@ -248,8 +266,12 @@ class WorkflowNfcasereports {
                     def inputsRequired = io.inputs
                     def inputsPresent = inputsRequired.every { available_inputs.contains(it) }
                     def outputsNeeded = io.outputs.any { !available_inputs.contains(it) }
-                    if (tool == "sage" && params.tumor_only) {
-                        outputsNeeded = !available_inputs.contains("snv_somatic_vcf")
+                    // if paired, check if normal outputs are needed
+                    if (!params.tumor_only) {
+                        def paired_normal_outputs = io.paired_normal_outputs
+                        if (paired_normal_outputs) {
+                            outputsNeeded = paired_normal_outputs.any { !available_inputs.contains(it) }
+                        }
                     }
                     if (inputsPresent && outputsNeeded) {
                         selected_tools.add(tool)

@@ -11,17 +11,26 @@
                 "type": "string",
                 "pattern": "^\\S+$",
                 "errorMessage": "Patient ID must be provided and cannot contain spaces",
-                "meta": ["patient"]
+                "meta": [
+                    "patient"
+                ],
             },
             "sample": {
                 "type": "string",
                 "pattern": "^\\S+$",
                 "errorMessage": "Sample ID must be provided and cannot contain spaces",
-                "meta": ["sample"]
+                "meta": [
+                    "sample"
+                ],
+                "input_of": [],
+                "output_of": [],
+                "is_paired_normal": false
             },
             "sex": {
                 "errorMessage": "Sex cannot contain spaces",
-                "meta": ["sex"],
+                "meta": [
+                    "sex"
+                ],
                 "default": "NA",
                 "anyOf": [
                     {
@@ -32,29 +41,40 @@
                         "type": "string",
                         "maxLength": 0
                     }
-                ]
+                ],
             },
             "status": {
                 "type": "integer",
                 "errorMessage": "Status can only be 0 (normal) or 1 (tumor). Defaults to 0, if none is supplied.",
-                "meta": ["status"],
+                "meta": [
+                    "status"
+                ],
                 "default": "0",
                 "minimum": 0,
-                "maximum": 1
+                "maximum": 1,
             },
             "lane": {
                 "type": "string",
                 "pattern": "^\\S+$",
-                "unique": ["patient", "sample"],
+                "unique": [
+                    "patient",
+                    "sample"
+                ],
                 "anyOf": [
                     {
-                        "dependentRequired": ["fastq_1"]
+                        "dependentRequired": [
+                            "fastq_1"
+                        ]
                     },
                     {
-                        "dependentRequired": ["bam"]
+                        "dependentRequired": [
+                            "bam"
+                        ]
                     }
                 ],
-                "meta": ["lane"]
+                "meta": [
+                    "lane"
+                ],
             },
             "fastq_1": {
                 "errorMessage": "FastQ file for reads 1 cannot contain spaces and must have extension '.fq.gz' or '.fastq.gz'",
@@ -69,11 +89,18 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [
+                    "aligner"
+                ],
+                "output_of": [],
+                "is_paired_normal": false
             },
             "fastq_2": {
                 "errorMessage": "FastQ file for reads 2 cannot contain spaces and must have extension '.fq.gz' or '.fastq.gz'",
-                "dependentRequired": ["fastq_1"],
+                "dependentRequired": [
+                    "fastq_1"
+                ],
                 "anyOf": [
                     {
                         "type": "string",
@@ -85,7 +112,12 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [
+                    "aligner"
+                ],
+                "output_of": [],
+                "is_paired_normal": false
             },
             "table": {
                 "errorMessage": "Recalibration table cannot contain spaces and must have extension '.table'",
@@ -100,7 +132,10 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [],
+                "output_of": [],
+                "is_paired_normal": false
             },
             "cram": {
                 "errorMessage": "CRAM file cannot contain spaces and must have extension '.cram'",
@@ -115,7 +150,10 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [],
+                "output_of": [],
+                "is_paired_normal": false
             },
             "bam": {
                 "errorMessage": "BAM file cannot contain spaces and must have extension '.bam'",
@@ -130,7 +168,135 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [
+                    "postprocessing",
+                    "collect_wgs_metrics",
+                    "collect_multiple_metrics",
+                    "estimate_library_complexity",
+                    "msisensorpro",
+                    "gridss",
+                    "amber",
+                    "fragcounter",
+                    "sage",
+                    "cobalt"
+                ],
+                "output_of": [
+                    "aligner"
+                ],
+                "is_paired_normal": false
+            },
+            "qc_coverage_metrics": {
+                "errorMessage": "qc_coverage_metrics file must be a text file",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true,
+                "input_of": [],
+                "output_of": [
+                    "collect_wgs_metrics"
+                ],
+                "is_paired_normal": false
+            },
+            "qc_alignment_summary": {
+                "errorMessage": "qc_alignment_summary file must be a text file",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true,
+                "input_of": [],
+                "output_of": [
+                    "collect_multiple_metrics"
+                ],
+                "is_paired_normal": false
+            },
+            "qc_insert_size": {
+                "errorMessage": "qc_insert_size file must be a text file",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true,
+                "input_of": [],
+                "output_of": [
+                    "collect_multiple_metrics"
+                ],
+                "is_paired_normal": false
+            },
+            "qc_dup_rate": {
+                "errorMessage": "qc_dup_rate file must be a text file",
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+\\$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^NA$"
+                    },
+                    {
+                        "type": "string",
+                        "pattern": "^/dev/null$"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0
+                    }
+                ],
+                "format": "file-path",
+                "exists": true,
+                "input_of": [],
+                "output_of": [
+                    "estimate_library_complexity"
+                ],
+                "is_paired_normal": false
             },
             "msi": {
                 "errorMessage": "MSI somatic file must be a text file",
@@ -153,7 +319,12 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [],
+                "output_of": [
+                    "msisensorpro"
+                ],
+                "is_paired_normal": false
             },
             "msi_germline": {
                 "errorMessage": "MSI germline file must be a text file",
@@ -176,7 +347,12 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [],
+                "output_of": [
+                    "msisensorpro"
+                ],
+                "is_paired_normal": true
             },
             "hets": {
                 "errorMessage": "Pileups file and must have extension '.txt'",
@@ -199,14 +375,22 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [
+                    "jabba",
+                    "hrdetect"
+                ],
+                "output_of": [
+                    "amber"
+                ],
+                "is_paired_normal": false
             },
             "amber_dir": {
                 "errorMessage": "Amber directory must be a valid path to a directory",
                 "anyOf": [
                     {
                         "type": "string",
-                        "pattern": ".+",
+                        "pattern": ".+"
                     },
                     {
                         "type": "string",
@@ -222,7 +406,14 @@
                     }
                 ],
                 "format": "directory-path",
-                "exists": true
+                "exists": true,
+                "input_of": [
+                    "purple"
+                ],
+                "output_of": [
+                    "amber"
+                ],
+                "is_paired_normal": false
             },
             "frag_cov": {
                 "errorMessage": "COV file cannot contain spaces and must have extension '.rds' or '.txt'",
@@ -237,7 +428,14 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [
+                    "dryclean"
+                ],
+                "output_of": [
+                    "fragcounter"
+                ],
+                "is_paired_normal": false
             },
             "dryclean_cov": {
                 "errorMessage": "COV file cannot contain spaces and must have extension '.rds' or '.txt'",
@@ -252,14 +450,22 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [
+                    "cbs",
+                    "jabba"
+                ],
+                "output_of": [
+                    "dryclean"
+                ],
+                "is_paired_normal": false
             },
             "cobalt_dir": {
                 "errorMessage": "Cobalt directory must be a valid path to a directory",
                 "anyOf": [
                     {
                         "type": "string",
-                        "pattern": ".+",
+                        "pattern": ".+"
                     },
                     {
                         "type": "string",
@@ -275,7 +481,14 @@
                     }
                 ],
                 "format": "directory-path",
-                "exists": true
+                "exists": true,
+                "input_of": [
+                    "purple"
+                ],
+                "output_of": [
+                    "cobalt"
+                ],
+                "is_paired_normal": false
             },
             "purity": {
                 "errorMessage": "purity must be a number",
@@ -288,6 +501,13 @@
                         "type": "number"
                     }
                 ],
+                "input_of": [
+                    "jabba"
+                ],
+                "output_of": [
+                    "purple"
+                ],
+                "is_paired_normal": false
             },
             "ploidy": {
                 "errorMessage": "ploidy must be a number",
@@ -300,6 +520,13 @@
                         "type": "number"
                     }
                 ],
+                "input_of": [
+                    "jabba"
+                ],
+                "output_of": [
+                    "purple"
+                ],
+                "is_paired_normal": false
             },
             "seg": {
                 "errorMessage": "SEG file cannot contain spaces and must have extension '.rds'",
@@ -322,7 +549,14 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [
+                    "jabba"
+                ],
+                "output_of": [
+                    "cbs"
+                ],
+                "is_paired_normal": false
             },
             "nseg": {
                 "errorMessage": "NSEG file cannot contain spaces and must have extension '.rds'",
@@ -345,7 +579,12 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [],
+                "output_of": [
+                    "cbs"
+                ],
+                "is_paired_normal": true
             },
             "vcf": {
                 "errorMessage": "VCF file for reads 1 cannot contain spaces and must have extension '.vcf' or '.vcf.gz' or '.rds'",
@@ -364,7 +603,15 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [
+                    "jabba",
+                    "hrdetect"
+                ],
+                "output_of": [
+                    "gridss"
+                ],
+                "is_paired_normal": false
             },
             "jabba_gg": {
                 "errorMessage": "jabba.simple.gg.rds file and must have extension '.rds'",
@@ -387,7 +634,17 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [
+                    "non_integer_balance",
+                    "snv_multiplicity",
+                    "oncokb",
+                    "hrdetect"
+                ],
+                "output_of": [
+                    "jabba"
+                ],
+                "is_paired_normal": false
             },
             "jabba_rds": {
                 "errorMessage": "jabba.rds file and must have extension '.rds'",
@@ -410,7 +667,12 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [],
+                "output_of": [
+                    "jabba"
+                ],
+                "is_paired_normal": false
             },
             "ni_balanced_gg": {
                 "errorMessage": "balanced_gg.rds file and must have extension '.rds'",
@@ -433,7 +695,16 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [
+                    "lp_phased_balance",
+                    "events",
+                    "fusions"
+                ],
+                "output_of": [
+                    "non_integer_balance"
+                ],
+                "is_paired_normal": false
             },
             "lp_balanced_gg": {
                 "errorMessage": "balanced_gg.rds file and must have extension '.rds'",
@@ -456,7 +727,12 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [],
+                "output_of": [
+                    "lp_phased_balance"
+                ],
+                "is_paired_normal": false
             },
             "events": {
                 "errorMessage": "complex.rds file and must have extension '.rds'",
@@ -479,7 +755,14 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [
+                    "onenesstwoness"
+                ],
+                "output_of": [
+                    "events"
+                ],
+                "is_paired_normal": false
             },
             "fusions": {
                 "errorMessage": "fusions.rds file and must have extension '.rds'",
@@ -502,7 +785,14 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [
+                    "oncokb"
+                ],
+                "output_of": [
+                    "fusions"
+                ],
+                "is_paired_normal": false
             },
             "snv_somatic_vcf": {
                 "errorMessage": "Sage somatic VCF output file cannot contain spaces and must have extension '.vcf' or '.vcf.gz'",
@@ -525,7 +815,16 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [
+                    "snpeff",
+                    "signatures",
+                    "hrdetect"
+                ],
+                "output_of": [
+                    "sage"
+                ],
+                "is_paired_normal": false
             },
             "snv_germline_vcf": {
                 "errorMessage": "Sage germline VCF output file cannot contain spaces and must have extension '.vcf' or '.vcf.gz'",
@@ -548,7 +847,12 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [],
+                "output_of": [
+                    "sage"
+                ],
+                "is_paired_normal": true
             },
             "variant_somatic_ann": {
                 "errorMessage": "Annotated somatic VCF file cannot contain spaces and must have extension '.vcf' ",
@@ -571,7 +875,15 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [
+                    "snv_multiplicity",
+                    "oncokb"
+                ],
+                "output_of": [
+                    "snpeff"
+                ],
+                "is_paired_normal": false
             },
             "variant_somatic_bcf": {
                 "errorMessage": "Annotated somatic BCF file cannot contain spaces and must have extension '.bcf' ",
@@ -594,7 +906,12 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [],
+                "output_of": [
+                    "snpeff"
+                ],
+                "is_paired_normal": false
             },
             "variant_germline_ann": {
                 "errorMessage": "Annotated germline VCF file cannot contain spaces and must have extension '.vcf' ",
@@ -617,7 +934,12 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [],
+                "output_of": [
+                    "snpeff"
+                ],
+                "is_paired_normal": true
             },
             "variant_germline_bcf": {
                 "errorMessage": "Annotated germline BCF file cannot contain spaces and must have extension '.bcf' ",
@@ -640,7 +962,12 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [],
+                "output_of": [
+                    "snpeff"
+                ],
+                "is_paired_normal": true
             },
             "snv_multiplicity": {
                 "errorMessage": "SNV Multiplicity file cannot contain spaces and must have extension '.rds'",
@@ -663,7 +990,14 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [
+                    "oncokb"
+                ],
+                "output_of": [
+                    "snv_multiplicity"
+                ],
+                "is_paired_normal": false
             },
             "oncokb_maf": {
                 "errorMessage": "Oncokb MAF file cannot contain spaces and must have extension '.maf'",
@@ -686,7 +1020,12 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [],
+                "output_of": [
+                    "oncokb"
+                ],
+                "is_paired_normal": false
             },
             "oncokb_fusions": {
                 "errorMessage": "Oncokb fusions file cannot contain spaces and must have extension '.tsv'",
@@ -709,7 +1048,12 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [],
+                "output_of": [
+                    "oncokb"
+                ],
+                "is_paired_normal": false
             },
             "oncokb_cna": {
                 "errorMessage": "Oncokb cna file cannot contain spaces and must have extension '.tsv'",
@@ -732,7 +1076,12 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [],
+                "output_of": [
+                    "oncokb"
+                ],
+                "is_paired_normal": false
             },
             "sbs_signatures": {
                 "errorMessage": "SBS Signatures file cannot have spaces and must have extension '.txt' or '.all'",
@@ -741,7 +1090,7 @@
                         "type": "string",
                         "pattern": "^\\S+\\.txt$"
                     },
-					{
+                    {
                         "type": "string",
                         "pattern": "^\\S+\\.all$"
                     },
@@ -759,7 +1108,12 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [],
+                "output_of": [
+                    "signatures"
+                ],
+                "is_paired_normal": false
             },
             "indel_signatures": {
                 "errorMessage": "Indel Signatures file cannot have spaces and must have extension '.txt' or '.all'",
@@ -768,7 +1122,7 @@
                         "type": "string",
                         "pattern": "^\\S+\\.txt$"
                     },
-					{
+                    {
                         "type": "string",
                         "pattern": "^\\S+\\.all$"
                     },
@@ -786,7 +1140,12 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [],
+                "output_of": [
+                    "signatures"
+                ],
+                "is_paired_normal": false
             },
             "signatures_matrix": {
                 "errorMessage": "SBS Signatures Matrix file cannot have spaces and must have extension '.txt' or '.all'",
@@ -795,7 +1154,7 @@
                         "type": "string",
                         "pattern": "^\\S+\\.txt$"
                     },
-					{
+                    {
                         "type": "string",
                         "pattern": "^\\S+\\.all$"
                     },
@@ -813,7 +1172,12 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [],
+                "output_of": [
+                    "signatures"
+                ],
+                "is_paired_normal": false
             },
             "hrdetect": {
                 "errorMessage": "HRDetect file cannot contain spaces and must have extension '.rds'",
@@ -836,7 +1200,14 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
+                "exists": true,
+                "input_of": [
+                    "onenesstwoness"
+                ],
+                "output_of": [
+                    "hrdetect"
+                ],
+                "is_paired_normal": false
             },
             "onenesstwoness": {
                 "errorMessage": "OnenessTwoness file cannot contain spaces and must have extension '.rds'",
@@ -859,9 +1230,18 @@
                     }
                 ],
                 "format": "file-path",
-                "exists": true
-            },
+                "exists": true,
+                "input_of": [],
+                "output_of": [
+                    "onenesstwoness"
+                ],
+                "is_paired_normal": false
+            }
         },
-        "required": ["patient", "sample"]
+        "required": [
+            "patient",
+            "sample",
+            "status"
+        ]
     }
 }
