@@ -88,10 +88,6 @@ workflow BAM_QC {
         versions = versions.mix(GATK4_ESTIMATELIBRARYCOMPLEXITY.out.versions)
     }
 
-    // Gather all reports generated
-
-    // Gather versions of all tools used
-
     emit:
     reports
 
