@@ -1618,6 +1618,8 @@ workflow NFCASEREPORTS {
             .join(bam_snv_inputs)
             .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
 
+		bam_snv_calling.view{ "bam_snv_calling: $it" }
+
         snv_somatic_existing_outputs = inputs
             .map { it -> [it.meta, it.snv_somatic_vcf, it.snv_somatic_tbi] }
             .filter { !it[1].isEmpty() && !it[2].isEmpty()}
@@ -1703,7 +1705,7 @@ workflow NFCASEREPORTS {
     if (tools_used.contains("all") || tools_used.contains("snpeff")) {
         variant_somatic_ann_inputs = inputs
             .filter { it.variant_somatic_ann.isEmpty() || it.variant_somatic_bcf.isEmpty() }
-            .map { it -> [it.meta.patient, it.meta] }
+            .map { it -> [it.meta.patient, it.meta + [id: it.meta.sample ]] }
 
         variant_ann_input_somatic = variant_somatic_ann_inputs
             .join(filtered_somatic_vcf_for_merge)
@@ -1732,7 +1734,7 @@ workflow NFCASEREPORTS {
         if (!params.tumor_only) {
             variant_germline_ann_inputs = inputs
                 .filter { it.variant_germline_ann.isEmpty() || it.variant_germline_bcf.isEmpty() }
-                .map { it -> [it.meta.patient, it.meta] }
+                .map { it -> [it.meta.patient, it.meta + [id: it.meta.sample ]] }
 
             variant_ann_input_germline = variant_germline_ann_inputs
                 .join(germline_vcf_for_merge)
@@ -1825,6 +1827,9 @@ workflow NFCASEREPORTS {
     if (tools_used.contains("all") || tools_used.contains("purple")) {
         // need a channel with patient and meta for merging with rest
         purple_inputs_for_merge = inputs.filter { it.ploidy.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
+		
+
+		purple_inputs_for_merge.view{ "purple_inputs_for_merge: $it" }
 
         meta = purple_inputs_for_merge
             .branch{
@@ -1834,8 +1839,9 @@ workflow NFCASEREPORTS {
             .tumor
             .map {
             patient, meta ->
-            [patient, meta + [tumor_id: meta.sample] ]
+            [patient, meta + [tumor_id: meta.sample, id: meta.sample] ]
         }
+
 
         purple_inputs_snv_germline = Channel.empty()
         if (!params.tumor_only) {
