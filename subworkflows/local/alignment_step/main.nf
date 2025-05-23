@@ -14,6 +14,9 @@ include { MULTIQC } from "${workflow.projectDir}/modules/nf-core/multiqc/main"
 // Loading the module that dumps the versions of software being used
 include { CUSTOM_DUMPSOFTWAREVERSIONS } from "${workflow.projectDir}/modules/nf-core/custom/dumpsoftwareversions/main"
 
+// FASTQ Concatenation
+include { CAT_FASTQ } from "${workflow.projectDir}/modules/nf-core/cat/fastq/main"
+
 // Map input reads to reference genome
 include { FASTQ_ALIGN_BWAMEM_MEM2 } from "${workflow.projectDir}/subworkflows/local/fastq_align_bwamem_mem2/main"
 include { FASTQ_PARABRICKS_FQ2BAM } from "${workflow.projectDir}/subworkflows/local/fastq_parabricks_fq2bam/main"
@@ -172,8 +175,17 @@ workflow ALIGNMENT_STEP {
             bam_mapped = alignment_existing_outputs.mix(FASTQ_PARABRICKS_FQ2BAM.out.bam)
 			// bam_mapped = FASTQ_PARABRICKS_FQ2BAM.out.bam}
         } else {
+			inputs_for_cat_fastq = reads_for_alignment.map { meta, fastq_1s, fastq_2s, rg ->
+				[meta, [fastq_1s, fastq_2s] ]
+			}
+			// Merge fastq files for each sample
+			// Note that the RG used in FASTQ_ALIGN
+			// will only contain the first RG from the set of fastqs.
+			// Which is a desired side effect.
+			CAT_FASTQ(inputs_for_cat_fastq)
             FASTQ_ALIGN_BWAMEM_MEM2(
-                reads_for_alignment,
+                // reads_for_alignment,
+				CAT_FASTQ.out.reads,
                 index_alignment
             )
             // merge existing BAMs with newly mapped ones
