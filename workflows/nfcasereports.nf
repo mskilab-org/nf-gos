@@ -461,18 +461,18 @@ requiredFields = [
 
 tool_input_output_map = [
     "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
-	"qc_coverage": [ 
+	"collect_wgs_metrics": [ 
 		inputs: ['bam'], 
 		outputs: ['qc_coverage_metrics'] 
 	],
-	"qc_multiple_metrics": [ 
+	"collect_multiple_metrics": [ 
 		inputs: ['bam'], 
 		outputs: [
 			['qc_alignment_summary'],
 			['qc_insert_size']
 		] 
 	],
-	"qc_duplicates": [ inputs: ['bam'], outputs: ['qc_dup_rate'] ],
+	"estimate_library_complexity": [ inputs: ['bam'], outputs: ['qc_dup_rate'] ],
     // "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics', "estimate_library_complexity"] ],
 	"postprocessing": [ inputs: ['bam'], outputs: [] ], // FIXME: Postprocessing will never be selected as a tool given the current set of inputs/outputs, empty output means tool will not be selected. postprocessing tool must be controlled by params.is_run_post_processing.
     "msisensorpro": [ inputs: ['bam'], outputs: ['msi', 'msi_germline'] ],
@@ -1226,6 +1226,10 @@ workflow NFCASEREPORTS {
 	alignment_bams_final = alignment_bams_final.mix(ALIGNMENT_STEP.out.alignment_bams_final)
 	// reports = reports.mix(ALIGNMENT_STEP.out.reports.collect{ meta, report -> report })
 	versions = versions.mix(ALIGNMENT_STEP.out.versions)
+
+	 // omit meta since it is not used in the BAM_QC
+    dict_path = dict.map{ meta, dict -> [dict] }
+    BAM_QC(inputs, alignment_bams_final, dict_path, tools_used)
 
     // MSISensorPro
     // ##############################
