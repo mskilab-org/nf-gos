@@ -576,7 +576,7 @@ def skip_tools = params.skip_tools ? params.skip_tools.split(',').collect { it.t
 println "Skipping tools: ${skip_tools}"
 // TODO: if GRIDSS - skip if vcf is found, but not if vcf_unfiltered is present.
 selected_tools = []
-def tools_qc = ["qc_coverage", "qc_multiple_metrics", "qc_duplicates"]
+def tools_qc = ["collect_wgs_metrics", "collect_multiple_metrics", "estimate_library_complexity"]
 selected_tools_map = [:]
 tool_input_output_map.each { tool, io ->
 	if (!selected_tools.contains(tool) && !skip_tools.contains(tool)) {
@@ -588,7 +588,7 @@ tool_input_output_map.each { tool, io ->
 		// special cases
 		def is_sage_tumor_only = tool == "sage" && params.tumor_only
 		def is_current_tool_qc = tools_qc.contains(tool)
-		def is_current_tool_qc_multiple_metrics = tool == "qc_multiple_metrics" // nested
+		def is_current_tool_qc_multiple_metrics = tool == "collect_multiple_metrics" // nested
 		// TODO: for later
 		def is_current_tool_jabba = tool == "jabba" // separate first input, (vcf or sv_retier) and remaining required inputs
 		def is_output_nested_list = io.outputs instanceof List && io.outputs.every { it instanceof List }
@@ -695,11 +695,11 @@ tools_used.removeAll(skip_tools)
 println "Tools that will be run based on your inputs: ${tools_used}"
 
 
-is_run_qc_duplicates = params.is_run_qc_duplicates ?: false // if parameter doesn't exist, set to false
-do_qc_coverage = tools_used.contains("qc_coverage")
-do_qc_multiple_metrics = tools_used.contains("qc_multiple_metrics")
-do_qc_duplicates = tools_used.contains("qc_duplicates") || is_run_qc_duplicates
-do_bamqc = do_qc_coverage || do_qc_multiple_metrics || do_qc_duplicates
+// is_run_qc_duplicates = params.is_run_qc_duplicates ?: false // if parameter doesn't exist, set to false
+// do_qc_coverage = tools_used.contains("qc_coverage")
+// do_qc_multiple_metrics = tools_used.contains("qc_multiple_metrics")
+// do_qc_duplicates = tools_used.contains("qc_duplicates") || is_run_qc_duplicates
+// do_bamqc = do_qc_coverage || do_qc_multiple_metrics || do_qc_duplicates
 
 if (!params.dbsnp && !params.known_indels) {
     if (!params.skip_tools || (params.skip_tools && !params.skip_tools.contains('baserecalibrator'))) {
@@ -818,8 +818,8 @@ include { PREPARE_INTERVALS } from '../subworkflows/local/prepare_intervals/main
 // include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_NO_MD } from '../subworkflows/local/cram_qc_mosdepth_samtools/main'
 // include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_RECAL } from '../subworkflows/local/cram_qc_mosdepth_samtools/main'
 
-// // BAM Picard QC
-// include { BAM_QC } from '../subworkflows/local/bam_qc/main'
+// BAM Picard QC
+include { BAM_QC } from '../subworkflows/local/bam_qc/main'
 // include { BAM_QC_PICARD_COLLECTMULTIPLEMETRICS } from '../subworkflows/local/bam_qc/main'
 // include { BAM_QC_PICARD_COLLECTWGSMETRICS } from '../subworkflows/local/bam_qc/main'
 // include { BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY } from '../subworkflows/local/bam_qc/main'
@@ -1225,7 +1225,7 @@ workflow NFCASEREPORTS {
 
 	alignment_bams_final = alignment_bams_final.mix(ALIGNMENT_STEP.out.alignment_bams_final)
 	// reports = reports.mix(ALIGNMENT_STEP.out.reports.collect{ meta, report -> report })
-	versions = versions.mix(ALIGNMENT_STEP.out.versions)
+	// versions = versions.mix(ALIGNMENT_STEP.out.versions)
 
 	 // omit meta since it is not used in the BAM_QC
     dict_path = dict.map{ meta, dict -> [dict] }

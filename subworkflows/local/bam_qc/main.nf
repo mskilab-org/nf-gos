@@ -2,10 +2,10 @@
 // QC on BAM
 //
 
-include { PICARD_COLLECTWGSMETRICS } from '../../../modules/nf-core/picard/collectwgsmetrics/main'
-include { PICARD_COLLECTMULTIPLEMETRICS } from '../../../modules/nf-core/picard/collectmultiplemetrics/main'
-include { GATK4_ESTIMATELIBRARYCOMPLEXITY } from '../../../modules/nf-core/gatk4/estimatelibrarycomplexity/main'
-include { SAMTOOLS_SUBSAMPLE } from '../../../modules/local/subsample_reads/main'
+include { PICARD_COLLECTWGSMETRICS } from "${workflow.projectDir}/modules/nf-core/picard/collectwgsmetrics/main"
+include { PICARD_COLLECTMULTIPLEMETRICS } from "${workflow.projectDir}/modules/nf-core/picard/collectmultiplemetrics/main"
+include { GATK4_ESTIMATELIBRARYCOMPLEXITY } from "${workflow.projectDir}/modules/nf-core/gatk4/estimatelibrarycomplexity/main"
+include { SAMTOOLS_SUBSAMPLE } from "${workflow.projectDir}/modules/local/subsample_reads/main"
 
 fasta = WorkflowNfcasereports.create_file_channel(params.fasta)
 fai = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
@@ -17,7 +17,7 @@ workflow BAM_QC {
     take:
     inputs
     bam // channel: [mandatory] [ meta.sample, meta, bam, bai ]
-    dict,
+    dict
 	tools_used
 
     main:
@@ -28,9 +28,7 @@ workflow BAM_QC {
 	// on NYU: "/gpfs/data/imielinskilab/DB/references/hg19/human_g1k_v37_decoy.fasta.subsampled_0.33.interval_list"
 	intervals_file = params.subsample_interval ?: []
 
-	
-
-    if (tools_used.contains("collect_wgs_metrics")) {
+    if (tools_used.contains("all") || tools_used.contains("collect_wgs_metrics")) {
         collect_wgs_metrics_inputs = inputs
             .filter { it.qc_coverage_metrics.isEmpty() }
             .map { it -> [it.meta.sample] }
@@ -49,7 +47,7 @@ workflow BAM_QC {
     }
 
 
-    if (tools_used.contains("collect_multiple_metrics")) {
+    if (tools_used.contains("all") || tools_used.contains("collect_multiple_metrics")) {
         collect_multiple_metrics_inputs = inputs
             .filter { it.qc_alignment_summary.isEmpty() || it.qc_insert_size.isEmpty() }
             .map { it -> [it.meta.sample] }
@@ -66,7 +64,7 @@ workflow BAM_QC {
     }
 
 	is_run_qc_duplicates = params.is_run_qc_duplicates ?: false // if parameter doesn't exist, set to false
-	do_qc_duplicates = tools_used.contains("estimate_library_complexity") && is_run_qc_duplicates
+	do_qc_duplicates = (tools_used.contains("all") || tools_used.contains("estimate_library_complexity")) && is_run_qc_duplicates
     if (do_qc_duplicates) {
         estimate_library_complexity_inputs = inputs
             .filter { it.qc_dup_rate.isEmpty() }
