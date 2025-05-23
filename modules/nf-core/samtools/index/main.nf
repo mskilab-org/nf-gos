@@ -12,8 +12,10 @@ process SAMTOOLS_INDEX {
 
     output:
     tuple val(meta), path("*.bai") , optional:true, emit: bai
+	tuple val(meta), path("*.bam") , optional:true, emit: bam
     tuple val(meta), path("*.csi") , optional:true, emit: csi
     tuple val(meta), path("*.crai"), optional:true, emit: crai
+	tuple val(meta), path("*.cram") , optional:true, emit: cram
     path  "versions.yml"           , emit: versions
 
     when:
@@ -21,7 +23,14 @@ process SAMTOOLS_INDEX {
 
     script:
     def args = task.ext.args ?: ''
+	def filename = input.getName()   // just the filename
+	def ext = input.name.tokenize('.')[-1]
+	def base = input.name - ".${ext}"
     """
+
+	ln -s $input ${base}___linked.${ext}
+	touch ${base}___linked.${ext}
+
     samtools \\
         index \\
         -@ ${task.cpus-1} \\
