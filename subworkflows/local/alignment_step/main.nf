@@ -311,20 +311,20 @@ workflow ALIGNMENT_STEP {
         // Gather used softwares versions
         // versions = versions.mix(BAM_APPLYBQSR.out.versions)
 
-        CRAM_QC_RECAL(
-            cram_variant_calling,
-            fasta,
-            intervals_for_preprocessing
-        )
+        // CRAM_QC_RECAL(
+        //     cram_variant_calling,
+        //     fasta,
+        //     intervals_for_preprocessing
+        // )
 
-        // Gather QC
+        // // Gather QC
         // reports = reports.mix(CRAM_QC_RECAL.out.reports.collect{ meta, report -> report })
 
-        // Gather software versions
-        // versions = versions.mix(CRAM_QC_RECAL.out.versions)
+        // // Gather software versions
+        // // versions = versions.mix(CRAM_QC_RECAL.out.versions)
 
-        // convert CRAM files to BAM for downstream processes
-        CRAM_TO_BAM_RECAL(cram_variant_calling, fasta, fasta_fai)
+        // // convert CRAM files to BAM for downstream processes
+        // CRAM_TO_BAM_RECAL(cram_variant_calling, fasta, fasta_fai)
         // versions = versions.mix(CRAM_TO_BAM_RECAL.out.versions)
 
         CRAM_TO_BAM_FINAL(cram_variant_calling, fasta, fasta_fai)
