@@ -175,14 +175,22 @@ workflow ALIGNMENT_STEP {
             bam_mapped = alignment_existing_outputs.mix(FASTQ_PARABRICKS_FQ2BAM.out.bam)
 			// bam_mapped = FASTQ_PARABRICKS_FQ2BAM.out.bam}
         } else {
+			// inputs_for_cat_fastq = reads_for_alignment.map { meta, fastq_1s, fastq_2s, rg ->
+			// 	[meta, [fastq_1s, fastq_2s] ]
+			// }
 			inputs_for_cat_fastq = reads_for_alignment.map { meta, fastq_1s, fastq_2s, rg ->
-				[meta, [fastq_1s, fastq_2s] ]
+				def reads = (0..<fastq_1s.size()).collectMany { i ->
+					[file(fastq_1s[i]), file(fastq_2s[i])]
+				}
+				tuple(meta, reads)
 			}
+			inputs_for_cat_fastq.view { log.info "inputs_for_cat_fastq: $it" }
 			// Merge fastq files for each sample
 			// Note that the RG used in FASTQ_ALIGN
 			// will only contain the first RG from the set of fastqs.
 			// Which is a desired side effect.
 			CAT_FASTQ(inputs_for_cat_fastq)
+			index_alignment.view { log.info "index_alignment: $it" }
             FASTQ_ALIGN_BWAMEM_MEM2(
                 // reads_for_alignment,
 				CAT_FASTQ.out.reads,
