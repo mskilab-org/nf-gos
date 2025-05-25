@@ -28,14 +28,17 @@ process SAMTOOLS_INDEX {
 	def base = input.name - ".${ext}"
     """
 
-	ln -s $input ${base}___indexed.${ext}
-	touch ${base}___indexed.${ext}
+	## ln -ns $input ${base}___indexed.${ext}
+	## touch ${base}___indexed.${ext}
 
     samtools \\
         index \\
         -@ ${task.cpus-1} \\
         $args \\
-        ${base}___indexed.${ext}
+		$input
+        
+		
+	# ${base}___indexed.${ext}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
