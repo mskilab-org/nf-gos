@@ -70,7 +70,10 @@ workflow ALIGNMENT_STEP {
 	
 	input_fastq_qc = input_fastq.map { it -> [it[0], [it[1], it[2]]] }
 
-
+	alignment_bams_final = inputs
+		.map { it -> [it.meta, it.bam, it.bai] }
+		.filter { ! it[1].isEmpty() }
+		.map { it -> [it[0].id, it[0], it[1], it[2]] }
 	
 
 
