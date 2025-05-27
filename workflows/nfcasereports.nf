@@ -475,7 +475,11 @@ tool_input_output_map = [
 	"estimate_library_complexity": [ inputs: ['bam'], outputs: ['qc_dup_rate'] ],
     // "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics', "estimate_library_complexity"] ],
 	"postprocessing": [ inputs: ['bam'], outputs: [] ], // FIXME: Postprocessing will never be selected as a tool given the current set of inputs/outputs, empty output means tool will not be selected. postprocessing tool must be controlled by params.is_run_post_processing.
-    "msisensorpro": [ inputs: ['bam'], outputs: ['msi', 'msi_germline'] ],
+    "msisensorpro": [ inputs: ['bam'], outputs: [
+		'msi' 
+		// 'msi_germline'
+		] 
+	],
 	// TODO: figure out what the best way to 
     // "gridss": [ inputs: ['bam'], outputs: ['vcf_unfiltered'] ],
 	// "junctionfilter": [ inputs: ['vcf_unfiltered'], outputs: ['vcf'] ],
