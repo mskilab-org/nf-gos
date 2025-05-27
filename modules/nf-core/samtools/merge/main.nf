@@ -56,16 +56,18 @@ process SAMTOOLS_MERGE {
         --threads ${task.cpus-1} \\
         $args \\
         ${reference} \\
-        ${prefix}.${file_type} \\
+        -o ${prefix}.${file_type}.temporary_for_check \\
         $input_files
 	
-	is_output_complete=\$(samtools quickcheck ${prefix}.${file_type} && echo 'true' || echo 'false')
+	is_output_complete=\$(samtools quickcheck ${prefix}.${file_type}.temporary_for_check && echo 'true' || echo 'false')
 
 	if ! \$is_output_complete; then
 		printf "Merged output is truncated!!!\n"
-		rm ${prefix}.${file_type}
+		rm ${prefix}.${file_type}.temporary_for_check
 		exit 1
 	fi
+
+	mv ${prefix}.${file_type}.temporary_for_check ${prefix}.${file_type}
 
 
     cat <<-END_VERSIONS > versions.yml
