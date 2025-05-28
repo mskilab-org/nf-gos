@@ -587,7 +587,7 @@
                 "is_paired_normal": true
             },
             "vcf": {
-                "errorMessage": "VCF file for reads 1 cannot contain spaces and must have extension '.vcf' or '.vcf.gz' or '.rds'",
+                "errorMessage": "VCF/RDS file with structural variants cannot contain spaces and must have extension '.vcf' or '.vcf.gz' or '.rds'",
                 "anyOf": [
                     {
                         "type": "string",
