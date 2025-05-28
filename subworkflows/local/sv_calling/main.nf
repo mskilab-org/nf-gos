@@ -3,11 +3,11 @@
 //
 
 //GRIDSS
-include { BAM_SVCALLING_GRIDSS } from '../subworkflows/local/bam_svcalling_gridss/main'
-include { BAM_SVCALLING_GRIDSS_SOMATIC } from '../subworkflows/local/bam_svcalling_gridss/main'
+include { BAM_SVCALLING_GRIDSS } from '../bam_svcalling_gridss/main'
+include { BAM_SVCALLING_GRIDSS_SOMATIC } from '../bam_svcalling_gridss/main'
 
 // SV Junction Filtering
-include { SV_JUNCTION_FILTER as JUNCTION_FILTER } from '../subworkflows/local/junction_filter/main'
+include { SV_JUNCTION_FILTER as JUNCTION_FILTER } from '../junction_filter/main'
 
 tools_to_run = WorkflowNfcasereports.toolsToRun
 
