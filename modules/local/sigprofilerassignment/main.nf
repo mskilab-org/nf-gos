@@ -16,6 +16,7 @@ process SIGPROFILERASSIGNMENT {
     tuple val(meta), path("sbs_results/Assignment_Solution/**/*.txt")    , emit: sbs_sigs, optional: true
     tuple val(meta), path("indel_results/Assignment_Solution/**/*.txt")    , emit: indel_sigs, optional: true
     tuple val(meta), path("sig_inputs/output/**/*.all")    , emit: sig_matrix, optional: true
+	tuple val(meta), path("sig_inputs")    , emit: sig_inputs, optional: true
     path "versions.yml"                                     , emit: versions
 
     when:
