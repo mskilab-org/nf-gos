@@ -3,8 +3,8 @@ process JABBA {
     label 'process_high'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/jabba:latest':
-        'mskilab/jabba:latest' }"
+        'docker://mskilab/jabba:0.0.1':
+        'mskilab/jabba:0.0.1' }"
 
     input:
     tuple val(meta), path(junction), path(cov_rds), val(j_supp), val(het_pileups_wgs), val(purity), val(ploidy), val(cbs_seg_rds), val(cbs_nseg_rds)
@@ -170,8 +170,8 @@ process COERCE_SEQNAMES {
     label 'process_low'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/jabba:latest':
-        'mskilab/jabba:latest' }"
+        'docker://mskilab/jabba:0.0.1':
+        'mskilab/jabba:0.0.1' }"
 
     input:
     tuple val(meta), path(file)
@@ -214,8 +214,8 @@ process RETIER_WHITELIST_JUNCTIONS {
     label 'process_low'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/jabba:latest':
-        'mskilab/jabba:latest' }"
+        'docker://mskilab/jabba:0.0.1':
+        'mskilab/jabba:0.0.1' }"
 
     input:
     tuple val(meta), path(junctions)
