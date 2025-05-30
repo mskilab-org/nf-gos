@@ -20,9 +20,9 @@ process PARABRICKS_FQ2BAM {
     tuple val(meta), path("*.bam")                , emit: bam
     tuple val(meta), path("*.bai")                , emit: bai
     path "versions.yml"                           , emit: versions
-    path "qc_metrics", optional:true              , emit: qc_metrics
+    path "*qc_metrics", optional:true              , emit: qc_metrics
     path("*.table"), optional:true                , emit: bqsr_table
-    path("duplicate-metrics.txt"), optional:true  , emit: duplicate_metrics
+    path("*duplicate-metrics.txt"), optional:true  , emit: duplicate_metrics
 
     when:
     task.ext.when == null || task.ext.when
