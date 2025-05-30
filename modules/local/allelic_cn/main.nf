@@ -5,11 +5,11 @@ process NON_INTEGER_BALANCE {
 
     // container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
     //     '/gpfs/commons/groups/imielinski_lab/home/sdider/Projects/nf-jabba/tests/test_runs/work/singularity/jabba_cplex_latest.sif':
-    //     'mskilab/jabba:latest' }"
+    //     'mskilab/jabba:0.0.1' }"
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/jabba:latest':
-        'mskilab/jabba:latest' }"
+        'docker://mskilab/jabba:0.0.1':
+        'mskilab/jabba:0.0.1' }"
 
     input:
     tuple val(meta), path(jabba_gg), path(decomposed_cov), path(het_pileups_wgs)
@@ -102,11 +102,11 @@ process LP_PHASED_BALANCE {
 
     // container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
     //     '/gpfs/commons/groups/imielinski_lab/home/sdider/Projects/nf-jabba/tests/test_runs/work/singularity/jabba_cplex_latest.sif':
-    //     'mskilab/jabba:latest' }"
+    //     'mskilab/jabba:0.0.1' }"
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/jabba:latest':
-        'mskilab/jabba:latest' }"
+        'docker://mskilab/jabba:0.0.1':
+        'mskilab/jabba:0.0.1' }"
 
     input:
     tuple val(meta), path(hets_gg, stageAs: "non_integer_balanced.gg.rds"), path(hets) // output from non_integer_balance, sites.txt from hetpileups
