@@ -182,8 +182,8 @@ Every module in the pipeline has been containerized. Some modules are partially 
 >  1. Download CPLEX (Linux x86-64). (You may need to use the HTTP method.)
 >  2. Pull image and run the container using:
 > ```
-> docker pull mskilab/jabba:latest
-> docker run -it --rm --platform linux/amd64 mskilab/jabba:latest
+> docker pull mskilab/jabba:0.0.1
+> docker run -it --rm --platform linux/amd64 mskilab/jabba:0.0.1
 > ```
 >  3. Copy CPLEX binary into the container: docker cp /PATH/TO/DOWNLOADED_CPLEX.bin CONTAINER_ID:/opt/cplex_studio
 >  4. Install CPLEX: /opt/cplex_studio/DOWNLOADED_CPLEX.bin (If you get a Permission denied error, run
