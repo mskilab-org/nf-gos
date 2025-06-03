@@ -11,12 +11,22 @@ process SIGPROFILERASSIGNMENT {
     tuple val(meta), path(vcf), path(tbi)
     val(genome)
     val(cosmic_version)
+	path(sbs_sigs)
+	path(id_sigs)
 
     output:
     tuple val(meta), path("sbs_results/Assignment_Solution/**/*.txt")    , emit: sbs_sigs, optional: true
     tuple val(meta), path("indel_results/Assignment_Solution/**/*.txt")    , emit: indel_sigs, optional: true
     tuple val(meta), path("sig_inputs/output/**/*.all")    , emit: sig_matrix, optional: true
-	tuple val(meta), path("sig_inputs")    , emit: sig_inputs, optional: true
+	tuple val(meta), path("sig_inputs/**")    , emit: sig_inputs, optional: true
+	tuple val(meta), path("sig_inputs/**/{ID}")    , emit: indels_dir, optional: true
+	tuple val(meta), path("sig_inputs/output/SBS/*SBS96.all")    , emit: sbs_96_catalogue, optional: true
+	tuple val(meta), path("sig_inputs/output/ID/*ID83.all")    , emit: indels_83_catalogue, optional: true
+	tuple val(meta), path("sbs_results/**/*sbs_Assignment_Solution_Activities*.txt")    , emit: sbs_activities, optional: true
+	tuple val(meta), path("indel_results/**/*indel_Assignment_Solution_Activities*.txt")    , emit: indel_activities, optional: true
+	tuple val(meta), path("sbs_results/**/*Decomposed_Mutation_Probabilities*.txt")    , emit: sbs_posterior_prob, optional: true
+	tuple val(meta), path("indel_results/**/*Decomposed_Mutation_Probabilities*.txt")    , emit: indel_posterior_prob, optional: true
+	
     path "versions.yml"                                     , emit: versions
 
     when:
@@ -34,6 +44,8 @@ process SIGPROFILERASSIGNMENT {
     --input-vcf ${vcf} \\
     --genome ${genome} \\
     --cosmic-version ${cosmic_version} \\
+	--sbs-signatures ${sbs_sigs} \\
+	--id-signatures ${id_sigs}
 
     # append sbs_ and indel_ to the output file names
     mv sbs_results/Assignment_Solution/Activities/Assignment_Solution_Activities.txt sbs_results/Assignment_Solution/Activities/sbs_Assignment_Solution_Activities.txt

@@ -9,6 +9,8 @@ from SigProfilerMatrixGenerator.scripts import SigProfilerMatrixGeneratorFunc as
 # Usage
 # python sigprofilerassgnment.py --data-directory /path/to/vcf/files --output-directory /path/to/output --maximum-signatures 25 --cosmic-version 3.2
 
+def none_or_str(value):
+    return None if value == "None" else value
 
 def unzip_vcf(input_vcf, input_dir):
     if not os.path.exists(input_dir):
@@ -44,7 +46,7 @@ def main(args):
         cosmic_version=cosmic_version,
         exome=False,
         genome_build=genome,
-        signature_database=None,
+        signature_database=args.sbs_signatures,
         exclude_signature_subgroups=None,
         export_probabilities=True,
         export_probabilities_per_mutation=True,
@@ -63,6 +65,7 @@ def main(args):
         cosmic_version=cosmic_version,
         exome=False,
         genome_build=genome,
+        signature_database=args.id_signatures,
         export_probabilities=True,
         export_probabilities_per_mutation=True,
         make_plots=False,
@@ -87,6 +90,10 @@ if __name__ == '__main__':
                         help='Path to the input gzipped VCF file.')
     parser.add_argument('--cosmic-version', type=float, default=3.4,
                         help='COSMIC database version to use. Default is 3.4.')
+    parser.add_argument('--id-signatures', type=none_or_str, default=None,
+                        help='Custom id signature matrix.')
+    parser.add_argument('--sbs-signatures', type=none_or_str, default=None,
+                        help='Custom sbs signature matrix.')
 
     args = parser.parse_args()
 

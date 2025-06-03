@@ -914,14 +914,11 @@ include { VCF_FUSIONS_CNA_ONCOKB_ANNOTATOR } from '../subworkflows/local/oncokb/
 include { VCF_PAVE as VCF_PAVE_SOMATIC } from '../subworkflows/local/vcf_pave/main'
 include { VCF_PAVE as VCF_PAVE_GERMLINE } from '../subworkflows/local/vcf_pave/main'
 
-// // SigProfilerAssignment
-// include { VCF_SIGPROFILERASSIGNMENT } from '../subworkflows/local/vcf_sigprofilerassignment/main'
+// SigProfilerAssignment
+include { VCF_SIGPROFILERASSIGNMENT } from '../subworkflows/local/vcf_sigprofilerassignment/main'
 
 // Alignment Step Process
 include { ALIGNMENT_STEP } from '../subworkflows/local/alignment_step/main'
-
-// Alignment Step Process
-include { SIGNATURES_STEP } from '../subworkflows/local/signatures_step/main'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2373,44 +2370,34 @@ workflow NFCASEREPORTS {
                 .mix(oncokb_existing_outputs_cna)
     }
 
-	SIGNATURES_STEP(inputs, filtered_somatic_vcf_for_merge, tools_used)
+    // Signatures
+    // ##############################
+    if (tools_used.contains("all") || tools_used.contains("signatures")) {
+		inputs_tumor_status = inputs.branch{ tumor: it.meta.status == 1 }
+        signatures_inputs = inputs_tumor_status.tumor
+            .filter { it.sbs_signatures.isEmpty() || it.indel_signatures.isEmpty() || it.signatures_matrix.isEmpty()}
+            .map { it -> [it.meta.patient, it.meta + [id: it.meta.patient]] }
 
-	sbs_signatures = SIGNATURES_STEP.out.sbs_signatures
-	indel_signatures = SIGNATURES_STEP.out.indel_signatures
-	signatures_matrix = SIGNATURES_STEP.out.signatures_matrix
-	sbs_activities = SIGNATURES_STEP.out.sbs_activities
-	indel_activities = SIGNATURES_STEP.out.indel_activities
-	sbs_posterior_prob = SIGNATURES_STEP.out.sbs_posterior_prob
-	indel_posterior_prob = SIGNATURES_STEP.out.indel_posterior_prob
+        signatures_inputs_somatic_vcf = signatures_inputs
+            .join(filtered_somatic_vcf_for_merge)
+            .map { it -> [ it[1], it[2], it[3] ] } // meta, somatic snv, tbi
 
-    // // Signatures
-    // // ##############################
-    // if (tools_used.contains("all") || tools_used.contains("signatures")) {
-	// 	inputs_tumor_status = inputs.branch{ tumor: it.meta.status == 1 }
-    //     signatures_inputs = inputs_tumor_status.tumor
-    //         .filter { it.sbs_signatures.isEmpty() || it.indel_signatures.isEmpty() || it.signatures_matrix.isEmpty()}
-    //         .map { it -> [it.meta.patient, it.meta + [id: it.meta.patient]] }
+        sbs_signatures_existing_outputs = inputs_tumor_status.tumor.map { it -> [it.meta, it.sbs_signatures] }.filter { !it[1].isEmpty() && it[0].status == 1 }
+        indel_signatures_existing_outputs = inputs_tumor_status.tumor.map { it -> [it.meta, it.indel_signatures] }.filter { !it[1].isEmpty() && it[0].status == 1 }
+        signatures_matrix_existing_outputs = inputs_tumor_status.tumor.map { it -> [it.meta, it.signatures_matrix] }.filter { !it[1].isEmpty() && it[0].status == 1 }
 
-    //     signatures_inputs_somatic_vcf = signatures_inputs
-    //         .join(filtered_somatic_vcf_for_merge)
-    //         .map { it -> [ it[1], it[2], it[3] ] } // meta, somatic snv, tbi
+        VCF_SIGPROFILERASSIGNMENT(signatures_inputs_somatic_vcf)
 
-    //     sbs_signatures_existing_outputs = inputs_tumor_status.tumor.map { it -> [it.meta, it.sbs_signatures] }.filter { !it[1].isEmpty() && it[0].status == 1 }
-    //     indel_signatures_existing_outputs = inputs_tumor_status.tumor.map { it -> [it.meta, it.indel_signatures] }.filter { !it[1].isEmpty() && it[0].status == 1 }
-    //     signatures_matrix_existing_outputs = inputs_tumor_status.tumor.map { it -> [it.meta, it.signatures_matrix] }.filter { !it[1].isEmpty() && it[0].status == 1 }
-
-    //     VCF_SIGPROFILERASSIGNMENT(signatures_inputs_somatic_vcf)
-
-    //     sbs_signatures = Channel.empty()
-    //         .mix(VCF_SIGPROFILERASSIGNMENT.out.sbs_signatures)
-    //         .mix(sbs_signatures_existing_outputs)
-    //     indel_signatures = Channel.empty()
-    //         .mix(VCF_SIGPROFILERASSIGNMENT.out.indel_signatures)
-    //         .mix(indel_signatures_existing_outputs)
-    //     signatures_matrix = Channel.empty()
-    //         .mix(VCF_SIGPROFILERASSIGNMENT.out.signatures_matrix)
-    //         .mix(signatures_matrix_existing_outputs)
-    // }
+        sbs_signatures = Channel.empty()
+            .mix(VCF_SIGPROFILERASSIGNMENT.out.sbs_signatures)
+            .mix(sbs_signatures_existing_outputs)
+        indel_signatures = Channel.empty()
+            .mix(VCF_SIGPROFILERASSIGNMENT.out.indel_signatures)
+            .mix(indel_signatures_existing_outputs)
+        signatures_matrix = Channel.empty()
+            .mix(VCF_SIGPROFILERASSIGNMENT.out.signatures_matrix)
+            .mix(signatures_matrix_existing_outputs)
+    }
 
     // HRDetect
     // ##############################
