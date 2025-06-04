@@ -22,6 +22,13 @@ class WorkflowNfcasereports {
 
     }
 
+	public static map_join(channel_a, channel_b, key) {
+        channel_a
+			.map{ it -> [it[key], it] }
+			.cross(channel_b.map{it -> [it[key], it]})
+			.map { it[0][1] + it[1][1] }
+    }
+
     public static create_file_channel(parameter, else_part = Channel.empty()) {
         return parameter ? Channel.fromPath(parameter).collect() : else_part
     }

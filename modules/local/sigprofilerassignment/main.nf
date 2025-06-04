@@ -4,11 +4,11 @@ process SIGPROFILERASSIGNMENT {
     label 'process_medium'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/sigprofilerassignment:0.0.3':
-        'mskilab/sigprofilerassignment:0.0.3' }"
+        'docker://mskilab/sigprofilerassignment:0.0.4':
+        'mskilab/sigprofilerassignment:0.0.4' }"
 
     input:
-    tuple val(meta), path(vcf), path(tbi)
+    tuple val(meta), path(vcf)
     val(genome)
     val(cosmic_version)
 	path(sbs_sigs)
@@ -35,13 +35,19 @@ process SIGPROFILERASSIGNMENT {
     script:
     def args        = task.ext.args ?: ''
     def prefix      = task.ext.prefix ?: "${meta.id}"
+	def vcf_gz      = vcf.endsWith('.gz') ? vcf : "${vcf}.gz"
     def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
     """
     export SIGPROFILER_PATH=\$(echo "${baseDir}/bin/sigprofilerassignment.py")
 
+	if  [ ! -f ${vcf_gz} ]; then
+		bgzip -c ${vcf} > ${vcf_gz}
+		bcftools index --tbi ${vcf_gz}
+	fi
+
     python \$SIGPROFILER_PATH \\
-    --input-vcf ${vcf} \\
+    --input-vcf ${vcf_gz} \\
     --genome ${genome} \\
     --cosmic-version ${cosmic_version} \\
 	--sbs-signatures ${sbs_sigs} \\
