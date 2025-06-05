@@ -15,6 +15,9 @@ workflow SIGNATURES_STEP {
 
   // Creating empty channels for output
   main:
+
+  is_filter_ffpe_impact = params.filter_ffpe_impact ?: false
+
   signatures_inputs = Channel.empty()
   signatures_inputs_somatic_vcf = Channel.empty()
   sbs_signatures_existing_outputs = Channel.empty()
@@ -36,19 +39,19 @@ workflow SIGNATURES_STEP {
 
 
   filtered_ffpe_impact_somatic_vcf_inputs = inputs_tumor_status.tumor
-   	//   .filter { it.ffpe_impact_filtered_vcf.isEmpty() }
+   	  .filter { it.ffpe_impact_filtered_vcf.isEmpty() }
 	  .map { it -> [ it.meta.patient, it.meta, it.variant_somatic_ann ] } // patient, meta, annotated_somatic_vcf
   
   
   
-  vcf_out = snv_somatic_annotations_for_merge
+  annotated_vcf_ffpe_impact_or_snpeff = snv_somatic_annotations_for_merge
 
 
   if (tools_used.contains("all") || tools_used.contains("signatures")) {
-	filtered_ffpe_impact_somatic_vcf_for_merge = Channel.empty()
-	// filtered_ffpe_impact_somatic_vcf_for_merge = inputs_tumor_status.tumor
-   	//   .filter { ! it.somatic_ffpe_impact_annotated_vcf.isEmpty() }
-	//   .map { it -> [ it.meta, it.ffpe_impact_filtered_vcf, it.ffpe_impact_filtered_vcf_tbi ] }
+	// filtered_ffpe_impact_somatic_vcf_for_merge = Channel.empty()
+	filtered_ffpe_impact_somatic_vcf_for_merge = inputs_tumor_status.tumor
+   	  .filter { ! it.ffpe_impact_filtered_vcf.isEmpty() }
+	  .map { it -> [ it.meta, it.ffpe_impact_filtered_vcf, it.ffpe_impact_filtered_vcf_tbi ] }
 	
 	signatures_inputs = inputs_tumor_status.tumor
 		.filter { it.sbs_signatures.isEmpty() || it.indel_signatures.isEmpty() || it.signatures_matrix.isEmpty()}
@@ -103,11 +106,11 @@ workflow SIGNATURES_STEP {
 		.join(indel_posterior_prob_join) // patient, indel_posterior_prob
 		.map { it -> [it[1], it[2], it[3], it[4] ] } // meta, annotated somatic_mut_vcf, sbs_posterior_prob, indel_posterior_prob
 
-
-	FFPE_IMPACT_FILTER(merged_inputs)
-
-	vcf_out = filtered_ffpe_impact_somatic_vcf_for_merge
+	if (is_filter_ffpe_impact) {
+		FFPE_IMPACT_FILTER(merged_inputs)
+		annotated_vcf_ffpe_impact_or_snpeff = filtered_ffpe_impact_somatic_vcf_for_merge
 		.mix(FFPE_IMPACT_FILTER.out.ffpe_impact_filtered_vcf) // meta, ffpe_impact_filtered_vcf, ffpe_impact_filtered_vcf_tbi
+	} 	
 
   }
 
@@ -121,6 +124,6 @@ workflow SIGNATURES_STEP {
   indel_activities
   sbs_posterior_prob
   indel_posterior_prob
-  vcf_out
+  annotated_vcf_ffpe_impact_or_snpeff
 
 }

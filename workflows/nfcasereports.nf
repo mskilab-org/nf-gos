@@ -293,6 +293,8 @@ inputs = ch_from_samplesheet.map {
     sbs_signatures,
     indel_signatures,
     signatures_matrix,
+	ffpe_impact_vcf,
+	ffpe_impact_filtered_vcf,
     hrdetect,
     onenesstwoness
     -> [
@@ -350,6 +352,10 @@ inputs = ch_from_samplesheet.map {
         sbs_signatures: sbs_signatures,
         indel_signatures: indel_signatures,
         signatures_matrix: signatures_matrix,
+		ffpe_impact_vcf: ffpe_impact_vcf,
+        ffpe_impact_vcf_tbi: ffpe_impact_vcf ? ffpe_impact_vcf + '.tbi' : [],
+		ffpe_impact_filtered_vcf: ffpe_impact_filtered_vcf,
+        ffpe_impact_filtered_vcf_tbi: ffpe_impact_filtered_vcf ? ffpe_impact_filtered_vcf + '.tbi' : [],
         hrdetect: hrdetect,
         onenesstwoness: onenesstwoness
     ]
@@ -508,7 +514,7 @@ tool_input_output_map = [
     "snv_multiplicity": [ inputs: ['jabba_gg', 'variant_somatic_ann'], outputs: ['snv_multiplicity'] ],
     "oncokb": [ inputs: ['variant_somatic_ann', 'snv_multiplicity', 'jabba_gg', 'fusions'], outputs: ['oncokb_maf', 'oncokb_fusions', 'oncokb_cna'] ],
     "signatures": [ inputs: ['variant_somatic_ann'], outputs: ['sbs_signatures', 'indel_signatures', 'signatures_matrix'] ],
-    "hrdetect": [ inputs: ['hets', 'vcf', 'jabba_gg', 'snv_somatic_vcf'], outputs: ['hrdetect'] ],
+    "hrdetect": [ inputs: ['hets', 'vcf', 'jabba_gg', 'variant_somatic_ann'], outputs: ['hrdetect'] ],
     "onenesstwoness": [ inputs: ['events', 'hrdetect'], outputs: ['onenesstwoness'] ]
 ]
 
@@ -2229,14 +2235,17 @@ workflow NFCASEREPORTS {
 	indel_activities = SIGNATURES_STEP.out.indel_activities
 	sbs_posterior_prob = SIGNATURES_STEP.out.sbs_posterior_prob
 	indel_posterior_prob = SIGNATURES_STEP.out.indel_posterior_prob
-	vcf_out = SIGNATURES_STEP.out.vcf_out
+	annotated_vcf_ffpe_impact_or_snpeff = SIGNATURES_STEP.out.annotated_vcf_ffpe_impact_or_snpeff // meta.patient, annotated vcf, tbi
+
+	annotated_vcf_ffpe_impact_or_snpeff_for_merge = annotated_vcf_ffpe_impact_or_snpeff
+		.map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, annotated vcf, tbi
 
     // SNV Multiplicity
     // ##############################
     if (tools_used.contains("all") || tools_used.contains("snv_multiplicity")) {
         snv_multiplicity_inputs = inputs.filter { it.snv_multiplicity.isEmpty() }.map { it -> [it.meta.patient, it.meta] }
 
-        snv_multiplicity_inputs_somatic_vcf = snv_somatic_annotations_for_merge
+        snv_multiplicity_inputs_somatic_vcf = annotated_vcf_ffpe_impact_or_snpeff_for_merge
             .join(snv_multiplicity_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, annotated somatic snv vcf
         snv_multiplicity_inputs_jabba_gg = non_integer_balance_balanced_gg_for_merge
@@ -2339,7 +2348,7 @@ workflow NFCASEREPORTS {
             .filter { it.oncokb_maf.isEmpty() || it.oncokb_fusions.isEmpty() || it.oncokb_cna.isEmpty() }
             .map { it -> [it.meta.patient, it.meta + [id: it.meta.sample]] }
 
-        oncokb_inputs_annotated_vcf = snv_somatic_annotations_for_merge
+        oncokb_inputs_annotated_vcf = annotated_vcf_ffpe_impact_or_snpeff_for_merge
             .join(oncokb_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, annotated somatic snv
 
