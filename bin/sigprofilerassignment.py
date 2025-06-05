@@ -26,6 +26,18 @@ def unzip_vcf(input_vcf, input_dir):
 
     return unzipped_vcf_path
 
+def recursive_touch(path):
+    """
+    Creates a file at the given path recursively, including any necessary parent directories.
+    If the file exists, it updates the modification time.
+    """
+    # Create parent directories if they don't exist
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    
+    # Create or update the file
+    with open(path, 'a'):
+        os.utime(path, None)
+
 
 def main(args):
     input_dir = args.input_directory
@@ -34,44 +46,121 @@ def main(args):
     sigmat_project = 'sigmat_results'
     genome = args.genome or 'GRCh37'
     cosmic_version = args.cosmic_version or 3.4
+    
+    sbs_touch = [
+        "sbs_results/Assignment_Solution/Activities/Assignment_Solution_Activities.txt",
+        "sbs_results/Assignment_Solution/Activities/Decomposed_Mutation_Probabilities/Decomposed_Mutation_Probabilities.txt",
+        "sig_inputs/output/SBS/Input_vcffiles.SBS1536.all",
+        "sig_inputs/output/SBS/Input_vcffiles.SBS18.all",
+        "sig_inputs/output/SBS/Input_vcffiles.SBS24.all",
+        "sig_inputs/output/SBS/Input_vcffiles.SBS288.all",
+        "sig_inputs/output/SBS/Input_vcffiles.SBS384.all",
+        "sig_inputs/output/SBS/Input_vcffiles.SBS4608.all",
+        "sig_inputs/output/SBS/Input_vcffiles.SBS6.all",
+        "sig_inputs/output/SBS/Input_vcffiles.SBS6144.all",
+        "sig_inputs/output/SBS/Input_vcffiles.SBS96.all",
+        "sig_inputs/output/SBS/sigmat_results.SBS1536.all",
+        "sig_inputs/output/SBS/sigmat_results.SBS18.all",
+        "sig_inputs/output/SBS/sigmat_results.SBS24.all",
+        "sig_inputs/output/SBS/sigmat_results.SBS288.all",
+        "sig_inputs/output/SBS/sigmat_results.SBS384.all",
+        "sig_inputs/output/SBS/sigmat_results.SBS4608.all",
+        "sig_inputs/output/SBS/sigmat_results.SBS6.all",
+        "sig_inputs/output/SBS/sigmat_results.SBS6144.all",
+        "sig_inputs/output/SBS/sigmat_results.SBS96.all"
+    ]
+    
+    indel_touch = [
+        "indel_results/Assignment_Solution/Activities/Assignment_Solution_Activities.txt",
+        "indel_results/Assignment_Solution/Activities/Decomposed_Mutation_Probabilities/Decomposed_Mutation_Probabilities_WG-25-08___vs___WG-25-80_somatic.txt",
+        "sig_inputs/output/ID/Input_vcffiles.ID28.all",
+        "sig_inputs/output/ID/Input_vcffiles.ID332.all",
+        "sig_inputs/output/ID/Input_vcffiles.ID415.all",
+        "sig_inputs/output/ID/Input_vcffiles.ID83.all",
+        "sig_inputs/output/ID/Input_vcffiles.ID8628.all",
+        "sig_inputs/output/ID/Input_vcffiles.ID96.all",
+        "sig_inputs/output/ID/sigmat_results.ID28.all",
+        "sig_inputs/output/ID/sigmat_results.ID332.all",
+        "sig_inputs/output/ID/sigmat_results.ID415.all",
+        "sig_inputs/output/ID/sigmat_results.ID83.all",
+        "sig_inputs/output/ID/sigmat_results.ID8628.all",
+        "sig_inputs/output/ID/sigmat_results.ID96.all",
+        "sig_inputs/output/vcf_files/ID/10_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/11_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/12_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/13_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/14_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/15_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/16_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/17_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/18_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/19_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/1_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/20_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/21_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/22_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/2_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/3_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/4_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/5_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/6_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/7_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/8_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/9_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/MT_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/X_seqinfo.txt",
+        "sig_inputs/output/vcf_files/ID/Y_seqinfo.txt"
+    ]
+
 
     # run twice for SBS and indel
     print('running sbs...')
-    Analyze.cosmic_fit(
-        samples=input_dir,
-        output=output_sbs,
-        input_type="vcf",
-        context_type="96",
-        collapse_to_SBS96=True,
-        cosmic_version=cosmic_version,
-        exome=False,
-        genome_build=genome,
-        signature_database=args.sbs_signatures,
-        exclude_signature_subgroups=None,
-        export_probabilities=True,
-        export_probabilities_per_mutation=True,
-        make_plots=False,
-        sample_reconstruction_plots=False,
-        verbose=True
-    )
+    try:
+        Analyze.cosmic_fit(
+            samples=input_dir,
+            output=output_sbs,
+            input_type="vcf",
+            context_type="96",
+            collapse_to_SBS96=True,
+            cosmic_version=cosmic_version,
+            exome=False,
+            genome_build=genome,
+            signature_database=args.sbs_signatures,
+            exclude_signature_subgroups=None,
+            export_probabilities=True,
+            export_probabilities_per_mutation=True,
+            make_plots=False,
+            sample_reconstruction_plots=False,
+            verbose=True
+        )
+    except:
+        print(f"SNVs might be empty")
+        # Touch files to ensure they exist    
+        for f in sbs_touch:
+            recursive_touch(f)
 
     print('running indel...')
-    Analyze.cosmic_fit(
-        samples=input_dir,
-        output=output_indel,
-        input_type="vcf",
-        context_type="ID",
-        collapse_to_SBS96=False,
-        cosmic_version=cosmic_version,
-        exome=False,
-        genome_build=genome,
-        signature_database=args.id_signatures,
-        export_probabilities=True,
-        export_probabilities_per_mutation=True,
-        make_plots=False,
-        sample_reconstruction_plots=False,
-        verbose=True
-    )
+    try:
+        Analyze.cosmic_fit(
+            samples=input_dir,
+            output=output_indel,
+            input_type="vcf",
+            context_type="ID",
+            collapse_to_SBS96=False,
+            cosmic_version=cosmic_version,
+            exome=False,
+            genome_build=genome,
+            signature_database=args.id_signatures,
+            export_probabilities=True,
+            export_probabilities_per_mutation=True,
+            make_plots=False,
+            sample_reconstruction_plots=False,
+            verbose=True
+        )
+    except:
+        for f in indel_touch:
+            recursive_touch(f)
+
 
     print('running matrix generator...')
     matrices = matGen.SigProfilerMatrixGeneratorFunc(

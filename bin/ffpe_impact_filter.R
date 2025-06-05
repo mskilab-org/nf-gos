@@ -36,6 +36,9 @@ suppressPackageStartupMessages({
 sbs_pp = fread(opt$signatures_post_prob_sbs)
 indel_pp = fread(opt$signatures_post_prob_indel)
 
+is_sbs_pp_empty = NROW(sbs_pp) == 0
+is_indel_pp_empty = NROW(indel_pp) == 0
+
 library(VariantAnnotation)
 
 vcf_path = opt$somatic_mut_vcf
@@ -80,6 +83,9 @@ is_sbs = is_ref_alt_same & is_ref_char_one
 is_indel = !is_ref_alt_same
 is_mnv = is_ref_alt_same & !is_ref_char_one
 
+is_no_sbs_in_vcf = !any(is_sbs)
+is_no_indel_in_vcf = !any(is_indel)
+
 
 ref_bs = Biostrings::DNAStringSet(ref)
 alt_bs = Biostrings::DNAStringSet(alt)
@@ -90,28 +96,28 @@ ref_bs[is_collapse] = Biostrings::reverseComplement(ref_bs[is_collapse])
 alt_bs[is_collapse] = Biostrings::reverseComplement(alt_bs[is_collapse])
 
 
-reftoalt_collapsed = gsub(".*\\[([AGCT>]+)\\].*", "\\1", sbs_pp$MutationType)
-
-refalt_mat = do.call(rbind, strsplit(reftoalt_collapsed, ">"))
-ref_collapsed = refalt_mat[,1]
-alt_collapsed = refalt_mat[,2]
-
-
 rr_cra_key = paste(rr_ckey, paste(ref_bs, ">", alt_bs, sep = ""))
 
-sbs_pp[, reftoalt_collapsed := gsub(".*\\[([AGCT>]+)\\].*", "\\1", MutationType)]
-sbs_pp$seqnames = sbs_pp$Chr
-sbs_pp$start = sbs_pp$Pos
-sbs_pp[, cra_key := paste(seqnames, start, reftoalt_collapsed)]
+is_any_sbs_present = ! (is_sbs_pp_empty || is_no_sbs_in_vcf)
 
-mapped_sbs_pp = sbs_pp[match(rr_cra_key, sbs_pp$cra_key)[is_sbs],]
-vcf_info_fields$FFPEIMPACT[is_sbs] = mapped_sbs_pp[, SBSFFPE + SBS57]
+if (is_any_sbs_present) {
+	sbs_pp[, reftoalt_collapsed := gsub(".*\\[([AGCT>]+)\\].*", "\\1", MutationType)]
+	sbs_pp$seqnames = sbs_pp$Chr
+	sbs_pp$start = sbs_pp$Pos
+	sbs_pp[, cra_key := paste(seqnames, start, reftoalt_collapsed)]
+	mapped_sbs_pp = sbs_pp[match(rr_cra_key, sbs_pp$cra_key)[is_sbs],]
+	vcf_info_fields$FFPEIMPACT[is_sbs] = mapped_sbs_pp[, SBSFFPE + SBS57]
+}
 
-indel_pp[, ckey := paste(Chr, Pos)]
+is_any_indel_present = ! (is_indel_pp_empty || is_no_indel_in_vcf)
+if (is_any_indel_present) {
 
-mapped_indel_pp = indel_pp[match(rr_ckey, indel_pp$ckey)[is_indel],]
+	indel_pp[, ckey := paste(Chr, Pos)]
 
-vcf_info_fields$FFPEIMPACT[is_indel] = mapped_indel_pp$IDFFPE
+	mapped_indel_pp = indel_pp[match(rr_ckey, indel_pp$ckey)[is_indel],]
+
+	vcf_info_fields$FFPEIMPACT[is_indel] = mapped_indel_pp$IDFFPE
+}
 
 VariantAnnotation::info(vcf) = vcf_info_fields
 

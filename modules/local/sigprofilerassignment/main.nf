@@ -35,7 +35,7 @@ process SIGPROFILERASSIGNMENT {
     script:
     def args        = task.ext.args ?: ''
     def prefix      = task.ext.prefix ?: "${meta.id}"
-	def vcf_gz      = vcf.endsWith('.gz') ? vcf : "${vcf}.gz"
+	def vcf_gz      = vcf.toString().endsWith('.gz') ? vcf : "${vcf}.gz"
     def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
     """
