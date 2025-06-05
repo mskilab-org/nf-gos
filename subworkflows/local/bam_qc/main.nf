@@ -3,7 +3,9 @@
 //
 
 include { PICARD_COLLECTWGSMETRICS } from "${workflow.projectDir}/modules/nf-core/picard/collectwgsmetrics/main"
+include { PARABRICKS_BAMMETRICS } from "${workflow.projectDir}/modules/local/bammetrics/main"
 include { PICARD_COLLECTMULTIPLEMETRICS } from "${workflow.projectDir}/modules/nf-core/picard/collectmultiplemetrics/main"
+include { GPU_COLLECTMULTIPLEMETRICS } from "${workflow.projectDir}/modules/local/gpu_collectmultiplemetrics/main"
 include { GATK4_ESTIMATELIBRARYCOMPLEXITY } from "${workflow.projectDir}/modules/nf-core/gatk4/estimatelibrarycomplexity/main"
 include { SAMTOOLS_SUBSAMPLE } from "${workflow.projectDir}/modules/local/subsample_reads/main"
 
@@ -28,6 +30,8 @@ workflow BAM_QC {
 	// on NYU: "/gpfs/data/imielinskilab/DB/references/hg19/human_g1k_v37_decoy.fasta.subsampled_0.33.interval_list"
 	intervals_file = params.subsample_interval ?: []
 
+	use_gpu = params.use_gpu
+
     if (tools_used.contains("all") || tools_used.contains("collect_wgs_metrics")) {
         collect_wgs_metrics_inputs = inputs
             .filter { it.qc_coverage_metrics.isEmpty() }
@@ -35,17 +39,30 @@ workflow BAM_QC {
         collect_wgs_metrics_bam = collect_wgs_metrics_inputs
             .join(bam)
             .map { id, meta, bam, bai -> [ meta, bam, bai ] }
+		
+		if (use_gpu) {
+			process_wgsmetrics = PARABRICKS_BAMMETRICS(
+				collect_wgs_metrics_bam,
+				fasta.map{ it -> [ [ id:'fasta' ], it ] },
+				fai.map{ it -> [ [ id:'fai' ], it ] },
+				intervals_file
+			)
+		} else {
+			process_wgsmetrics = PICARD_COLLECTWGSMETRICS(
+				collect_wgs_metrics_bam,
+				fasta.map{ it -> [ [ id:'fasta' ], it ] },
+				fai.map{ it -> [ [ id:'fai' ], it ] },
+				intervals_file
+			)
+		}
 
-        PICARD_COLLECTWGSMETRICS(
-            collect_wgs_metrics_bam,
-            fasta.map{ it -> [ [ id:'fasta' ], it ] },
-            fai.map{ it -> [ [ id:'fai' ], it ] },
-            intervals_file
-        )
-        reports = reports.mix(PICARD_COLLECTWGSMETRICS.out.metrics)
-        versions = versions.mix(PICARD_COLLECTWGSMETRICS.out.versions)
+		reports = reports.mix(process_wgsmetrics.metrics)
+		versions = versions.mix(process_wgsmetrics.versions)
     }
 
+
+	do_gpu_multiple_metrics = use_gpu && params.aligner != "fq2bam" // fq2bam already includes this.
+	// do_gpu_multiple_metrics = use_gpu
 
     if (tools_used.contains("all") || tools_used.contains("collect_multiple_metrics")) {
         collect_multiple_metrics_inputs = inputs
@@ -54,17 +71,28 @@ workflow BAM_QC {
         collect_multiple_metrics_bam = collect_multiple_metrics_inputs
             .join(bam)
             .map { id, meta, bam, bai -> [ meta, bam, bai ] }
-        PICARD_COLLECTMULTIPLEMETRICS(
-            collect_multiple_metrics_bam,
-            fasta.map{ it -> [ [ id:'fasta' ], it ] },
-            fai.map{ it -> [ [ id:'fai' ], it ] }
-        )
-        reports = reports.mix(PICARD_COLLECTMULTIPLEMETRICS.out.metrics)
-        versions = versions.mix(PICARD_COLLECTMULTIPLEMETRICS.out.versions)
+
+		// FIXME: GPU multiple metrics failing to pick up GPU
+		if (do_gpu_multiple_metrics) {
+			process_mm_qc = GPU_COLLECTMULTIPLEMETRICS(
+				collect_multiple_metrics_bam,
+				fasta.map{ it -> [ [ id:'fasta' ], it ] },
+				fai.map{ it -> [ [ id:'fai' ], it ] }
+			)
+		} else {
+			process_mm_qc = PICARD_COLLECTMULTIPLEMETRICS(
+				collect_multiple_metrics_bam,
+				fasta.map{ it -> [ [ id:'fasta' ], it ] },
+				fai.map{ it -> [ [ id:'fai' ], it ] }
+			)
+		}
+
+        reports = reports.mix(process_mm_qc.metrics)
+        versions = versions.mix(process_mm_qc.versions)
     }
 
 	is_run_qc_duplicates = params.is_run_qc_duplicates ?: false // if parameter doesn't exist, set to false
-	do_qc_duplicates = (tools_used.contains("all") || tools_used.contains("estimate_library_complexity")) && is_run_qc_duplicates
+	do_qc_duplicates = (tools_used.contains("all") || tools_used.contains("estimate_library_complexity")) && is_run_qc_duplicates && ! params.aligner == "fq2bam"
     if (do_qc_duplicates) {
         estimate_library_complexity_inputs = inputs
             .filter { it.qc_dup_rate.isEmpty() }

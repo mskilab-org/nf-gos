@@ -10,7 +10,7 @@ workflow SIGNATURES_STEP {
   // defining inputs
   take:
   inputs
-  snv_somatic_annotations_for_merge
+  snv_somatic_annotations_for_merge // meta.patient, annotated somatic snv vcf
   tools_used
 
   // Creating empty channels for output
@@ -42,9 +42,15 @@ workflow SIGNATURES_STEP {
    	  .filter { it.ffpe_impact_filtered_vcf.isEmpty() }
 	  .map { it -> [ it.meta.patient, it.meta, it.variant_somatic_ann ] } // patient, meta, annotated_somatic_vcf
   
+  inputs_tumors_meta_for_merge = inputs_tumor_status.tumor.map{ it -> [ it.meta.patient, it.meta + [id: it.meta.sample] - it.meta.subMap('read_group', 'size', 'tumor_id') ] }.distinct()
   
-  
-  annotated_vcf_ffpe_impact_or_snpeff = snv_somatic_annotations_for_merge
+  annotated_vcf_ffpe_impact_or_snpeff_for_merge = snv_somatic_annotations_for_merge // meta.patient, annotated somatic snv vcf
+
+  annotated_vcf_ffpe_impact_or_snpeff = inputs_tumors_meta_for_merge
+	.join(annotated_vcf_ffpe_impact_or_snpeff_for_merge, failOnDuplicate: true, failOnMismatch: true)
+	.map { it -> [ it[1], it[2]] } // meta, annotated somatic snv vcf
+
+
 
 
   if (tools_used.contains("all") || tools_used.contains("signatures")) {
@@ -104,7 +110,9 @@ workflow SIGNATURES_STEP {
 	merged_inputs = filtered_ffpe_impact_somatic_vcf_inputs // patient, meta, annotated somatic_mut_vcf
 		.join(sbs_posterior_prob_join) // patient, sbs_posterior_prob
 		.join(indel_posterior_prob_join) // patient, indel_posterior_prob
-		.map { it -> [it[1], it[2], it[3], it[4] ] } // meta, annotated somatic_mut_vcf, sbs_posterior_prob, indel_posterior_prob
+		.map { patient, meta, annotated_vcf, sbs_posterior_prob, indel_posterior_prob -> 
+			[meta, annotated_vcf, sbs_posterior_prob, indel_posterior_prob ] 
+		} // meta, annotated somatic_mut_vcf, sbs_posterior_prob, indel_posterior_prob
 
 	if (is_filter_ffpe_impact) {
 		FFPE_IMPACT_FILTER(merged_inputs)

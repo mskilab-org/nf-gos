@@ -2238,7 +2238,7 @@ workflow NFCASEREPORTS {
 	annotated_vcf_ffpe_impact_or_snpeff = SIGNATURES_STEP.out.annotated_vcf_ffpe_impact_or_snpeff // meta.patient, annotated vcf, tbi
 
 	annotated_vcf_ffpe_impact_or_snpeff_for_merge = annotated_vcf_ffpe_impact_or_snpeff
-		.map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, annotated vcf, tbi
+		.map { it -> [ it[0].patient, it[1] ] } // meta.patient, annotated vcf
 
     // SNV Multiplicity
     // ##############################
@@ -2408,9 +2408,9 @@ workflow NFCASEREPORTS {
             .join(hrdetect_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, hets
 
-        hrdetect_inputs_vcf = filtered_somatic_vcf_for_merge
+        hrdetect_inputs_vcf = annotated_vcf_ffpe_impact_or_snpeff_for_merge
             .join(hrdetect_inputs)
-            .map { it -> [ it[0], it[1], it[2] ] } // meta.patient, somatic snv, tbi
+            .map { it -> [ it[0], it[1] ] } // meta.patient, somatic snv
 
         hrdetect_inputs_jabba_rds = jabba_rds_for_merge
             .join(hrdetect_inputs)
@@ -2429,8 +2429,7 @@ workflow NFCASEREPORTS {
                 sv,
                 hets,
                 snv,
-                snv_tbi,
-                jabba ->[ meta, sv, hets, snv, snv_tbi, jabba ]
+                jabba ->[ meta, sv, hets, snv, jabba ]
             }
 
             JUNC_SNV_GGRAPH_HRDETECT(hrdetect_input)

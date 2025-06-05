@@ -1,18 +1,19 @@
 process GPU_COLLECTMULTIPLEMETRICS {
     tag "$meta.id"
-    label 'process_gpu'
+    label 'process_medium'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'docker://nvcr.io/nvidia/clara/clara-parabricks:4.5.0-1' :
         'nvcr.io/nvidia/clara/clara-parabricks:4.5.0-1' }"
+	containerOptions "${ workflow.containerEngine == "singularity" ? '--nv': ( workflow.containerEngine == "docker" ? '--gpus all': null ) }"
 
     input:
-    tuple val(meta), path(bam), path(bai)
-    path fasta
-    path fai
+    tuple val(meta) , path(bam), path(bai)
+    tuple val(meta2), path(fasta)
+    tuple val(meta3), path(fai)
 
     output:
-    tuple val(meta), path(out_dir), emit: metrics_dir
+    tuple val(meta), path("*gpu_collectmultiplemetrics_qc/**"), emit: metrics
     path "versions.yml"           , emit: versions
 
     when:
@@ -29,6 +30,8 @@ process GPU_COLLECTMULTIPLEMETRICS {
         --bam ${bam} \\
         --out-qc-metrics-dir ${out_dir} \\
         --gen-all-metrics \\
+		--tmp-dir ./ \\
+		--num-gpus 1 \\
         $args
 
     cat <<-END_VERSIONS > versions.yml
