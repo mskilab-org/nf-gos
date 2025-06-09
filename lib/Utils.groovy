@@ -44,4 +44,9 @@ class Utils {
                 "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
         }
     }
+
+    public static remove_lanes_from_meta(meta_map, lane_keys = ['num_lanes', 'lane', 'lanes', 'id', 'read_group', 'size', 'data_type']) {
+        def new_meta = meta_map - meta_map.subMap(lane_keys) + [id: meta_map.sample]
+        return new_meta
+    }
 }

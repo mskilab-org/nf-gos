@@ -135,7 +135,7 @@ if (is_indel_annotation_missing) {
 }
 msg = gsub("^\n{1,}|\n{1,}$", "", msg, perl = TRUE)
 
-if (is_either_missing) stop("\n", msg)
+if (is_either_missing) cat("\n", msg, "\n\n")
 
 is_ffpe_pass = (!is.na(vcf_info_fields$FFPEIMPACT) & vcf_info_fields$FFPEIMPACT <= 0.5)
 is_other = is.na(vcf_info_fields$FFPEIMPACT)

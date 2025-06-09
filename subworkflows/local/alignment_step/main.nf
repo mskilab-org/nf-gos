@@ -1,3 +1,5 @@
+import Utils
+
 // This is the main workflow for the alignment step of the pipeline.
 
 include { test_robust_absence; test_robust_presence } from "${workflow.projectDir}/lib/NfUtils"
@@ -71,15 +73,16 @@ workflow ALIGNMENT_STEP {
 	input_fastq_qc = input_fastq.map { it -> [it[0], [it[1], it[2]]] }
 
 	alignment_bams_final = inputs
-		.map { it -> [it.meta, it.bam, it.bai] }
+		.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.bam, it.bai] }
 		.filter { ! it[1].isEmpty() }
-		.map { it -> [it[0].id, it[0], it[1], it[2]] }
+		.map { it -> [it[0].sample, it[0], it[1], it[2]] }
+        .distinct()
 	
 
 
 	if (tools_used.contains("all") || tools_used.contains("aligner")) {
         
-        alignment_existing_outputs = inputs.map { it -> [it.meta, it.bam] }.filter { !it[1].isEmpty() }
+        alignment_existing_outputs = inputs.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.bam] }.filter { !it[1].isEmpty() }.distinct()
 
 
         // // QC
@@ -226,7 +229,7 @@ workflow ALIGNMENT_STEP {
                 // Use groupKey to make sure that the correct group can advance as soon as it is complete
                 // and not stall the workflow until all reads from all channels are mapped
 				// cleanedMeta = meta.subMap('patient', 'sample', 'sex', 'status', 'id') + [ id: meta.sample]
-				cleanedMeta = meta - meta.subMap('num_lanes', 'read_group', 'size', 'tumor_id') + [ id:meta.sample ]
+				cleanedMeta = meta - meta.subMap('num_lanes', 'read_group', 'size', 'tumor_id', 'lanes') + [ id:meta.sample ]
                 [ groupKey( cleanedMeta, numReads), bam ]
             }
         .groupTuple()
@@ -239,7 +242,7 @@ workflow ALIGNMENT_STEP {
         // Gather used softwares versions
         // versions = versions.mix(BAM_MERGE_INDEX_SAMTOOLS.out.versions)
 
-        alignment_bams_final = BAM_MERGE_INDEX_SAMTOOLS.out.bam_bai.map({ meta, bam, bai -> [ meta.id, meta, bam, bai ] })
+        alignment_bams_final = BAM_MERGE_INDEX_SAMTOOLS.out.bam_bai.map({ meta, bam, bai -> [ meta.sample, Utils.remove_lanes_from_meta(meta), bam, bai ] })
 		alignment_bams_final.view{ log.info "alignment_bams_final: $it" }
     }
 
@@ -335,7 +338,7 @@ workflow ALIGNMENT_STEP {
 
         alignment_bams_final = Channel.empty()
             .mix(CRAM_TO_BAM_FINAL.out.alignment_index)
-            .map{ meta, bam, bai -> [ meta.id, meta - meta.subMap("data_type"), bam, bai ] }
+            .map{ meta, bam, bai -> [ meta.sample, Utils.remove_lanes_from_meta(meta), bam, bai ] }
     }
 
 

@@ -9,7 +9,7 @@ workflow SIGNATURES_STEP {
 	
   // defining inputs
   take:
-  inputs
+  inputs_unlaned
   snv_somatic_annotations_for_merge // meta.patient, annotated somatic snv vcf
   tools_used
 
@@ -32,7 +32,11 @@ workflow SIGNATURES_STEP {
 
   ffpe_filtered_existing_vcf = Channel.empty()
 
-  inputs_tumor_status = inputs.branch{ tumor: it.meta.status == 1 }
+//   inputs_unlaned = inputs.map { it ->
+//     it + [meta: Utils.remove_lanes_from_meta(it.meta)]
+//   }
+
+  inputs_tumor_status = inputs_unlaned.branch{ tumor: it.meta.status == 1 }
   
 
   versions = Channel.empty()
@@ -40,9 +44,17 @@ workflow SIGNATURES_STEP {
 
   filtered_ffpe_impact_somatic_vcf_inputs = inputs_tumor_status.tumor
    	  .filter { it.ffpe_impact_filtered_vcf.isEmpty() }
-	  .map { it -> [ it.meta.patient, it.meta, it.variant_somatic_ann ] } // patient, meta, annotated_somatic_vcf
+	  .map { it -> [ it.meta.patient, it.meta ] } // patient, meta
+	  .join(snv_somatic_annotations_for_merge) // patient, annotated_somatic_vcf
+	  .distinct()
   
-  inputs_tumors_meta_for_merge = inputs_tumor_status.tumor.map{ it -> [ it.meta.patient, it.meta + [id: it.meta.sample] - it.meta.subMap('read_group', 'size', 'tumor_id') ] }.distinct()
+  filtered_ffpe_impact_existing_outputs = inputs_tumor_status.tumor
+   	  .filter { ! it.ffpe_impact_filtered_vcf.isEmpty() }
+	  .map { it -> [ it.meta, it.ffpe_impact_filtered_vcf, it.ffpe_impact_filtered_vcf_tbi ] }
+	  .distinct()
+
+  
+  inputs_tumors_meta_for_merge = inputs_tumor_status.tumor.map{ it -> [ it.meta.patient, it.meta + [id: it.meta.sample]] }.distinct()
   
   annotated_vcf_ffpe_impact_or_snpeff_for_merge = snv_somatic_annotations_for_merge // meta.patient, annotated somatic snv vcf
 
@@ -116,8 +128,8 @@ workflow SIGNATURES_STEP {
 
 	if (is_filter_ffpe_impact) {
 		FFPE_IMPACT_FILTER(merged_inputs)
-		annotated_vcf_ffpe_impact_or_snpeff = filtered_ffpe_impact_somatic_vcf_for_merge
-		.mix(FFPE_IMPACT_FILTER.out.ffpe_impact_filtered_vcf) // meta, ffpe_impact_filtered_vcf, ffpe_impact_filtered_vcf_tbi
+		annotated_vcf_ffpe_impact_or_snpeff = FFPE_IMPACT_FILTER.out.ffpe_impact_filtered_vcf
+			.mix(filtered_ffpe_impact_existing_outputs) // meta, ffpe_impact_filtered_vcf, ffpe_impact_filtered_vcf_tbi
 	} 	
 
   }

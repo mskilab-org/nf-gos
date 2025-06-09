@@ -61,7 +61,9 @@ workflow BAM_QC {
     }
 
 
-	do_gpu_multiple_metrics = use_gpu && params.aligner != "fq2bam" // fq2bam already includes this.
+	is_aligner_excludes_multiple_metrics = params.aligner != "fq2bam"
+	do_gpu_multiple_metrics = use_gpu && is_aligner_excludes_multiple_metrics // fq2bam already includes this.
+	
 	// do_gpu_multiple_metrics = use_gpu
 
     if (tools_used.contains("all") || tools_used.contains("collect_multiple_metrics")) {
@@ -72,6 +74,7 @@ workflow BAM_QC {
             .join(bam)
             .map { id, meta, bam, bai -> [ meta, bam, bai ] }
 
+		process_mm_qc = [metrics: Channel.empty(), versions: Channel.empty()]
 		// FIXME: GPU multiple metrics failing to pick up GPU
 		if (do_gpu_multiple_metrics) {
 			process_mm_qc = GPU_COLLECTMULTIPLEMETRICS(
@@ -79,15 +82,15 @@ workflow BAM_QC {
 				fasta.map{ it -> [ [ id:'fasta' ], it ] },
 				fai.map{ it -> [ [ id:'fai' ], it ] }
 			)
-		} else {
+		} else if (is_aligner_excludes_multiple_metrics) {
 			process_mm_qc = PICARD_COLLECTMULTIPLEMETRICS(
 				collect_multiple_metrics_bam,
 				fasta.map{ it -> [ [ id:'fasta' ], it ] },
 				fai.map{ it -> [ [ id:'fai' ], it ] }
 			)
+			
 		}
-
-        reports = reports.mix(process_mm_qc.metrics)
+		reports = reports.mix(process_mm_qc.metrics)
         versions = versions.mix(process_mm_qc.versions)
     }
 
