@@ -20,6 +20,7 @@ process BWAMEM2_MEM {
     task.ext.when == null || task.ext.when
 
     script:
+    def rg_arg = meta.containsKey('rg') ? "-R ${meta.rg}" : ""
     def args = task.ext.args ?: ''
     def args2 = task.ext.args2 ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
@@ -30,6 +31,7 @@ process BWAMEM2_MEM {
     bwa-mem2 \\
         mem \\
         $args \\
+        $rg_arg \\
         -t $task.cpus \\
         \$INDEX \\
         $reads \\
