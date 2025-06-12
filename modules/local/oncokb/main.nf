@@ -2,10 +2,10 @@ process ONCOKB_ANNOTATOR {
     tag "$meta.id"
     label 'process_medium'
     secret 'ONCOKB_API_KEY'
-    errorStrategy 'retry'
-    maxRetries 10000
-    maxErrors 10000
     maxForks 3 // Limit the number of concurrent tasks to avoid overwhelming the ONCOKB API
+    errorStrategy 'retry'
+    maxRetries 100
+    maxErrors 100
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'docker://mskilab/unified:0.0.2':
