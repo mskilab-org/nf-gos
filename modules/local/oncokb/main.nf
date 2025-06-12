@@ -2,6 +2,9 @@ process ONCOKB_ANNOTATOR {
     tag "$meta.id"
     label 'process_medium'
     secret 'ONCOKB_API_KEY'
+    errorStrategy 'retry'
+    maxRetries 20
+    maxErrors 20
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'docker://mskilab/unified:0.0.2':
