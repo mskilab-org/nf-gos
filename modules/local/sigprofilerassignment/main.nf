@@ -26,6 +26,7 @@ process SIGPROFILERASSIGNMENT {
 	tuple val(meta), path("indel_results/**/*indel_Assignment_Solution_Activities*.txt")    , emit: indel_activities, optional: true
 	tuple val(meta), path("sbs_results/**/*Decomposed_Mutation_Probabilities*.txt")    , emit: sbs_posterior_prob, optional: true
 	tuple val(meta), path("indel_results/**/*Decomposed_Mutation_Probabilities*.txt")    , emit: indel_posterior_prob, optional: true
+    
 	
     path "versions.yml"                                     , emit: versions
 
