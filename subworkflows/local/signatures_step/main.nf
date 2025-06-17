@@ -16,6 +16,15 @@ workflow SIGNATURES_STEP {
   // Creating empty channels for output
   main:
 
+  sbs_signatures = Channel.empty()
+  indel_signatures = Channel.empty()
+  signatures_matrix = Channel.empty()
+  sbs_activities = Channel.empty()
+  indel_activities = Channel.empty()
+  sbs_posterior_prob = Channel.empty()
+  indel_posterior_prob = Channel.empty()
+  annotated_vcf_ffpe_impact_or_snpeff = Channel.empty()
+
   is_filter_ffpe_impact = params.filter_ffpe_impact ?: false
 
   signatures_inputs = Channel.empty()

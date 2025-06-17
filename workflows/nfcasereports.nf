@@ -935,6 +935,9 @@ include { VCF_PAVE as VCF_PAVE_GERMLINE } from '../subworkflows/local/vcf_pave/m
 include { ALIGNMENT_STEP } from '../subworkflows/local/alignment_step/main'
 
 // Alignment Step Process
+include { SV_CALLING_STEP } from '../subworkflows/local/sv_calling_step/main'
+
+// Alignment Step Process
 include { SIGNATURES_STEP } from '../subworkflows/local/signatures_step/main'
 
 /*
@@ -1348,89 +1351,121 @@ workflow NFCASEREPORTS {
 
     // SV Calling
     // ##############################
-    if (tools_used.contains("all") || tools_used.contains("gridss") || params.is_run_junction_filter) {
+    SV_CALLING_STEP(
+        inputs_unlaned,
+        alignment_bams_final,
+        index_alignment,
+        tools_used
+    )
 
-        // Filter out bams for which SV calling has already been done
+    vcf_from_gridss_gridss = SV_CALLING_STEP.out.vcf_from_gridss_gridss
 
-		bam_sv_inputs = inputs.filter { it.vcf.isEmpty() }.map { it -> [it.meta.sample] }
-        bam_sv_calling = alignment_bams_final
-            .join(bam_sv_inputs)
-            .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
+    if (params.tumor_only) {
+        vcf_from_sv_calling_for_merge = vcf_from_gridss_gridss
+            .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
 
-		// gridss_existing_outputs = inputs.map { it -> [it.meta, it.vcf, it.vcf_tbi] }.filter { !it[1].isEmpty() && !it[2].isEmpty() }
-		gridss_existing_outputs = inputs.map {
-			it -> [it.meta, it.vcf, it.vcf_tbi] }
-			.filter { !it[1].isEmpty() && !it[2].isEmpty() }
+        JUNCTION_FILTER(vcf_from_gridss_gridss)
 
-        if (params.tumor_only) {
-            bam_sv_calling_status = bam_sv_calling.branch{
-                tumor:  it[0].status == 1
-            }
+        pon_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.pon_filtered_sv_rds)
+        final_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.final_filtered_sv_rds)
+        final_filtered_sv_rds_for_merge = final_filtered_sv_rds
+            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, rds
+    } else {
+        //somatic filter for GRIDSS
+        BAM_SVCALLING_GRIDSS_SOMATIC(vcf_from_gridss_gridss)
 
-            // add empty arrays to stand-in for normals
-            bam_sv_calling_pair = bam_sv_calling_status.tumor.map{ meta, bam, bai -> [ meta + [tumor_id: meta.sample], [], [], bam, bai ] }
-        } else {
-            // getting the tumor and normal cram files separated
-            bam_sv_calling_status = bam_sv_calling.branch{
-                normal: it[0].status == 0
-                tumor:  it[0].status == 1
-            }
+        versions = versions.mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.versions)
+        vcf_somatic_high_conf = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_high_confidence)
+        vcf_from_sv_calling_for_merge = vcf_somatic_high_conf
+            .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
 
-            // All normal samples
-            bam_sv_calling_normal_for_crossing = bam_sv_calling_status.normal.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
-
-            // All tumor samples
-            bam_sv_calling_tumor_for_crossing = bam_sv_calling_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
-
-            // Crossing the normal and tumor samples to create tumor and normal pairs
-            bam_sv_calling_pair = bam_sv_calling_normal_for_crossing.cross(bam_sv_calling_tumor_for_crossing)
-                .map { normal, tumor ->
-                    def meta = [:]
-
-                    meta.id         = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
-                    meta.normal_id  = normal[1].sample
-                    meta.patient    = normal[0]
-                    meta.sex        = normal[1].sex
-                    meta.tumor_id   = tumor[1].sample
-
-                    [ meta, normal[2], normal[3], tumor[2], tumor[3] ]
-            }
-        }
-
-        BAM_SVCALLING_GRIDSS(
-            bam_sv_calling_pair,
-            index_alignment
-        )
-
-        vcf_from_gridss_gridss = Channel.empty()
-            .mix(BAM_SVCALLING_GRIDSS.out.vcf)
-            .mix(gridss_existing_outputs)
-        versions = versions.mix(BAM_SVCALLING_GRIDSS.out.versions)
-
-        if (params.tumor_only) {
-            vcf_from_sv_calling_for_merge = vcf_from_gridss_gridss
-                .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
-
-            JUNCTION_FILTER(vcf_from_gridss_gridss)
-
-            pon_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.pon_filtered_sv_rds)
-            final_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.final_filtered_sv_rds)
-            final_filtered_sv_rds_for_merge = final_filtered_sv_rds
-                .map { it -> [ it[0].patient, it[1] ] } // meta.patient, rds
-        } else {
-            //somatic filter for GRIDSS
-            BAM_SVCALLING_GRIDSS_SOMATIC(vcf_from_gridss_gridss)
-
-            versions = versions.mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.versions)
-            vcf_somatic_high_conf = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_high_confidence)
-            vcf_from_sv_calling_for_merge = vcf_somatic_high_conf
-                .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
-
-            unfiltered_som_sv = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_all)
-            unfiltered_som_sv_for_merge = unfiltered_som_sv
-                .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
-        }
+        unfiltered_som_sv = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_all)
+        unfiltered_som_sv_for_merge = unfiltered_som_sv
+            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
     }
+    // if (tools_used.contains("all") || tools_used.contains("gridss") || params.is_run_junction_filter) {
+
+    //     // Filter out bams for which SV calling has already been done
+
+	// 	bam_sv_inputs = inputs.filter { it.vcf.isEmpty() }.map { it -> [it.meta.sample] }
+    //     bam_sv_calling = alignment_bams_final
+    //         .join(bam_sv_inputs)
+    //         .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
+
+	// 	// gridss_existing_outputs = inputs.map { it -> [it.meta, it.vcf, it.vcf_tbi] }.filter { !it[1].isEmpty() && !it[2].isEmpty() }
+	// 	gridss_existing_outputs = inputs.map {
+	// 		it -> [it.meta, it.vcf, it.vcf_tbi] }
+	// 		.filter { !it[1].isEmpty() && !it[2].isEmpty() }
+
+    //     if (params.tumor_only) {
+    //         bam_sv_calling_status = bam_sv_calling.branch{
+    //             tumor:  it[0].status == 1
+    //         }
+
+    //         // add empty arrays to stand-in for normals
+    //         bam_sv_calling_pair = bam_sv_calling_status.tumor.map{ meta, bam, bai -> [ meta + [tumor_id: meta.sample], [], [], bam, bai ] }
+    //     } else {
+    //         // getting the tumor and normal cram files separated
+    //         bam_sv_calling_status = bam_sv_calling.branch{
+    //             normal: it[0].status == 0
+    //             tumor:  it[0].status == 1
+    //         }
+
+    //         // All normal samples
+    //         bam_sv_calling_normal_for_crossing = bam_sv_calling_status.normal.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
+
+    //         // All tumor samples
+    //         bam_sv_calling_tumor_for_crossing = bam_sv_calling_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
+
+    //         // Crossing the normal and tumor samples to create tumor and normal pairs
+    //         bam_sv_calling_pair = bam_sv_calling_normal_for_crossing.cross(bam_sv_calling_tumor_for_crossing)
+    //             .map { normal, tumor ->
+    //                 def meta = [:]
+
+    //                 meta.id         = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
+    //                 meta.normal_id  = normal[1].sample
+    //                 meta.patient    = normal[0]
+    //                 meta.sex        = normal[1].sex
+    //                 meta.tumor_id   = tumor[1].sample
+
+    //                 [ meta, normal[2], normal[3], tumor[2], tumor[3] ]
+    //         }
+    //     }
+
+    //     BAM_SVCALLING_GRIDSS(
+    //         bam_sv_calling_pair,
+    //         index_alignment
+    //     )
+
+    //     vcf_from_gridss_gridss = Channel.empty()
+    //         .mix(BAM_SVCALLING_GRIDSS.out.vcf)
+    //         .mix(gridss_existing_outputs)
+    //     versions = versions.mix(BAM_SVCALLING_GRIDSS.out.versions)
+
+    //     if (params.tumor_only) {
+    //         vcf_from_sv_calling_for_merge = vcf_from_gridss_gridss
+    //             .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
+
+    //         JUNCTION_FILTER(vcf_from_gridss_gridss)
+
+    //         pon_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.pon_filtered_sv_rds)
+    //         final_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.final_filtered_sv_rds)
+    //         final_filtered_sv_rds_for_merge = final_filtered_sv_rds
+    //             .map { it -> [ it[0].patient, it[1] ] } // meta.patient, rds
+    //     } else {
+    //         //somatic filter for GRIDSS
+    //         BAM_SVCALLING_GRIDSS_SOMATIC(vcf_from_gridss_gridss)
+
+    //         versions = versions.mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.versions)
+    //         vcf_somatic_high_conf = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_high_confidence)
+    //         vcf_from_sv_calling_for_merge = vcf_somatic_high_conf
+    //             .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
+
+    //         unfiltered_som_sv = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_all)
+    //         unfiltered_som_sv_for_merge = unfiltered_som_sv
+    //             .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
+    //     }
+    // }
 
     // AMBER
     // ##############################
