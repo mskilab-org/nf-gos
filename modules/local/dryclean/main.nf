@@ -3,8 +3,8 @@ process DRYCLEAN {
     label 'process_medium'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/dryclean:0.0.4':
-        'mskilab/dryclean:0.0.4' }"
+        'docker://mskilab/dryclean:0.0.5':
+        'mskilab/dryclean:0.0.5' }"
 
 
     input:
