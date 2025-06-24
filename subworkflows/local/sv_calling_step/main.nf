@@ -165,16 +165,16 @@ workflow SV_CALLING_STEP {
             GRIDSS_ASSEMBLE_SCATTER(assembly_mixed_input, fasta, fasta_fai, bwa_index, blacklist_gridss)
 
             collected_assembly_dirs = GRIDSS_ASSEMBLE_SCATTER.out.gridss_workdir
-                .map { meta, gridss_scatter_assembly_paths ->
-                    [meta.patient, gridss_scatter_assembly_paths]
+                .map { meta, gridss_scatter_assembly_paths_per_jobnode ->
+                    [meta.patient, gridss_scatter_assembly_paths_per_jobnode]
                 }
                 .view { "GRIDSS_ASSEMBLE_SCATTER: $it" }
                 .groupTuple(by: 0, size: total_jobnodes) // [meta.patient, list[workdirs0, workdirs1, ...]]
                 .map { patient, list_of_gridss_scatter_assembly_paths ->
-                    def gridss_workdir = list_of_gridss_scatter_assembly_paths.flatten()
-                    assembly_dir = list_of_gridss_scatter_assembly_paths.collect{ it.getParent().getName().toString() }.unique()[0]
-                    gridss_workdir = gridss_workdir.findAll { it =~ /.*chunk.*\.(bam|bai)$/ }
-                    [patient, assembly_dir, gridss_workdir]
+                    def gridss_scatter_assembly_paths = list_of_gridss_scatter_assembly_paths.flatten()
+                    assembly_dir = gridss_scatter_assembly_paths.collect{ it.getParent().getName().toString() }.unique()[0]
+                    gridss_scatter_assembly_paths = gridss_scatter_assembly_paths.findAll { it =~ /.*chunk.*\.(bam|bai)$/ }
+                    [patient, assembly_dir, gridss_scatter_assembly_paths]
                 }
                 .view { "collected_assembly_dirs: $it" }
             
