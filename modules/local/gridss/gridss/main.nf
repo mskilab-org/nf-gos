@@ -283,6 +283,8 @@ process GRIDSS_ASSEMBLE_GATHER {
 
     cp -P gridss_assembly_dir___staged/* ./${gridss_assembly_dir} || { echo "No assembly files found in gridss_assembly_dir___staged" && exit 1; }
 
+    ls ./${gridss_assembly_dir}
+
     ${bwa}
 
     gridss \\
