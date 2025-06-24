@@ -179,7 +179,7 @@ process GRIDSS_ASSEMBLE_SCATTER {
 
 
     output:
-    tuple val(meta), path("*assembly.bam.gridss.working"), emit: gridss_workdir, optional:false
+    tuple val(meta), path("*assembly.bam.gridss.working/**"), emit: gridss_workdir, optional:false
     path "versions.yml", emit: versions
 
     when:
@@ -252,7 +252,7 @@ process GRIDSS_ASSEMBLE_GATHER {
 
 
     input:
-    tuple val(meta), path(tumorbam), path(tumorbai), path(tumor_gridss_preprocess_dir), path(normalbam), path(normalbai), path(normal_gridss_preprocess_dir), path(gridss_workdir)
+    tuple val(meta), path(tumorbam), path(tumorbai), path(tumor_gridss_preprocess_dir), path(normalbam), path(normalbai), path(normal_gridss_preprocess_dir), val(gridss_assembly_dir), path(gridss_assembly_paths, stageAs: "gridss_assembly_dir___staged/*")
     path(fasta)
     path(fasta_fai)
     path(bwa_index)
@@ -260,7 +260,7 @@ process GRIDSS_ASSEMBLE_GATHER {
 
 
     output:
-    tuple val(meta), path("*.assembly.bam"), emit: gridss_final_assembly, optional:false
+    tuple val(meta), path("*.assembly.bam"), path("*.assembly.bam.gridss.working/**"), emit: gridss_final_assembly, optional:false
     path "versions.yml", emit: versions
 
     when:
@@ -277,6 +277,12 @@ process GRIDSS_ASSEMBLE_GATHER {
     def blacklist = blacklist_gridss ? "--blacklist ${blacklist_gridss}" : ""
 
     """
+    mkdir -p ${gridss_assembly_dir}
+
+    echo "gridss_assembly_dir: ${gridss_assembly_dir}"
+
+    cp -P gridss_assembly_dir___staged/* ./${gridss_assembly_dir} || { echo "No assembly files found in gridss_assembly_dir___staged" && exit 1; }
+
     ${bwa}
 
     gridss \\
@@ -331,7 +337,7 @@ process GRIDSS_CALL {
 
 
     input:
-    tuple val(meta), path(tumorbam), path(tumorbai), path(tumor_gridss_preprocess_dir), path(normalbam), path(normalbai), path(normal_gridss_preprocess_dir), path(gridss_workdir), path(gridss_final_assembly)
+    tuple val(meta), path(tumorbam), path(tumorbai), path(tumor_gridss_preprocess_dir), path(normalbam), path(normalbai), path(normal_gridss_preprocess_dir), val(gridss_assembly_dir), path(gridss_assembly_paths, stageAs: "gridss_assembly_dir___staged/*"), path(gridss_final_assembly)
     path(fasta)
     path(fasta_fai)
     path(bwa_index)
@@ -359,6 +365,13 @@ process GRIDSS_CALL {
     def blacklist = blacklist_gridss ? "--blacklist ${blacklist_gridss}" : ""
 
     """
+    mkdir -p ${gridss_assembly_dir}
+
+    echo "gridss_assembly_dir: ${gridss_assembly_dir}"
+
+    cp -P gridss_assembly_dir___staged/* ./${gridss_assembly_dir} || { echo "No assembly files found in gridss_assembly_dir___staged" && exit 1; }
+
+
     ${bwa}
 
     gridss \\

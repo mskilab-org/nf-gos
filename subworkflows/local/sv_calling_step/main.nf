@@ -163,6 +163,20 @@ workflow SV_CALLING_STEP {
                 .view{ "assembly_mixed_input $it" }
             
             GRIDSS_ASSEMBLE_SCATTER(assembly_mixed_input, fasta, fasta_fai, bwa_index, blacklist_gridss)
+
+            collected_assembly_dirs = GRIDSS_ASSEMBLE_SCATTER.out.gridss_workdir
+                .map { meta, gridss_scatter_assembly_paths ->
+                    [meta.patient, gridss_scatter_assembly_paths]
+                }
+                .view { "GRIDSS_ASSEMBLE_SCATTER: $it" }
+                .groupTuple(by: 0, size: total_jobnodes) // [meta.patient, list[workdirs0, workdirs1, ...]]
+                .map { patient, list_of_gridss_scatter_assembly_paths ->
+                    def gridss_workdir = list_of_gridss_scatter_assembly_paths.flatten()
+                    assembly_dir = list_of_gridss_scatter_assembly_paths.collect{ it.getParent().getName().toString() }.unique()[0]
+                    gridss_workdir = gridss_workdir.findAll { it =~ /.*chunk.*\.(bam|bai)$/ }
+                    [patient, assembly_dir, gridss_workdir]
+                }
+                .view { "collected_assembly_dirs: $it" }
             
             gatherassembly_mixed_input = assembly_mixed_input
                 .map{ meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, jobnodes, jobindex ->
@@ -179,12 +193,9 @@ workflow SV_CALLING_STEP {
                 }
                 .distinct()
                 .join(
-                    GRIDSS_ASSEMBLE_SCATTER.out.gridss_workdir
-                        .map { meta, workdir ->
-                            [meta.patient, workdir]
-                        }
+                    collected_assembly_dirs
                 )
-                .map{ patient, meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_workdir ->
+                .map{ patient, meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths ->
                     [
                         meta, 
                         tumor_bam, 
@@ -193,13 +204,16 @@ workflow SV_CALLING_STEP {
                         normal_bam, 
                         normal_bai,
                         normal_gridss_preprocess,
-                        gridss_workdir
+                        gridss_assembly_dir,
+                        gridss_scatter_assembly_paths
+                        
                     ]
                 }
-
+                .view { "GRIDSS_ASSEMBLE_GATHER input: $it" }
+            
             GRIDSS_ASSEMBLE_GATHER(gatherassembly_mixed_input, fasta, fasta_fai, bwa_index, blacklist_gridss)
 
-            call_input = gatherassembly_mixed_input.map{ meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_workdir ->
+            call_input = gatherassembly_mixed_input.map{ meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths ->
                     [
                         meta.patient, 
                         meta, 
@@ -209,17 +223,18 @@ workflow SV_CALLING_STEP {
                         normal_bam, 
                         normal_bai,
                         normal_gridss_preprocess, 
-                        gridss_workdir
+                        gridss_assembly_dir,
+                        gridss_scatter_assembly_paths
                     ]
                 }
                 .distinct()
                 .join(
                     GRIDSS_ASSEMBLE_GATHER.out.gridss_final_assembly
-                        .map { meta, gridss_final_assembly ->
-                            [meta.patient, gridss_final_assembly]
+                        .map { meta, gridss_final_assembly, gridss_gather_assembly_paths ->
+                            [meta.patient, gridss_final_assembly, gridss_gather_assembly_paths]
                         }
                 )
-                .map{ patient, meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_workdir, gridss_final_assembly ->
+                .map{ patient, meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths, gridss_final_assembly, gridss_gather_assembly_paths ->
                     [
                         meta, 
                         tumor_bam, 
@@ -228,10 +243,13 @@ workflow SV_CALLING_STEP {
                         normal_bam, 
                         normal_bai,
                         normal_gridss_preprocess,
-                        gridss_workdir,
+                        gridss_assembly_dir,
+                        gridss_scatter_assembly_paths + gridss_gather_assembly_paths,
                         gridss_final_assembly
                     ]
                 }
+                .view { "GRIDSS_CALL input: $it" }
+            
             GRIDSS_CALL(call_input, fasta, fasta_fai, bwa_index, blacklist_gridss)
 
             vcf_from_gridss_gridss = vcf_from_gridss_gridss
