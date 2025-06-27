@@ -38,7 +38,7 @@ workflow SV_CALLING_STEP {
             normal: it.meta.status.toString() == "0"
         }
 
-    def normal_ids = inputs_unlaned_split.normal.map { it.meta.patient }.distinct().collect().view { "Normal IDs: $it" }
+    def normal_ids = inputs_unlaned_split.normal.map { it.meta.patient }.distinct().collect().ifEmpty(["NO_NORMALS_PRESENT___MD7cicQBtB"]).view { "Normal IDs: $it" }
     def tumor_ids = inputs_unlaned_split.tumor.map { it.meta.patient }.distinct().collect().view { "Tumor IDs: $it" }
 
     def total_jobnodes = 4
@@ -79,16 +79,20 @@ workflow SV_CALLING_STEP {
                     [ meta.patient, gridss_preprocess_dir ]
                 }
 
-            tumor_only_ids = tumor_ids
-                .filter {  it -> 
-                    !normal_ids.contains(it)
+            mixed_ids = tumor_ids
+                .concat(normal_ids)
+                .collect(flat: false)
+
+            tumor_only_ids = mixed_ids
+                .map{ tumor, normal ->
+                    tumor.findAll { !normal.contains(it) }
                 }
                 .flatten()
                 .view { "Tumor IDs without normal: $it" }
-
-            tumor_paired_ids = tumor_ids
-                .filter {  it -> 
-                    normal_ids.contains(it)
+            
+            tumor_paired_ids = mixed_ids
+                .map{ tumor, normal ->
+                    tumor.findAll { normal.contains(it) }
                 }
                 .flatten()
                 .view { "Tumor IDs with normal: $it" }
@@ -296,7 +300,7 @@ workflow SV_CALLING_STEP {
 
             BAM_SVCALLING_GRIDSS(
                 bam_sv_calling_pair,
-                index_alignment
+                bwa_index
             )
             vcf_from_gridss_gridss = Channel.empty()
                 .mix(BAM_SVCALLING_GRIDSS.out.vcf)
