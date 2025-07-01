@@ -1724,7 +1724,7 @@ workflow NFCASEREPORTS {
             .join(bam_snv_inputs)
             .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
 
-		bam_snv_calling.view{ "bam_snv_calling: $it" }
+		// bam_snv_calling.view{ "bam_snv_calling: $it" }
 
         snv_somatic_existing_outputs = inputs_unlaned
             .map { it -> [it.meta, it.snv_somatic_vcf, it.snv_somatic_tbi] }
@@ -1939,7 +1939,7 @@ workflow NFCASEREPORTS {
 			.map { it -> [it.meta.patient, Utils.remove_lanes_from_meta(it.meta) - it.meta.subMap('tumor_id')] }
 			.distinct()
 
-		purple_inputs_for_merge.view{ "purple_inputs_for_merge: $it" }
+		// purple_inputs_for_merge.view{ "purple_inputs_for_merge: $it" }
 
         meta_purple = purple_inputs_for_merge
             .branch{

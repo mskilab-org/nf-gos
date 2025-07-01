@@ -243,7 +243,7 @@ workflow ALIGNMENT_STEP {
         // versions = versions.mix(BAM_MERGE_INDEX_SAMTOOLS.out.versions)
 
         alignment_bams_final = BAM_MERGE_INDEX_SAMTOOLS.out.bam_bai.map({ meta, bam, bai -> [ meta.sample, Utils.remove_lanes_from_meta(meta), bam, bai ] })
-		alignment_bams_final.view{ log.info "alignment_bams_final: $it" }
+		// alignment_bams_final.view{ log.info "alignment_bams_final: $it" }
     }
 
     // BAM Postprocessing
