@@ -1370,6 +1370,8 @@ workflow NFCASEREPORTS {
         final_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.final_filtered_sv_rds)
         final_filtered_sv_rds_for_merge = final_filtered_sv_rds
             .map { it -> [ it[0].patient, it[1] ] } // meta.patient, rds
+            .mix(final_filtered_sv_rds_for_merge)
+
     } else {
         //somatic filter for GRIDSS
         BAM_SVCALLING_GRIDSS_SOMATIC(vcf_from_gridss_gridss)
@@ -1818,8 +1820,8 @@ workflow NFCASEREPORTS {
             .map { it -> [ it[1], it[2], it[3] ] } // meta, filtered (pass and tumor-only filter) snvs, tbi
 
 
-        variant_somatic_ann_existing_outputs = inputs.map { it -> [it.meta, it.variant_somatic_ann] }.filter { !it[1].isEmpty() }
-        variant_somatic_bcf_existing_outputs = inputs.map { it -> [it.meta, it.variant_somatic_bcf] }.filter { !it[1].isEmpty() }
+        variant_somatic_ann_existing_outputs = inputs_unlaned.map { it -> [it.meta, it.variant_somatic_ann] }.filter { !it[1].isEmpty() }
+        variant_somatic_bcf_existing_outputs = inputs_unlaned.map { it -> [it.meta, it.variant_somatic_bcf] }.filter { !it[1].isEmpty() }
 
         VCF_SNPEFF_SOMATIC(
             variant_ann_input_somatic,
@@ -1838,7 +1840,7 @@ workflow NFCASEREPORTS {
             .mix(variant_somatic_bcf_existing_outputs)
 
         if (!params.tumor_only) {
-            variant_germline_ann_inputs = inputs
+            variant_germline_ann_inputs = inputs_unlaned
                 .filter { it.variant_germline_ann.isEmpty() || it.variant_germline_bcf.isEmpty() }
                 .map { it -> [it.meta.patient, it.meta + [id: it.meta.sample ]] }
 
@@ -1846,8 +1848,8 @@ workflow NFCASEREPORTS {
                 .join(germline_vcf_for_merge)
                 .map { it -> [ it[1], it[2], it[3] ] } // meta, germline snvs, tbi
 
-            variant_germline_ann_existing_outputs = inputs.map { it -> [it.meta, it.variant_germline_ann] }.filter { !it[1].isEmpty() }
-            variant_germline_bcf_existing_outputs = inputs.map { it -> [it.meta, it.variant_germline_bcf] }.filter { !it[1].isEmpty() }
+            variant_germline_ann_existing_outputs = inputs_unlaned.map { it -> [it.meta, it.variant_germline_ann] }.filter { !it[1].isEmpty() }
+            variant_germline_bcf_existing_outputs = inputs_unlaned.map { it -> [it.meta, it.variant_germline_bcf] }.filter { !it[1].isEmpty() }
 
             VCF_SNPEFF_GERMLINE(
                 variant_ann_input_germline,
@@ -2039,7 +2041,7 @@ workflow NFCASEREPORTS {
     // ##############################
 
     if (tools_used.contains("all") || tools_used.contains("jabba")) {
-        jabba_inputs = inputs.filter { (it.jabba_gg.isEmpty() || it.jabba_rds.isEmpty()) && it.meta.status == 1}.map { it -> [it.meta.patient, it.meta] }.distinct()
+        jabba_inputs = inputs_unlaned.filter { (it.jabba_gg.isEmpty() || it.jabba_rds.isEmpty()) && it.meta.status == 1}.map { it -> [it.meta.patient, it.meta] }.distinct()
 
 		// Dev block to retier either vcf or filtered retiered junctions
 		is_final_filtered_sv_rds_for_merge_retiered = params.is_retier_whitelist_junctions && params.tumor_only
@@ -2049,6 +2051,7 @@ workflow NFCASEREPORTS {
 		jabba_vcf_from_sv_calling_for_merge = vcf_from_sv_calling_for_merge
 		// Variable exists in case retiering is done
 		untiered_junctions_for_merge = vcf_from_sv_calling_for_merge
+        println "is_final_filtered_sv_rds_for_merge_retiered: ${is_final_filtered_sv_rds_for_merge_retiered}"
 		if (is_final_filtered_sv_rds_for_merge_retiered) {
 			untiered_junctions_for_merge = final_filtered_sv_rds_for_merge
 		}
@@ -2108,8 +2111,8 @@ workflow NFCASEREPORTS {
             .join(jabba_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, cbs_nseg
 
-        jabba_rds_existing_outputs = inputs.map { it -> [it.meta + [id: it.meta.sample], it.jabba_rds] }.filter { !it[1].isEmpty() }
-        jabba_gg_existing_outputs = inputs.map { it -> [it.meta + [id: it.meta.sample], it.jabba_gg] }.filter { !it[1].isEmpty() }
+        jabba_rds_existing_outputs = inputs_unlaned.map { it -> [it.meta + [id: it.meta.sample], it.jabba_rds] }.filter { !it[1].isEmpty() }
+        jabba_gg_existing_outputs = inputs_unlaned.map { it -> [it.meta + [id: it.meta.sample], it.jabba_gg] }.filter { !it[1].isEmpty() }
 
         if (params.tumor_only) {
             jabba_input = jabba_inputs
