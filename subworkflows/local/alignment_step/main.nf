@@ -86,7 +86,7 @@ workflow ALIGNMENT_STEP {
 
 
         // // QC
-        FASTQC(input_fastq_qc)
+        // FASTQC(input_fastq_qc)
 
         // reports = reports.mix(FASTQC.out.zip.collect{ meta, logs -> logs })
         // versions = versions.mix(FASTQC.out.versions.first())
