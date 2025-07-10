@@ -200,3 +200,89 @@ process SAGE_TUMOR_ONLY_FILTER {
     END_VERSIONS
     """
 }
+
+
+process RESCUE_CH_HEME {
+    tag "$meta.id"
+    label 'process_medium'
+
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'docker://mskilab/unified:0.0.5':
+        'mskilab/unified:0.0.5' }"
+
+    input:
+    tuple val(meta), path(sage_vcf), path(sage_vcf_tbi), path(sage_tumor_only_vcf), path(sage_tumor_only_vcf_tbi)
+    path(heme_ref)
+
+    output:
+    tuple val(meta), path("*.sage.pass_rescued_concatenated.vcf.gz"), path("*.sage.pass_rescued_concatenated.vcf.gz.tbi"),    emit: sage_tumor_only_rescue_ch_vcf
+    path "versions.yml",                                                                                        emit: versions, optional:true
+
+    when:
+    task.ext.when == null || task.ext.when
+    script:
+    def args        = task.ext.args ?: ''
+    def prefix      = task.ext.prefix ?: "${meta.id}"
+    def output      = "${meta.id}.sage.pass_filtered.tumoronly.vcf.gz"
+    def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
+    def safe_tmpdir = System.getenv('TMPDIR') ?: '/tmp'
+
+    """
+    export HOME=/root
+	export TMPDIR=${safe_tmpdir}
+    set +u  # Disable unbound variable check
+    source /opt/conda/etc/profile.d/conda.sh
+    conda activate pact
+
+    export RSCRIPT_PATH=\$(echo "${baseDir}/bin/rescue_ch.R")
+
+    Rscript \$RSCRIPT_PATH \\
+        --vcf ${sage_vcf} \\
+        --heme_db ${heme_ref} \\
+        --samp_id ${meta.id} \\
+        --outdir ./
+    
+    bgzip ${meta.id}.sage.pass_rescued.vcf
+
+    bcftools index --tbi ${meta.id}.sage.pass_rescued.vcf.gz
+
+    bcftools concat \\
+        --allow-overlaps \\
+        --remove-duplicates \\
+        ${sage_tumor_only_vcf} \\
+        ${meta.id}.sage.pass_rescued.vcf.gz \\
+        -o ${meta.id}.sage.pass_rescued_concatenated.unsorted.vcf.gz \\
+        -Oz
+    
+    
+    bcftools index --tbi ${meta.id}.sage.pass_rescued_concatenated.unsorted.vcf.gz
+
+    bcftools sort \\
+        -o ${meta.id}.sage.pass_rescued_concatenated.vcf.gz \\
+        ${meta.id}.sage.pass_rescued_concatenated.unsorted.vcf.gz
+
+    rm ${meta.id}.sage.pass_rescued_concatenated.unsorted.vcf.gz*
+
+    bcftools index --tbi ${meta.id}.sage.pass_rescued_concatenated.vcf.gz
+
+    
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        bcftools: \$(bcftools -v | head -n 1 | sed 's/^bcftools //')
+    END_VERSIONS
+
+    """
+
+    stub:
+    prefix = task.ext.prefix ?: "${meta.id}"
+    def VERSION = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
+    """
+    touch ${meta.id}.sage.filtered.tumoronly.vcf.gz
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        sage: ${VERSION}
+    END_VERSIONS
+    """
+}
+

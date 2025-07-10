@@ -109,6 +109,17 @@ if ((params.download_cache) && (params.snpeff_cache || params.vep_cache)) {
 // Initialise the workflow
 WorkflowNfcasereports.initialise(params, log)
 
+
+/* Parameter Preparation
+
+Instantiate derivative parameters for the workflow.
+
+*/
+
+params.is_heme = params.is_retier_whitelist_junctions 
+
+println "params.mski_base: ${params.mski_base}"
+
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Check mandatory parameters
@@ -283,6 +294,8 @@ inputs = ch_from_samplesheet.map {
     events,
     fusions,
     snv_somatic_vcf,
+    snv_somatic_vcf_tumoronly_filtered,
+    snv_somatic_vcf_rescue_ch_heme,
     snv_germline_vcf,
     variant_somatic_ann,
     variant_somatic_bcf,
@@ -340,6 +353,10 @@ inputs = ch_from_samplesheet.map {
         events: events,
         fusions: fusions,
         snv_somatic_vcf: snv_somatic_vcf,
+        snv_somatic_vcf_tumoronly_filtered: snv_somatic_vcf_tumoronly_filtered,
+        snv_somatic_vcf_tumoronly_filtered_tbi: snv_somatic_vcf_tumoronly_filtered ? snv_somatic_vcf_tumoronly_filtered + ".tbi" : [],
+        snv_somatic_vcf_rescue_ch_heme: snv_somatic_vcf_rescue_ch_heme,
+        snv_somatic_vcf_rescue_ch_heme_tbi: snv_somatic_vcf_rescue_ch_heme ? snv_somatic_vcf_rescue_ch_heme + '.tbi' : [],
         snv_somatic_tbi: snv_somatic_vcf ? snv_somatic_vcf + '.tbi' : [],
         snv_germline_vcf: snv_germline_vcf,
         snv_germline_tbi: snv_germline_vcf ? snv_germline_vcf + '.tbi' : [],
@@ -455,6 +472,8 @@ requiredFields = [
     'events',
     'fusions',
     'snv_somatic_vcf',
+    'snv_somatic_vcf_tumoronly_filtered',
+    "snv_somatic_vcf_rescue_ch_heme",
     'snv_germline_vcf',
     'variant_somatic_ann',
     'variant_somatic_bcf',
@@ -605,6 +624,7 @@ tool_input_output_map.each { tool, io ->
 		
 		// special cases
 		def is_sage_tumor_only = tool == "sage" && params.tumor_only
+        def is_sage_heme = is_sage_tumor_only && params.is_heme
 		def is_current_tool_qc = tools_qc.contains(tool)
 		def is_current_tool_qc_multiple_metrics = tool == "collect_multiple_metrics" // nested
 		// TODO: for later
@@ -615,7 +635,15 @@ tool_input_output_map.each { tool, io ->
 		
 		// Treat special cases
 		if (is_sage_tumor_only) {
-			outputsNeeded = missing_outputs.contains("snv_somatic_vcf")
+			outputsNeeded = ["snv_somatic_vcf", "snv_somatic_vcf_tumoronly_filtered"].any {
+                missing_outputs.contains(it)
+            }
+		}
+
+        if (is_sage_heme) {
+			outputsNeeded = ["snv_somatic_vcf", "snv_somatic_vcf_tumoronly_filtered", "snv_somatic_vcf_rescue_ch_heme"].any {
+                missing_outputs.contains(it)
+            }
 		}
 
 		if (is_current_tool_qc_multiple_metrics) {
@@ -878,6 +906,8 @@ include { COV_CBS as CBS } from '../subworkflows/local/cov_cbs/main'
 // SAGE
 include { BAM_SAGE } from '../subworkflows/local/bam_sage/main'
 include { BAM_SAGE_TUMOR_ONLY_FILTER } from '../subworkflows/local/bam_sage/main'
+include { RESCUE_CH_HEME_STEP } from '../subworkflows/local/rescue_ch_step/main'
+
 
 // SNPEFF
 include { VCF_SNPEFF as VCF_SNPEFF_SOMATIC } from '../subworkflows/local/vcf_snpeff/main'
@@ -939,6 +969,9 @@ include { SV_CALLING_STEP } from '../subworkflows/local/sv_calling_step/main'
 
 // Alignment Step Process
 include { SIGNATURES_STEP } from '../subworkflows/local/signatures_step/main'
+
+
+
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1778,11 +1811,25 @@ workflow NFCASEREPORTS {
 
         versions = versions.mix(BAM_SAGE.out.versions)
 
-        filtered_somatic_vcf = Channel.empty()
+        filtered_somatic_vcf_sage = Channel.empty()
             .mix(BAM_SAGE.out.sage_pass_filtered_somatic_vcf)
             .mix(snv_somatic_existing_outputs)
-        filtered_somatic_vcf_for_merge = filtered_somatic_vcf
-            .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, filtered somatic snv vcf, tbi
+        
+        filtered_somatic_vcf_tumoronly_outputs = inputs_unlaned
+            .map { it -> [it.meta, it.snv_somatic_vcf_tumoronly_filtered, it.snv_somatic_vcf_tumoronly_filtered_tbi] }
+            .distinct()
+        
+        tumor_only_filter_input = filtered_somatic_vcf_sage
+            .map{
+                [it[0].patient] + it.toList()
+            }
+            .join(
+                filtered_somatic_vcf_tumoronly_outputs
+                    .filter { it -> it[1].isEmpty() }
+                    .map { it -> [it[0].patient] }
+                    .distinct()
+            )
+            .map { it[1..-1] }
 
         if (!params.tumor_only) {
             germline_vcf = Channel.empty()
@@ -1795,16 +1842,43 @@ workflow NFCASEREPORTS {
 
         if (params.tumor_only) {
             BAM_SAGE_TUMOR_ONLY_FILTER(
-                filtered_somatic_vcf,
+                tumor_only_filter_input,
                 dbsnp_tbi,
                 known_indels_tbi
             )
 
-            filtered_somatic_vcf = Channel.empty()
+            filtered_somatic_vcf_tumor_only = Channel.empty()
                 .mix(BAM_SAGE_TUMOR_ONLY_FILTER.out.sage_filtered_vcf)
-            filtered_somatic_vcf_for_merge = filtered_somatic_vcf
-                .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, filtered somatic snv vcf, tbi
+                .mix(
+                    filtered_somatic_vcf_tumoronly_outputs
+                    .filter { it -> !it[1].isEmpty() }
+                )
+
+            filtered_somatic_vcf = filtered_somatic_vcf_tumor_only
+            
+            if (params.is_heme) {
+                heme_rescue_input = filtered_somatic_vcf_sage
+                    .map { [it[0].patient, it[0], it[1], it[2]] } // meta.patient, meta, sage vcf, sage tbi
+                    .join(
+                        filtered_somatic_vcf_tumor_only
+                            .map { [it[0].patient, it[1], it[2]]  } // meta.patient, vcf, tbi
+                    )
+                    .map { it[1..-1] } // meta, sage vcf, sage tbi, tumoronly vcf, tumoronly tbi
+                    .view { "heme_rescue_input: $it" }
+
+                RESCUE_CH_HEME_STEP(
+                    heme_rescue_input
+                )
+                filtered_somatic_vcf = RESCUE_CH_HEME_STEP.out.sage_tumor_only_rescue_ch_vcf
+            }
+
+            
+        } else {
+            filtered_somatic_vcf = filtered_somatic_vcf_sage
         }
+
+        filtered_somatic_vcf_for_merge = filtered_somatic_vcf
+                .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, filtered somatic snv vcf, tbi
     }
 
     // Variant Annotation

@@ -99,6 +99,7 @@ params.build_non_integer_balance     = WorkflowMain.getGenomeAttribute(params, '
 params.mask_non_integer_balance     = WorkflowMain.getGenomeAttribute(params, 'mask_non_integer_balance')
 params.mask_lp_phased_balance     = WorkflowMain.getGenomeAttribute(params, 'mask_lp_phased_balance')
 params.ref_hrdetect     = WorkflowMain.getGenomeAttribute(params, 'ref_hrdetect')
+params.heme_db     = WorkflowMain.getGenomeAttribute(params, 'heme_db')
 //params.blacklist_junctions_jabba     = WorkflowMain.getGenomeAttribute(params, 'blacklist_junctions_jabba')
 
 /*
