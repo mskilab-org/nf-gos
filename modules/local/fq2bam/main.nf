@@ -72,7 +72,7 @@ process PARABRICKS_FQ2BAM {
 
     """
     pbrun \\
-        fq2bam \\
+        fq2bamfast \\
         --ref $fasta \\
         $in_fq_command \\
         `# --read-group-sm $meta.id` \\
@@ -85,7 +85,9 @@ process PARABRICKS_FQ2BAM {
         $qc_metrics_output \\
         --num-gpus $task.accelerator.request \\
         --memory-limit $mem_limit \\
-        --num-cpu-threads-per-stage $task.cpus \\
+        `#--num-cpu-threads-per-stage $task.cpus` \\
+        --bwa-cpu-thread-pool $task.cpus `# this is for fq2bamfast` \\
+        --bwa-nstreams 2 `# this is for fq2bamfast` \\
         $low_memory_command \\
         $args
 
