@@ -209,7 +209,7 @@ process COERCE_SEQNAMES {
     """
 }
 
-process RETIER_WHITELIST_JUNCTIONS {
+process RETIER_WHITELIST_JUNCTIONS___OLD {
     tag "$meta.id"
     label 'process_low'
 
@@ -306,13 +306,13 @@ process RETIER_WHITELIST_JUNCTIONS {
 }
 
 
-process RETIER_WHITELIST_JUNCTIONS___DEV {
+process RETIER_WHITELIST_JUNCTIONS {
     tag "$meta.id"
     label 'process_low'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/unified:0.0.6-rcpp':
-        'mskilab/unified:0.0.6-rcpp' }"
+        'docker://mskilab/unified:0.0.8-rcpp':
+        'mskilab/unified:0.0.8-rcpp' }"
 
     input:
     tuple val(meta), path(junctions), path(junctions_raw)
@@ -422,6 +422,8 @@ process RETIER_WHITELIST_JUNCTIONS___DEV {
     num_reciprocals_rescue = NROW(ra.raw.reciprocals)
     is_reciprocal_present = num_reciprocals_rescue > 0
 
+    ra.out = ra.all
+
     ix_raw = unique(mcols(grl.unlist(ra.raw.reciprocals) %&% heme_gen)[["grl.ix"]])
     if (NROW(ix_raw) > 0) {
         ra.raw.reciprocals = ra.raw.reciprocals[ix_raw]
@@ -430,12 +432,11 @@ process RETIER_WHITELIST_JUNCTIONS___DEV {
         mcols(ra.raw.reciprocals) = mcols_ra.raw
         ra.all = gUtils::gr.fix(ra.all, ra.raw.reciprocals)
         ra.raw.reciprocals = gUtils::gr.fix(ra.raw.reciprocals, ra.all)
+        ra.out = c(
+            ra.all,
+            ra.raw.reciprocals
+        )
     }
-
-    ra.out = c(
-        ra.all,
-        ra.raw.reciprocals
-    )
 
     is_ra_duplicated = gGnome::fra.duplicated(ra.out, pad = 1000)
     ra.out = ra.out[!is_ra_duplicated]
