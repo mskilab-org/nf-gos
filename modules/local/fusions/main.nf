@@ -5,8 +5,9 @@ process FUSIONS {
 
     // using events container since the dependencies are the same
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/unified:0.0.2':
-        'mskilab/unified:0.0.2' }"
+        'docker://mskilab/unified:0.0.7-rcpp':
+        'mskilab/unified:0.0.7-rcpp' }"
+    // 0.0.6 and above do not require conda sourcing
 
     input:
     tuple val(meta), path(gGraph), path(sv_vcf), path(sv_vcf_tbi)
@@ -28,11 +29,7 @@ process FUSIONS {
     def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
     """
-    export HOME=/root && \
     set +u  # Disable unbound variable check
-    source /opt/conda/etc/profile.d/conda.sh && \
-    conda activate pact
-
 
     export RSCRIPT_PATH=\$(echo "${baseDir}/bin/Fusions.R")
 

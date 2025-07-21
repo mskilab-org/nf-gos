@@ -13,7 +13,7 @@ if (!exists('opt'))
         make_option(c("-j", "--junctions"), type = "character", help = "an RDS file contains a gGraph or JaBbA graph with cn annotation on nodes and edges, or is a BND formatted SV VCF"),
         make_option(c("-r", "--gencode"), type = "character", default = "~/DB/GENCODE/gencode.v19.annotation.gtf.nochr.rds", help = "an RDS or GTF file of GENCODE"),
         make_option(c("--genes"), type = "character", default = "/dev/null", help = "Gene list to filter junction breakends"),
-        make_option(c("--do_only_canonical"), type = "logical", default = TRUE, help = "Use only canonical (longest per gene), protein-coding transcripts"),
+        make_option(c("--do_only_canonical"), type = "logical", default = FALSE, help = "Use only canonical (longest per gene), protein-coding transcripts"),
         make_option(c("-o", "--outdir"), type = "character", default = './', help = "Directory to dump output into"),
         make_option(c("--cores"), type = "integer", default = 1L, help = "Number of cores")
     )
@@ -43,20 +43,21 @@ if (grepl('.rds$', opt$gencode))
 }
 
 if (opt$do_only_canonical) {
-    message("Using only canonical transcripts")
-    canonical_transcripts = (
-        gUtils::gr2dt(
-            gencode[
-                gencode$type == "transcript"
-                & gencode$gene_type == "protein_coding"
-                & gencode$transcript_type == "protein_coding"
-            ]
-        )[, .(transcript_id = transcript_id[which.max(end-start+1)]), by = gene_name]
-    )
-    gencode = gencode[
-        gencode$transcript_id %in% canonical_transcripts$transcript_id 
-        | (gencode$type == "gene" & gencode$gene_name %in% canonical_transcripts$gene_name)
-    ]
+    message("Prefiltering to only 1 canonical transcript per gene is deprecated. gGnome::fusions() internally selects the longest transcript with a break inside")
+    # message("Using only canonical transcripts")
+    # canonical_transcripts = (
+    #     gUtils::gr2dt(
+    #         gencode[
+    #             gencode$type == "transcript"
+    #             & gencode$gene_type == "protein_coding"
+    #             & gencode$transcript_type == "protein_coding"
+    #         ]
+    #     )[, .(transcript_id = transcript_id[which.max(end-start+1)]), by = gene_name]
+    # )
+    # gencode = gencode[
+    #     gencode$transcript_id %in% canonical_transcripts$transcript_id 
+    #     | (gencode$type == "gene" & gencode$gene_name %in% canonical_transcripts$gene_name)
+    # ]
 }
 
 message("Loading SV input: ", opt$junctions)

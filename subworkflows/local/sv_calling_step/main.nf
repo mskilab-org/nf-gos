@@ -135,11 +135,13 @@ workflow SV_CALLING_STEP {
                 .map { 
                     it.values()
                 }
+                
 
             assembly_tumoronly_input = bam_sv_calling_status.tumor
                 .map{ it ->
                     [it[0].patient, it[0], it[1], it[2]]
                 }
+                .view { "bam_sv_calling_status.tumor.map: ${it}" }
                 .join(tumor_only_ids)
                 .join(gridss_preprocess_tumor_for_merge)
                 .flatMap { tumor ->

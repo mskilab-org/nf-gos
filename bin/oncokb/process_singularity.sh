@@ -201,5 +201,5 @@ fi
 
 
 touch FINISHED
-chmod u=rwx,g=rwx,o=rx *
+# chmod u=rwx,g=rwx,o=rx *
 

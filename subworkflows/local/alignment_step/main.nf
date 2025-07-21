@@ -77,13 +77,15 @@ workflow ALIGNMENT_STEP {
 		.filter { ! it[1].isEmpty() }
 		.map { it -> [it[0].sample, it[0], it[1], it[2]] }
         .distinct()
+    
+    alignment_existing_outputs = inputs.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.bam] }.filter { !it[1].isEmpty() }.distinct()
+
 	
 
 
 	if (tools_used.contains("all") || tools_used.contains("aligner")) {
         
-        alignment_existing_outputs = inputs.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.bam] }.filter { !it[1].isEmpty() }.distinct()
-
+        
 
         // // QC
         // FASTQC(input_fastq_qc)

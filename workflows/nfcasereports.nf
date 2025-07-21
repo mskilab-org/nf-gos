@@ -603,7 +603,17 @@ def missing_outputs = requiredFields.findAll { field ->
     // Check if this field is missing (null or empty collection) in any sample
     sampleList.any { sample ->
         def value = sample[field]
-        !value || (value instanceof Collection && value.empty)
+        // !value || (value instanceof Collection && value.empty) || value.toString() == ""
+
+        def stringempty = (value == "")
+        def truthy_val = (
+            (!value) ||
+            (value == null) || 
+            (value instanceof Collection && value.empty) || 
+            (value.toString().trim() == "") ||
+            (value instanceof String && value.replaceAll(/["']/, "").trim() == "")
+        )
+        truthy_val
     }
 }
 println "Outputs MISSING from at least one sample: $missing_outputs"
@@ -2558,7 +2568,7 @@ workflow NFCASEREPORTS {
     // HRDetect
     // ##############################
     if ((tools_used.contains("all") || tools_used.contains("hrdetect"))) {
-        hrdetect_inputs = inputs
+        hrdetect_inputs = inputs_unlaned
             .filter { it.hrdetect.isEmpty() }
             .map { it -> [it.meta.patient, it.meta + [id: it.meta.sample]] }
 
@@ -2578,7 +2588,7 @@ workflow NFCASEREPORTS {
             .join(hrdetect_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, jabba ggraph
 
-        hrdetect_existing_outputs = inputs.map { it -> [it.meta, it.hrdetect] }.filter { !it[1].isEmpty() }
+        hrdetect_existing_outputs = inputs_unlaned.map { it -> [it.meta, it.hrdetect] }.filter { !it[1].isEmpty() }
 
         hrdetect_input = hrdetect_inputs
             .join(hrdetect_inputs_sv)

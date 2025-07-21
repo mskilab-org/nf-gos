@@ -1,7 +1,7 @@
 process PARABRICKS_FQ2BAM {
     tag "$meta.id"
 
-    container "nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1"
+    container "nvcr.io/nvidia/clara/clara-parabricks:4.5.0-1"
     containerOptions "${ workflow.containerEngine == "singularity" ? '--nv': ( workflow.containerEngine == "docker" ? '--gpus all': null ) }"
 
     input:
@@ -59,8 +59,11 @@ process PARABRICKS_FQ2BAM {
     def optical_duplicate_pixel_distance_command = optical_duplicate_pixel_distance && mark_duplicates ? "--optical-duplicate-pixel-distance $optical_duplicate_pixel_distance" : ""
     def qc_metrics_output = "--out-qc-metrics-dir ${prefix}___qc_metrics"
     def mem_limit = (task.memory.toGiga() * 0.4).toInteger() // Calculation is necessary for slurm to keep well under the requested memory limit
-    // def mem_limit = task.memory.toGiga().toInteger()
-    def low_memory_command = low_memory ? "--low-memory" : ""
+    // def low_memory_command = low_memory ? "--low-memory" : ""
+    def low_memory_command = task.low_memory_command ?: ""
+    def bwa_queue_capacity = task.normalized_queue_capacity ?: 10
+    bwa_queue_capacity = (bwa_queue_capacity / task.accelerator.request).toInteger()
+    def num_cpus = (task.cpus / task.accelerator.request).toInteger()
 
     known_sites.eachWithIndex { site, idx ->
         def tbi_file = known_sites_tbi[idx]
@@ -72,7 +75,7 @@ process PARABRICKS_FQ2BAM {
 
     """
     pbrun \\
-        fq2bamfast \\
+        fq2bam \\
         --ref $fasta \\
         $in_fq_command \\
         `# --read-group-sm $meta.id` \\
@@ -86,8 +89,10 @@ process PARABRICKS_FQ2BAM {
         --num-gpus $task.accelerator.request \\
         --memory-limit $mem_limit \\
         `#--num-cpu-threads-per-stage $task.cpus` \\
-        --bwa-cpu-thread-pool $task.cpus `# this is for fq2bamfast` \\
-        --bwa-nstreams 2 `# this is for fq2bamfast` \\
+        --bwa-cpu-thread-pool $num_cpus `# this is for fq2bamfast` \\
+        --bwa-nstreams $task.bwa_streams `# this is for fq2bamfast` \\
+        --bwa-normalized-queue-capacity $bwa_queue_capacity `# this is for fq2bamfast` \\
+        --verbose \\
         $low_memory_command \\
         $args
 

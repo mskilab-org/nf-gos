@@ -304,3 +304,155 @@ process RETIER_WHITELIST_JUNCTIONS {
     END_VERSIONS
     """
 }
+
+
+process RETIER_WHITELIST_JUNCTIONS___DEV {
+    tag "$meta.id"
+    label 'process_low'
+
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'docker://mskilab/unified:0.0.6-rcpp':
+        'mskilab/unified:0.0.6-rcpp' }"
+
+    input:
+    tuple val(meta), path(junctions), path(junctions_raw)
+    val(tfield)
+    path(whitelist_genes)
+
+    output:
+    tuple val(meta), path("*___tiered.rds"), emit: retiered_junctions, optional: true
+
+    script:
+    """
+    #!/usr/bin/env Rscript
+
+	options(error = function() {traceback(2); quit(save = "no", status = 1)})
+
+    library(gUtils)
+    library(dplyr)
+    library(VariantAnnotation)
+    library(gGnome)
+
+    # Load the whitelist genes
+    heme_gen = readRDS("${whitelist_genes}")
+
+    # Define the path to the junctions file
+    jpath = "${junctions}"
+    jpath_tiered = glue::glue('{tools::file_path_sans_ext(jpath)}___tiered.rds')
+
+    # Read the VCF file
+	is_character = is.character(jpath)
+	is_len_one = NROW(jpath) == 1
+	is_na = is_len_one && (is.na(jpath) || jpath %in% c("NA", base::nullfile()))
+	is_possible_path = is_character && is_len_one && !is_na
+  	is_existent_path = is_possible_path && file.exists(jpath)
+  	is_rds = is_possible_path && grepl(".rds\$", jpath)
+	is_vcf = is_possible_path && grepl(".vcf(.bgz|.gz){0,}\$", jpath)
+	
+	if (is_existent_path && is_rds) {
+		ra.all = readRDS(jpath)
+	} else if (is_existent_path && is_vcf) {
+		ra.all = gGnome:::read.juncs(jpath)
+	} else if (!is_existent_path) {
+		stop("jpath does not exist or is invalid path: ", jpath)
+	}
+
+	is_properly_formatted_grangeslist = (
+	    inherits(ra.all, "GRangesList")
+		&& (
+			all(S4Vectors::elementNROWS(ra.all) == 2)
+			|| (NROW(ra.all) == 0)
+		)
+	)
+
+	if (!is_properly_formatted_grangeslist) {
+		stop("Improperly formatted junctions")
+	}
+
+    # Important part is below
+    mcols_ra.all = mcols(ra.all)
+    mcols_ra.all[["${tfield}"]] = rep_len(2, NROW(mcols_ra.all))
+    ix = unique(mcols(grl.unlist(ra.all) %&% heme_gen)[["grl.ix"]])
+
+    if (NROW(ix)) {
+      cat("Whitelisted junctions overlapped with provided junctions. Retiering...\n")
+      mcols_ra.all[["${tfield}"]][ix] = 1
+      mcols(ra.all) = mcols_ra.all
+
+      # Output the path of the saved file
+      cat("Retiered junctions saved to:", jpath_tiered, "\n")
+    } else {
+      cat("No whitelisted junctions overlapped with provided junctions.\n")
+    }
+
+    # Define the path to the raw junctions file
+    jpath = "${junctions_raw}"
+
+    # Read the VCF / RDS file
+	is_character = is.character(jpath)
+	is_len_one = NROW(jpath) == 1
+	is_na = is_len_one && (is.na(jpath) || jpath %in% c("NA", base::nullfile()))
+	is_possible_path = is_character && is_len_one && !is_na
+  	is_existent_path = is_possible_path && file.exists(jpath)
+  	is_rds = is_possible_path && grepl(".rds\$", jpath)
+	is_vcf = is_possible_path && grepl(".vcf(.bgz|.gz){0,}\$", jpath)
+	
+	if (is_existent_path && is_rds) {
+		ra.raw = readRDS(jpath)
+	} else if (is_existent_path && is_vcf) {
+		ra.raw = gGnome:::read.juncs(jpath)
+	} else if (!is_existent_path) {
+		stop("junctions file does not exist or is invalid path: ", jpath)
+	}
+
+	is_properly_formatted_grangeslist = (
+	    inherits(ra.raw, "GRangesList")
+		&& (
+			all(S4Vectors::elementNROWS(ra.raw) == 2)
+			|| (NROW(ra.raw) == 0)
+		)
+	)
+
+	if (!is_properly_formatted_grangeslist) {
+		stop("Improperly formatted junctions")
+	}
+
+    ra.raw.reciprocals = gGnome::get_reciprocal_pairs(ra.raw)
+
+    num_reciprocals_rescue = NROW(ra.raw.reciprocals)
+    is_reciprocal_present = num_reciprocals_rescue > 0
+
+    ix_raw = unique(mcols(grl.unlist(ra.raw.reciprocals) %&% heme_gen)[["grl.ix"]])
+    if (NROW(ix_raw) > 0) {
+        ra.raw.reciprocals = ra.raw.reciprocals[ix_raw]
+        mcols_ra.raw = mcols(ra.raw.reciprocals)
+        mcols_ra.raw[["${tfield}"]] = 1
+        mcols(ra.raw.reciprocals) = mcols_ra.raw
+        ra.all = gUtils::gr.fix(ra.all, ra.raw.reciprocals)
+        ra.raw.reciprocals = gUtils::gr.fix(ra.raw.reciprocals, ra.all)
+    }
+
+    ra.out = c(
+        ra.all,
+        ra.raw.reciprocals
+    )
+
+    is_ra_duplicated = gGnome::fra.duplicated(ra.out, pad = 1000)
+    ra.out = ra.out[!is_ra_duplicated]
+
+    saveRDS(ra.out, jpath_tiered)
+    """
+    stub:
+
+    prefix = task.ext.prefix ?: "${meta.id}"
+    def VERSION = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
+
+    """
+    touch ___tiered.rds
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        Retier Junctions: ${VERSION}
+    END_VERSIONS
+    """
+}
