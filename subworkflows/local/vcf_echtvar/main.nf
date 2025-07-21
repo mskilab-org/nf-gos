@@ -5,7 +5,7 @@
 include { ECHTVAR_ANNO } from '../../../modules/local/echtvar/main.nf'
 include { DECOMPOSE_VCF } from '../../../modules/local/echtvar/main.nf'
 
-echtvar_database = WorkflowNfcasereports.create_file_channel(params.echtvar_database)
+echtvar_database = WorkflowNfcasereports.create_file_channel(params.echtvar_dbnsfp) // use dbnsfp database
 fasta = WorkflowNfcasereports.create_file_channel(params.fasta)
 
 workflow VCF_ECHTVAR {
@@ -19,13 +19,13 @@ workflow VCF_ECHTVAR {
 
     versions        = Channel.empty()
 
-    // decompose VCF first
-    DECOMPOSE_VCF(
-        input,
-        fasta
-    )
+    // decompose VCF first (generally not needed)
+    // DECOMPOSE_VCF(
+    //     input,
+    //     fasta
+    // )
 
-    echtvar_input = DECOMPOSE_VCF.out.vcf // [meta, vcf]
+    echtvar_input = input.map { meta, vcf, tbi -> [ meta, vcf ] }
 
     ECHTVAR_ANNO(
         echtvar_input,

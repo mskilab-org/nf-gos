@@ -77,6 +77,9 @@ def toolParamMap = [
     "snpeff"     : [
         params.snpeff_cache
     ],
+    "echtvar"  : [
+        params.echtvar_dbnsfp
+    ],
     "sage"       : [
         params.ensembl_data_dir,
         params.somatic_hotspots,
@@ -288,6 +291,8 @@ inputs = ch_from_samplesheet.map {
     variant_somatic_bcf,
     variant_germline_ann,
     variant_germline_bcf,
+    echtvar_variant_somatic_bcf,
+    echtvar_variant_germline_bcf,
     snv_multiplicity,
     oncokb_maf,
     oncokb_fusions,
@@ -347,6 +352,8 @@ inputs = ch_from_samplesheet.map {
         variant_somatic_bcf: variant_somatic_bcf,
         variant_germline_ann: variant_germline_ann,
         variant_germline_bcf: variant_germline_bcf,
+        echtvar_variant_somatic_bcf: echtvar_variant_somatic_bcf,
+        echtvar_variant_germline_bcf: echtvar_variant_germline_bcf,
         snv_multiplicity: snv_multiplicity,
         oncokb_maf: oncokb_maf,
         oncokb_fusions: oncokb_fusions,
@@ -460,6 +467,8 @@ requiredFields = [
     'variant_somatic_bcf',
     'variant_germline_ann',
     'variant_germline_bcf',
+    'echtvar_variant_somatic_bcf',
+    'echtvar_variant_germline_bcf',
     'snv_multiplicity',
     'oncokb_maf',
     'oncokb_fusions',
@@ -475,26 +484,26 @@ requiredFields = [
 
 tool_input_output_map = [
     "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
-	"collect_wgs_metrics": [ 
-		inputs: ['bam'], 
-		outputs: ['qc_coverage_metrics'] 
+	"collect_wgs_metrics": [
+		inputs: ['bam'],
+		outputs: ['qc_coverage_metrics']
 	],
-	"collect_multiple_metrics": [ 
-		inputs: ['bam'], 
+	"collect_multiple_metrics": [
+		inputs: ['bam'],
 		outputs: [
 			['qc_alignment_summary'],
 			['qc_insert_size']
-		] 
+		]
 	],
 	"estimate_library_complexity": [ inputs: ['bam'], outputs: ['qc_dup_rate'] ],
     // "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics', "estimate_library_complexity"] ],
 	"postprocessing": [ inputs: ['bam'], outputs: [] ], // FIXME: Postprocessing will never be selected as a tool given the current set of inputs/outputs, empty output means tool will not be selected. postprocessing tool must be controlled by params.is_run_post_processing.
     "msisensorpro": [ inputs: ['bam'], outputs: [
-		'msi' 
+		'msi'
 		// 'msi_germline'
-		] 
+		]
 	],
-	// TODO: figure out what the best way to 
+	// TODO: figure out what the best way to
     // "gridss": [ inputs: ['bam'], outputs: ['vcf_unfiltered'] ],
 	// "junctionfilter": [ inputs: ['vcf_unfiltered'], outputs: ['vcf'] ],
 	// "retiered_filtered_junctions": [ inputs: ['vcf'], outputs: ['sv_retier'] ], // ?
@@ -506,12 +515,12 @@ tool_input_output_map = [
     "sage": [ inputs: ['bam'], outputs: ['snv_somatic_vcf', 'snv_germline_vcf'] ],
     "cobalt": [ inputs: ['bam'], outputs: ['cobalt_dir'] ],
     "purple": [ inputs: ['cobalt_dir', 'amber_dir'], outputs: ['purity', 'ploidy'] ],
-	// "jabba": [ 
-	// 	inputs: [ 
-	// 		['vcf', 'sv_retier'], 
+	// "jabba": [
+	// 	inputs: [
+	// 		['vcf', 'sv_retier'],
 	// 		['hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg']
-	// 	], 
-	// 	outputs: ['jabba_rds', 'jabba_gg'] 
+	// 	],
+	// 	outputs: ['jabba_rds', 'jabba_gg']
 	// ],
     "jabba": [ inputs: [ 'vcf', 'hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
     "non_integer_balance": [ inputs: ['jabba_gg'], outputs: ['ni_balanced_gg'] ],
@@ -519,6 +528,7 @@ tool_input_output_map = [
     "events": [ inputs: ['ni_balanced_gg'], outputs: ['events'] ],
     "fusions": [ inputs: ['ni_balanced_gg'], outputs: ['fusions'] ],
     "snpeff": [ inputs: ['snv_somatic_vcf'], outputs: ['variant_somatic_ann', 'variant_somatic_bcf'] ],
+    "echtvar": [ inputs: ['snv_somatic_vcf'], outputs: ['echtvar_variant_somatic_bcf'] ],
     "snv_multiplicity": [ inputs: ['jabba_gg', 'variant_somatic_ann'], outputs: ['snv_multiplicity'] ],
     "oncokb": [ inputs: ['variant_somatic_ann', 'snv_multiplicity', 'jabba_gg', 'fusions'], outputs: ['oncokb_maf', 'oncokb_fusions', 'oncokb_cna'] ],
     "signatures": [ inputs: ['variant_somatic_ann'], outputs: ['sbs_signatures', 'indel_signatures', 'signatures_matrix'] ],
@@ -555,7 +565,7 @@ def samplesheetToList(String filePath) {
                 rowMap[field] = null
             }
         }
-		
+
 
         sampleList.add(rowMap)
     }
@@ -602,7 +612,7 @@ tool_input_output_map.each { tool, io ->
 		def inputsRequired = io.inputs
 		def inputsPresent = inputsRequired.every { available_inputs.contains(it) }
 		def outputsNeeded = io.outputs.any { missing_outputs.contains(it) }
-		
+
 		// special cases
 		def is_sage_tumor_only = tool == "sage" && params.tumor_only
 		def is_current_tool_qc = tools_qc.contains(tool)
@@ -612,14 +622,14 @@ tool_input_output_map.each { tool, io ->
 		def is_output_nested_list = io.outputs instanceof List && io.outputs.every { it instanceof List }
 		def is_output_generic_case = !is_sage_tumor_only && !is_current_tool_qc_multiple_metrics
 		def is_input_generic_case = !is_current_tool_jabba
-		
+
 		// Treat special cases
 		if (is_sage_tumor_only) {
 			outputsNeeded = missing_outputs.contains("snv_somatic_vcf")
 		}
 
 		if (is_current_tool_qc_multiple_metrics) {
-			def is_any_alignment_summary_absent = io.outputs[0].any { 
+			def is_any_alignment_summary_absent = io.outputs[0].any {
 				missing_outputs.contains(it)
 			}
 			def is_any_insert_size_absent = io.outputs[1].any {
@@ -634,38 +644,38 @@ tool_input_output_map.each { tool, io ->
 		}
 
 
-		
+
 
 		// selected_tools_map[tool] = inputs.filter { sample ->
 		// 	def is_all_input_col_present = false
 		// 	def is_any_output_col_empty = false
 
-		// 	is_all_input_col_present = io.inputs.every { field -> 
+		// 	is_all_input_col_present = io.inputs.every { field ->
 		// 		test_robust_presence(sample[field], test_file = false) // Tests if file exists and is nonzero file size
 		// 	}
 
 		// 	// if (is_input_generic_case) {
-		// 	// 	is_all_input_col_present = io.inputs.every { field -> 
+		// 	// 	is_all_input_col_present = io.inputs.every { field ->
 		// 	// 		! sample[field].isEmpty() // Tests if file exists and is nonzero file size
 		// 	// 	}
 		// 	// }
 		// 	// if (is_current_tool_jabba) {
-		// 	// 	is_any_sv_input_col_present = io.inputs[0].any { field -> 
+		// 	// 	is_any_sv_input_col_present = io.inputs[0].any { field ->
 		// 	// 		! sample[field].isEmpty() // Tests if file exists and is nonzero file size
 		// 	// 	}
-		// 	// 	is_all_remaining_input_col_present = io.inputs[1].every { field -> 
+		// 	// 	is_all_remaining_input_col_present = io.inputs[1].every { field ->
 		// 	// 		! sample[field].isEmpty() // Tests if file exists and is nonzero file size
 		// 	// 	}
 		// 	// 	is_all_input_col_present = is_any_sv_input_col_present && is_all_remaining_input_col_present
 		// 	// }
 
 
-			
+
 		// 	// Generic output case
 		// 	if (is_output_generic_case) {
 		// 		is_any_output_col_empty = io.outputs.any { field ->
 		// 			test_robust_absence(sample[field], test_file = false)
-		// 		}	
+		// 		}
 		// 	}
 
 
@@ -696,12 +706,12 @@ tool_input_output_map.each { tool, io ->
 		// 		is_any_output_col_empty = is_any_alignment_summary_absent || is_any_insert_size_absent
 		// 	}
 		// 	// End Treat special cases
-			
+
 		// 	return is_any_output_col_empty && is_all_input_col_present
 		// 	// return [tool, is_any_output_col_empty && is_all_input_col_present, sample]
 		// }
-		
-		
+
+
 	}
 }
 
@@ -882,6 +892,10 @@ include { BAM_SAGE_TUMOR_ONLY_FILTER } from '../subworkflows/local/bam_sage/main
 // SNPEFF
 include { VCF_SNPEFF as VCF_SNPEFF_SOMATIC } from '../subworkflows/local/vcf_snpeff/main'
 include { VCF_SNPEFF as VCF_SNPEFF_GERMLINE } from '../subworkflows/local/vcf_snpeff/main'
+
+// ECHTVAR
+include { VCF_ECHTVAR as VCF_ECHTVAR_SOMATIC } from '../subworkflows/local/vcf_echtvar/main'
+include { VCF_ECHTVAR as VCF_ECHTVAR_GERMLINE } from '../subworkflows/local/vcf_echtvar/main'
 
 // COBALT
 include { BAM_COBALT } from '../subworkflows/local/bam_cobalt/main'
@@ -1869,6 +1883,43 @@ workflow NFCASEREPORTS {
         }
     }
 
+    if (tools_used.contains("all") || tools_used.contains("echtvar")) {
+        variant_somatic_ann_inputs = inputs_unlaned
+            .filter { it.echtvar_variant_somatic_bcf.isEmpty() }
+            .map { it -> [it.meta.patient, it.meta + [id: it.meta.sample ]] }.distinct()
+
+        variant_ann_input_somatic = variant_somatic_ann_inputs
+            .join(filtered_somatic_vcf_for_merge)
+            .map { it -> [ it[1], it[2], it[3] ] } // meta, filtered (pass and tumor-only filter) snvs, tbi
+
+
+        echtvar_variant_somatic_bcf_existing_outputs = inputs_unlaned.map { it -> [it.meta, it.echtvar_variant_somatic_bcf] }.filter { !it[1].isEmpty() }
+
+        VCF_ECHTVAR_SOMATIC(variant_ann_input_somatic)
+
+        echtvar_snv_somatic_bcf_annotations = Channel.empty()
+            .mix(VCF_ECHTVAR_SOMATIC.out.echtvar_bcf)
+            .mix(echtvar_variant_somatic_bcf_existing_outputs)
+
+        if (!params.tumor_only) {
+            variant_germline_ann_inputs = inputs_unlaned
+                .filter { it.echtvar_variant_germline_bcf.isEmpty() }
+                .map { it -> [it.meta.patient, it.meta + [id: it.meta.sample ]] }
+
+            variant_ann_input_germline = variant_germline_ann_inputs
+                .join(germline_vcf_for_merge)
+                .map { it -> [ it[1], it[2], it[3] ] } // meta, germline snvs, tbi
+
+            echtvar_variant_germline_bcf_existing_outputs = inputs_unlaned.map { it -> [it.meta, it.echtvar_variant_germline_bcf] }.filter { !it[1].isEmpty() }
+
+            VCF_ECHTVAR_GERMLINE(variant_ann_input_germline)
+
+            echtvar_snv_germline_bcf_annotations = Channel.empty()
+                .mix(VCF_ECHTVAR_GERMLINE.out.echtvar_bcf)
+                .mix(variant_germline_bcf_existing_outputs)
+        }
+    }
+
     // COBALT
     // ##############################
     if (tools_used.contains("all") || tools_used.contains("cobalt")) {
@@ -2309,9 +2360,9 @@ workflow NFCASEREPORTS {
 
     }
 
-	
+
 	SIGNATURES_STEP(
-		inputs_unlaned, 
+		inputs_unlaned,
 		snv_somatic_annotations_for_merge, // meta.patient, annotated somatic snv vcf
 		tools_used
 	)
