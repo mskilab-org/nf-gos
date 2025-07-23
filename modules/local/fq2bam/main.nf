@@ -1,7 +1,7 @@
 process PARABRICKS_FQ2BAM {
     tag "$meta.id"
 
-    container "nvcr.io/nvidia/clara/clara-parabricks:4.5.0-1"
+    container "nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1"
     containerOptions "${ workflow.containerEngine == "singularity" ? '--nv': ( workflow.containerEngine == "docker" ? '--gpus all': null ) }"
 
     input:
@@ -58,12 +58,13 @@ process PARABRICKS_FQ2BAM {
     def mark_duplicates_output = mark_duplicates ? "--out-duplicate-metrics ${prefix}___duplicate-metrics.txt" : ""
     def optical_duplicate_pixel_distance_command = optical_duplicate_pixel_distance && mark_duplicates ? "--optical-duplicate-pixel-distance $optical_duplicate_pixel_distance" : ""
     def qc_metrics_output = "--out-qc-metrics-dir ${prefix}___qc_metrics"
-    def mem_limit = (task.memory.toGiga() * 0.4).toInteger() // Calculation is necessary for slurm to keep well under the requested memory limit
+    def mem_limit = (task.memory.toGiga() * 0.2).toInteger() // Calculation is necessary for slurm to keep well under the requested memory limit
     // def low_memory_command = low_memory ? "--low-memory" : ""
-    def low_memory_command = task.low_memory_command ?: ""
-    def bwa_queue_capacity = task.normalized_queue_capacity ?: 10
+    def low_memory_command = params.low_memory_command ?: ""
+    def bwa_queue_capacity = params.normalized_queue_capacity ?: 10
     bwa_queue_capacity = (bwa_queue_capacity / task.accelerator.request).toInteger()
     def num_cpus = (task.cpus / task.accelerator.request).toInteger()
+    def bwa_streams_val = params.bwa_streams ?: 2
 
     known_sites.eachWithIndex { site, idx ->
         def tbi_file = known_sites_tbi[idx]
@@ -88,10 +89,10 @@ process PARABRICKS_FQ2BAM {
         $qc_metrics_output \\
         --num-gpus $task.accelerator.request \\
         --memory-limit $mem_limit \\
-        `#--num-cpu-threads-per-stage $task.cpus` \\
-        --bwa-cpu-thread-pool $num_cpus `# this is for fq2bamfast` \\
-        --bwa-nstreams $task.bwa_streams `# this is for fq2bamfast` \\
-        --bwa-normalized-queue-capacity $bwa_queue_capacity `# this is for fq2bamfast` \\
+        --num-cpu-threads-per-stage $num_cpus \\
+        `#--bwa-cpu-thread-pool $num_cpus` `# this is for fq2bamfast` \\
+        `#--bwa-nstreams $bwa_streams_val` `# this is for fq2bamfast` \\
+        `#--bwa-normalized-queue-capacity $bwa_queue_capacity` `# this is for fq2bamfast` \\
         --verbose \\
         $low_memory_command \\
         $args

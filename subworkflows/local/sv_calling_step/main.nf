@@ -44,6 +44,10 @@ workflow SV_CALLING_STEP {
 
     def total_jobnodes = 4
 
+    // gridss_existing_outputs = inputs_unlaned.map {
+    //         it -> [it.meta, it.vcf, it.vcf_tbi] }
+    //         .filter { !it[1].isEmpty() && !it[2].isEmpty() }
+    
     gridss_existing_outputs = inputs_unlaned.map {
             it -> [it.meta, it.vcf, it.vcf_tbi] }
             .filter { !it[1].isEmpty() && !it[2].isEmpty() }
@@ -64,8 +68,8 @@ workflow SV_CALLING_STEP {
         
 
         // Filter out bams for which SV calling has already been done
-
-        bam_sv_inputs = inputs_unlaned.filter { it.vcf.isEmpty() }.map { it -> [it.meta.sample] }.distinct()
+        // FIXME: vcf to vcf_raw
+        bam_sv_inputs = inputs_unlaned.filter { it.vcf_raw.isEmpty() }.map { it -> [it.meta.sample] }.distinct()
         bam_sv_calling = alignment_bams_final // meta.sample, meta, bam, bai
             .join(bam_sv_inputs) // 
             .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
@@ -269,12 +273,22 @@ workflow SV_CALLING_STEP {
             
             GRIDSS_CALL(call_input, fasta, fasta_fai, bwa_index, blacklist_gridss)
 
-            vcf_from_gridss_gridss = vcf_from_gridss_gridss
-                .mix(GRIDSS_CALL.out.filtered_vcf)
+            vcf_from_gridss_gridss = GRIDSS_CALL.out.filtered_vcf
                 .mix(gridss_existing_outputs)
             
-            vcf_raw_from_gridss_gridss = vcf_raw_from_gridss_gridss
-                .mix(GRIDSS_CALL.out.vcf)
+            raw_vcf = GRIDSS_CALL.out.vcf
+            raw_vcf = raw_vcf
+                .map { meta, vcf_list, tbi_list ->
+                    def i_v = vcf_list.findIndexOf { it.name.contains('gridss.vcf.gz') } 
+                    def i_t = tbi_list.findIndexOf { it.name.contains('gridss.vcf.gz.tbi') } 
+
+                    def vcf = vcf_list[i_v]
+                    def tbi = tbi_list[i_t]
+                    [ meta, vcf, tbi ]
+                }
+                .view {"raw vcf: $it"}
+            
+            vcf_raw_from_gridss_gridss = raw_vcf
                 .mix(gridss_raw_existing_outputs)
         } else {
 
@@ -319,12 +333,10 @@ workflow SV_CALLING_STEP {
                 bam_sv_calling_pair,
                 bwa_index
             )
-            vcf_from_gridss_gridss = vcf_from_gridss_gridss
-                .mix(BAM_SVCALLING_GRIDSS.out.vcf)
+            vcf_from_gridss_gridss = BAM_SVCALLING_GRIDSS.out.vcf
                 .mix(gridss_existing_outputs)
 
-            vcf_raw_from_gridss_gridss = vcf_raw_from_gridss_gridss
-                .mix(BAM_SVCALLING_GRIDSS.out.vcf)
+            vcf_raw_from_gridss_gridss = BAM_SVCALLING_GRIDSS.out.vcf
                 .mix(gridss_raw_existing_outputs)
 
         }

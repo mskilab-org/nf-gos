@@ -1,3 +1,5 @@
+import Utils // Not necessary but included for clarity
+
 //
 // AMBER
 //
@@ -19,15 +21,35 @@ if (params.target_bed_amber != null) {
 
 workflow BAM_AMBER {
     take:
-    input // [meta, tbam, tbai, nbam, nbai]
+    tuple_input_to_amber // [meta, tbam, tbai, nbam, nbai]
+    inputs_unlaned // samplesheet input
 
     main:
     amber_dir = Channel.empty()
     sites = Channel.empty()
     versions = Channel.empty()
 
+    // This is a paired or tumor-only workflow, so outputs should be tied to the tumor sample,
+    // or at the patient level.
+
+    amber_existing_outputs_without_hets = inputs_unlaned
+        .filter { 
+            it.hets.isEmpty() &&
+            ! it.amber_dir.isEmpty() &&
+            it.meta.status.toString() == "1" 
+        }
+        .map { [ it.meta + [tumor_id: it.meta.sample ], it.amber_dir ] }
+        .distinct()
+        
+
+    // amber_existing_outputs_without_hets = inputs_unlaned
+    //     .filter { it.hets.isEmpty() && ! it.amber_dir.isEmpty() && it.status.toString() == "1" }
+    //     .map { [ it.meta, it.amber_dir ] }
+    //     .distinct()
+    //     .view { "amber_existing_outputs_without_hets: ${it}" }
+
     AMBER(
-        input,
+        tuple_input_to_amber,
         genome_ver,
         het_sites,
         target_bed_input // [meta, target_bed]
@@ -36,7 +58,11 @@ workflow BAM_AMBER {
     amber_dir = amber_dir.mix(AMBER.out.amber_dir)
     versions = versions.mix(AMBER.out.versions)
 
-    MAKE_HET_SITES(amber_dir)
+    amber_dir_inputs_for_hets = amber_dir
+        .mix(amber_existing_outputs_without_hets)
+        .view { "amber_dir_inputs_for_hets: ${it}" }
+
+    MAKE_HET_SITES(amber_dir_inputs_for_hets)
     sites = sites.mix(MAKE_HET_SITES.out.sites)
 
     emit:

@@ -608,8 +608,6 @@ def missing_outputs = requiredFields.findAll { field ->
     sampleList.any { sample ->
         def value = sample[field]
         // !value || (value instanceof Collection && value.empty) || value.toString() == ""
-
-        def stringempty = (value == "")
         def truthy_val = (
             (!value) ||
             (value == null) || 
@@ -1438,6 +1436,7 @@ workflow NFCASEREPORTS {
     // ##############################
     if (tools_used.contains("all") || tools_used.contains("amber")) {
         bam_amber_inputs = inputs_unlaned.filter { it.hets.isEmpty() && it.amber_dir.isEmpty() }.map { it -> [it.meta.sample] }.distinct()
+
         bam_amber_calling = alignment_bams_final
             .join(bam_amber_inputs)
             .map{ it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
@@ -1449,7 +1448,7 @@ workflow NFCASEREPORTS {
             .branch{
                 normal: it[0].status == 0
                 tumor:  it[0].status == 1
-            }
+            }.tumor
 
         amber_existing_outputs_amber_dirs = inputs_unlaned
             .map { it -> [it.meta, it.amber_dir] }
@@ -1457,7 +1456,7 @@ workflow NFCASEREPORTS {
             .branch{
                 normal: it[0].status == 0
                 tumor:  it[0].status == 1
-            }
+            }.tumor
 
         // getting the tumor and normal cram files separated
         bam_amber_status = bam_amber_calling.branch{
@@ -1489,7 +1488,7 @@ workflow NFCASEREPORTS {
         }
 
 
-        BAM_AMBER(bam_amber_pair)
+        BAM_AMBER(bam_amber_pair, inputs_unlaned)
         versions = versions.mix(BAM_AMBER.out.versions)
 
 		// FIXME: Something is wrong with this when it's instantiated.
@@ -1499,6 +1498,7 @@ workflow NFCASEREPORTS {
 
         amber_dir_for_merge = amber_dir
             .map { it -> [ it[0].patient, it[1] ] } // meta.patient, amber_dir
+            .distinct()
 
         sites_from_het_pileups_wgs = Channel.empty()
             .mix(BAM_AMBER.out.sites)
@@ -1506,6 +1506,7 @@ workflow NFCASEREPORTS {
 
         hets_sites_for_merge = sites_from_het_pileups_wgs
             .map { it -> [ it[0].patient, it[1] ] } // meta.patient, hets
+            .distinct()
     }
 
     // FRAGCOUNTER
@@ -1796,7 +1797,7 @@ workflow NFCASEREPORTS {
                             .map { [it[0].patient, it[1], it[2]]  } // meta.patient, vcf, tbi
                     )
                     .map { it[1..-1] } // meta, sage vcf, sage tbi, tumoronly vcf, tumoronly tbi
-                    .view { "heme_rescue_input: $it" }
+                    // .view { "heme_rescue_input: $it" }
 
                 RESCUE_CH_HEME_STEP(
                     heme_rescue_input
@@ -2072,7 +2073,7 @@ workflow NFCASEREPORTS {
 				.join(untiered_junctions_for_merge)
                 .join(vcf_raw_from_gridss_gridss_for_merge)
 				.map { it -> [ it[1], it[2], it[3] ] } // meta, (vcf or rds), vcf_raw
-                .view{ "MERGE_STEP: $it"}
+                // .view{ "MERGE_STEP: $it"}
 
 			RETIER_JUNCTIONS(untiered_junctions_input)
 			retiered_junctions_output_for_merge = Channel.empty()

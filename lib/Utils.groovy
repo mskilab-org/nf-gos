@@ -49,4 +49,35 @@ class Utils {
         def new_meta = meta_map - meta_map.subMap(lane_keys) + [id: meta_map.sample]
         return new_meta
     }
+
+    // public static robustly_test_if_empty(value) {
+    //     def truthy_val = (
+    //         (!value) ||
+    //         (value == null) || 
+    //         (value instanceof Collection && value.empty) || 
+    //         (value instanceof String && value.replaceAll(/["']/, "").trim() == "") ||
+    //         (value instanceof File && value.isEmpty())
+    //     )
+    //     return truthy_val
+    // }
+    static boolean robustly_test_if_empty(value) {
+        if (!value) return true
+        if (value == null) return true
+        if (value instanceof Collection && value.empty) return true
+        if (value instanceof String && value.replaceAll(/["']/, "").trim() == "") return true
+
+        try {
+            def val = value.toList()
+            if (val.empty) return true
+        } catch (Exception ignored) {
+            def dummy = null
+        }
+
+        def f = new File(value.toString())
+        if (!f.exists()) return true
+        if (f.isFile() && f.length() == 0) return true
+        if (f.isDirectory() && f.list().length == 0) return true
+
+        return false
+    }
 }
