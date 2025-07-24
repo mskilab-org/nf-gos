@@ -26,8 +26,25 @@ workflow FASTQ_PARABRICKS_FQ2BAM {
     duplicate_metrics = Channel.empty()
     versions = Channel.empty()
 
+      // if normals are present for multiple patients, these need to be deduplicated by removing patient
+    deduped_reads = reads
+        .map { 
+            def meta = it[0]
+            [ meta - meta.subMap("patient") ] + it[1..-1].toList()
+        }
+        .distinct()
+        .view { "deduped_reads: ${it}" }
+    
+    patient_sample_map = reads
+        .map {
+            def meta = it[0]
+            [ meta.sample, meta ]
+        }
+        .distinct()
+        .view { "patient_sample_map: ${it}" }
+
     PARABRICKS_FQ2BAM(
-        reads,
+        deduped_reads,
         fasta,
         fasta_fai,
         intervals,
@@ -43,6 +60,31 @@ workflow FASTQ_PARABRICKS_FQ2BAM {
     qc = qc.mix(PARABRICKS_FQ2BAM.out.qc_metrics)
     bqsr_table = bqsr_table.mix(PARABRICKS_FQ2BAM.out.bqsr_table)
     duplicate_metrics = duplicate_metrics.mix(PARABRICKS_FQ2BAM.out.duplicate_metrics)
+
+    bam_to_cross = bam.map { meta, bam ->
+        [meta.sample, meta, bam] // meta here has no patient
+    }
+
+    bam = patient_sample_map
+        .cross(bam_to_cross)
+        .map { patient_map, baminfo -> 
+            def meta_complete = patient_map[1]
+            def bam = baminfo[2]
+            [ meta_complete, bam ]
+        }
+    
+    bam_to_cross = bam.map { meta, bam ->
+        [meta.sample, meta, bam] // meta here has no patient
+    }
+
+    bam = patient_sample_map
+        .cross(bam_to_cross)
+        .map { patient_map, baminfo -> 
+            def meta_complete = patient_map[1]
+            def bam = baminfo[2]
+            [ meta_complete, bam ]
+        }
+
 
     versions = versions.mix(PARABRICKS_FQ2BAM.out.versions)
 

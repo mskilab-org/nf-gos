@@ -145,7 +145,7 @@ workflow ALIGNMENT_STEP {
 		reads_for_alignment = reads_for_alignment
 			.map { meta, fastq_1, fastq_2, rg ->
 				// Ensure meta.sample exists and is used as grouping key
-				[meta.sample, [meta, fastq_1, fastq_2, rg]]
+				[meta.patient + "___sep___" + meta.sample, [meta, fastq_1, fastq_2, rg]]
 			}
 			.groupTuple()
 			.map { sample, items ->
@@ -156,7 +156,8 @@ workflow ALIGNMENT_STEP {
 				def rg_list = items.collect { it[3] }
 
 				// Use first meta as representative, add lanes info
-				def meta = metas[0] + [lanes: metas.size()]
+				// def meta = metas[0] + [lanes: metas.size()]
+                def meta = metas[0] + [lanes: metas[0].num_lanes]
 
 				// Return: meta, fastq_1s, fastq_2s, RGs
 				[meta, fastq_1s, fastq_2s, rg_list.flatten()]
@@ -171,6 +172,7 @@ workflow ALIGNMENT_STEP {
 				// out
 				[ meta + [ id:meta.sample ], fastq_1s, fastq_2s, rg ]
 			}
+            .view{ "grouped_reads_for_alignment: $it" }
 
         // GPU Alignment
         if (params.aligner == "fq2bam") {
