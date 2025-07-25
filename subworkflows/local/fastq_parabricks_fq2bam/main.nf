@@ -44,7 +44,7 @@ workflow FASTQ_PARABRICKS_FQ2BAM {
         .view { "patient_sample_map: ${it}" }
 
     PARABRICKS_FQ2BAM(
-        deduped_reads,
+        reads,
         fasta,
         fasta_fai,
         intervals,
