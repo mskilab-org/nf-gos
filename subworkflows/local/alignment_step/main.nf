@@ -67,18 +67,18 @@ workflow ALIGNMENT_STEP {
 	reports = Channel.empty()
 	versions = Channel.empty()
 
-	input_fastq = inputs.filter { it.bam.isEmpty() }.map { it -> [it.meta, it.fastq_1, it.fastq_2, it.meta.read_group] }
+	input_fastq = inputs.filter { it -> it.bam.isEmpty() }.map { it -> [it.meta, it.fastq_1, it.fastq_2, it.meta.read_group] }
 	
 	
 	input_fastq_qc = input_fastq.map { it -> [it[0], [it[1], it[2]]] }
 
 	alignment_bams_final = inputs
 		.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.bam, it.bai] }
-		.filter { ! it[1].isEmpty() }
+		.filter { it -> ! it[1].isEmpty() }
 		.map { it -> [it[0].sample, it[0], it[1], it[2]] }
-        .distinct()
+        .unique()
     
-    alignment_existing_outputs = inputs.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.bam] }.filter { !it[1].isEmpty() }.distinct()
+    alignment_existing_outputs = inputs.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.bam] }.filter { it -> !it[1].isEmpty() }.unique()
 
 	
 

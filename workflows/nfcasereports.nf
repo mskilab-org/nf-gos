@@ -1019,7 +1019,7 @@ alignment_bams_final = inputs_unlaned
     .map { it -> [it.meta, it.bam, it.bai] }
     .filter { ! it[1].isEmpty() }
     .map { it -> [it[0].sample, Utils.remove_lanes_from_meta(it[0]), it[1], it[2]] }
-	.distinct()
+	.unique()
 
 
 final_filtered_sv_rds_for_merge = inputs_unlaned
@@ -1031,19 +1031,19 @@ final_filtered_sv_rds_for_merge = inputs_unlaned
 		! is_vcf_or_rds_filesize_zero_or_nonexistent && is_rds }
     .map {
 		it -> [ it[0].patient, it[1] ] } // meta.patient, vcf_or_rds
-	.distinct()
+	.unique()
 
 vcf_from_sv_calling_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
     .filter { !it[1].isEmpty() && !it[2].isEmpty() }
     .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf_or_rds, tbi
-    .distinct()
+    .unique()
 
 unfiltered_som_sv_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.vcf, it.vcf_tbi] }
     .filter { !it[1].isEmpty() && !it[2].isEmpty() }
     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf_or_rds
-    .distinct()
+    .unique()
 
 tumor_frag_cov_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.frag_cov] }
@@ -1054,7 +1054,7 @@ tumor_frag_cov_for_merge = inputs_unlaned
     }
     .tumor
     .map { meta, frag_cov -> [ meta.sample, meta - meta.subMap('num_lanes', 'lane', 'id', 'read_group', 'size', 'tumor_id') + [id: meta.sample], frag_cov ] }
-	.distinct()
+	.unique()
 
 normal_frag_cov_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.frag_cov] }
@@ -1065,7 +1065,7 @@ normal_frag_cov_for_merge = inputs_unlaned
     }
     .normal
     .map { meta, frag_cov -> [ meta.sample, meta - meta.subMap('num_lanes', 'lane', 'id', 'read_group', 'size', 'tumor_id') + [id: meta.sample], frag_cov ] }
-	.distinct()
+	.unique()
 
 dryclean_tumor_cov_for_merge = inputs_unlaned
 	.map { it -> [it.meta, it.dryclean_cov] }
@@ -1076,7 +1076,7 @@ dryclean_tumor_cov_for_merge = inputs_unlaned
 	}
 	.tumor
 	.map { it -> [ it[0].patient, it[1] ] } // meta.patient, dryclean_cov
-	.distinct()
+	.unique()
 
 dryclean_normal_cov_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.dryclean_cov] }
@@ -1087,151 +1087,151 @@ dryclean_normal_cov_for_merge = inputs_unlaned
     }
     .normal
     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, dryclean_cov
-	.distinct()
+	.unique()
 
 amber_dir_for_merge = inputs_unlaned
 	.map { it -> [it.meta, it.amber_dir] }
 	.filter { !it[1].isEmpty() }
 	.map { it -> [ it[0].patient, it[1] ] } // meta.patient, amber_dir
-	.distinct()
+	.unique()
 
 hets_sites_for_merge = inputs_unlaned
 	.map { it -> [it.meta, it.hets] }
 	.filter { !it[1].isEmpty() }
 	.map { it -> [ it[0].patient, it[1] ] } // meta.patient, hets
-	.distinct()
+	.unique()
 
 cbs_seg_for_merge = inputs_unlaned
 	.map { it -> [it.meta, it.seg] }
 	.filter { !it[1].isEmpty() }
 	.map { it -> [ it[0].patient, it[1] ] } // meta.patient, cbs_seg
-	.distinct()
+	.unique()
 
 cbs_nseg_for_merge = inputs_unlaned
 	.map { it -> [it.meta, it.nseg] }
 	.filter { !it[1].isEmpty() }
 	.map { it -> [ it[0].patient, it[1] ] } // meta.patient, cbs_nseg
-	.distinct()
+	.unique()
 
 filtered_somatic_vcf_for_merge = inputs_unlaned
 	.map { it -> [it.meta, it.snv_somatic_vcf, it.snv_somatic_tbi] }
 	.filter { !it[1].isEmpty() && !it[2].isEmpty()}
 	.map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, filtered somatic snv vcf, tbi
-	.distinct()
+	.unique()
 
 germline_vcf_for_merge = inputs_unlaned
 	.map { it -> [it.meta, it.snv_germline_vcf, it.snv_germline_tbi] }
 	.filter { !it[1].isEmpty() && !it[2].isEmpty()}
 	.map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, germline snv vcf, tbi
-	.distinct()
+	.unique()
 
 snv_somatic_annotations_for_merge = inputs_unlaned
 	.map { it -> [it.meta, it.variant_somatic_ann] }
 	.filter { !it[1].isEmpty() }
 	.map { it -> [ it[0].patient, it[1] ] } // meta.patient, annotated somatic snv vcf
-	.distinct()
+	.unique()
 
 snv_germline_annotations_for_merge = inputs_unlaned
 	.map { it -> [it.meta, it.variant_somatic_bcf] }
 	.filter { !it[1].isEmpty() }
 	.map { it -> [ it[0].patient, it[1] ] } // meta.patient, annotated germline snv vcf
-	.distinct()
+	.unique()
 
 purity_for_merge = inputs_unlaned
 	.map { it -> [it.meta, it.purity] }
 	.filter { !it[1].isEmpty() }
 	.map { it -> [ it[0].patient, it[1] ] } // meta.patient, purity
-	.distinct()
+	.unique()
 
 ploidy_for_merge = inputs_unlaned
 	.map { it -> [it.meta, it.ploidy] }
 	.filter { !it[1].isEmpty() }
 	.map { it -> [ it[0].patient, it[1] ] } // meta.patient, ploidy
-	.distinct()
+	.unique()
 
 cbs_seg_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.seg] }
     .filter { !it[1].isEmpty() }
     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, cbs_seg
-	.distinct()
+	.unique()
 
 cbs_nseg_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.nseg] }
     .filter { !it[1].isEmpty() }
     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, cbs_nseg
-	.distinct()
+	.unique()
 
 filtered_somatic_vcf_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.snv_somatic_vcf, it.snv_somatic_tbi] }
     .filter { !it[1].isEmpty() && !it[2].isEmpty()}
     .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, filtered somatic snv vcf, tbi
-	.distinct()
+	.unique()
 
 germline_vcf_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.snv_germline_vcf, it.snv_germline_tbi] }
     .filter { !it[1].isEmpty() && !it[2].isEmpty()}
     .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, germline snv vcf, tbi
-	.distinct()
+	.unique()
 
 snv_germline_annotations_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.variant_somatic_bcf] }
     .filter { !it[1].isEmpty() }
     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, annotated germline snv vcf
-	.distinct()
+	.unique()
 
 cobalt_dir_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.cobalt_dir] }
     .filter { !it[1].isEmpty() }
     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, cobalt_dir
-	.distinct()
+	.unique()
 
 purity_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.purity] }
     .filter { !it[1].isEmpty() }
     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, purity
-	.distinct()
+	.unique()
 
 ploidy_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.ploidy] }
     .filter { !it[1].isEmpty() }
     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, ploidy
-	.distinct()
+	.unique()
 
 jabba_rds_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.jabba_rds] }
     .filter { !it[1].isEmpty() }
     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, jabba rds
-	.distinct()
+	.unique()
 
 jabba_gg_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.jabba_gg] }
     .filter { !it[1].isEmpty() }
     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, jabba.gg.rds
-	.distinct()
+	.unique()
 
 non_integer_balance_balanced_gg_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.ni_balanced_gg] }
     .filter { !it[1].isEmpty() }
     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, non integer balanced ggraph
-	.distinct()
+	.unique()
 
 events_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.events] }
     .filter { !it[1].isEmpty() }
     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, events
-	.distinct()
+	.unique()
 
 fusions_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.fusions] }
     .filter { !it[1].isEmpty() }
     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, fusions
-	.distinct()
+	.unique()
 
 snv_multiplicity_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.snv_multiplicity] }
     .filter { !it[1].isEmpty() }
     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, snv_multiplicity
-	.distinct()
+	.unique()
 
 
 workflow NFCASEREPORTS {
@@ -1334,7 +1334,7 @@ workflow NFCASEREPORTS {
     // ##############################
     if (tools_used.contains("all") || tools_used.contains("msisensorpro") && !params.tumor_only) {
 
-        bam_msi_inputs = inputs.filter { it.msi.isEmpty() }.map { it -> [it.meta.sample] }.distinct()
+        bam_msi_inputs = inputs.filter { it.msi.isEmpty() }.map { it -> [it.meta.sample] }.unique()
         bam_msi = alignment_bams_final
             .join(bam_msi_inputs)
             .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
@@ -1435,16 +1435,16 @@ workflow NFCASEREPORTS {
     // AMBER
     // ##############################
     if (tools_used.contains("all") || tools_used.contains("amber")) {
-        bam_amber_inputs = inputs_unlaned.filter { it.hets.isEmpty() && it.amber_dir.isEmpty() }.map { it -> [it.meta.sample] }.distinct()
+        bam_amber_inputs = inputs_unlaned.filter { it.hets.isEmpty() && it.amber_dir.isEmpty() }.map { it -> [it.meta.sample] }.unique()
 
         bam_amber_calling = alignment_bams_final
-            .join(bam_amber_inputs)
+            .combine(bam_amber_inputs, by: 0) // .join(bam_amber_inputs)
             .map{ it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
 
         amber_existing_outputs_hets = inputs_unlaned
             .map { it -> [it.meta, it.hets] }
             .filter { !it[1].isEmpty() }
-            .distinct()
+            .unique()
             .branch{
                 normal: it[0].status == 0
                 tumor:  it[0].status == 1
@@ -1498,7 +1498,6 @@ workflow NFCASEREPORTS {
 
         amber_dir_for_merge = amber_dir
             .map { it -> [ it[0].patient, it[1] ] } // meta.patient, amber_dir
-            .distinct()
 
         sites_from_het_pileups_wgs = Channel.empty()
             .mix(BAM_AMBER.out.sites)
@@ -1506,14 +1505,13 @@ workflow NFCASEREPORTS {
 
         hets_sites_for_merge = sites_from_het_pileups_wgs
             .map { it -> [ it[0].patient, it[1] ] } // meta.patient, hets
-            .distinct()
     }
 
     // FRAGCOUNTER
     // ##############################
 
     if (tools_used.contains("all") || tools_used.contains("fragcounter")) {
-        bam_fragcounter_inputs = inputs_unlaned.filter { it.frag_cov.isEmpty() }.map { it -> [it.meta.sample] }.distinct()
+        bam_fragcounter_inputs = inputs_unlaned.filter { it.frag_cov.isEmpty() }.map { it -> [it.meta.sample] }.unique()
         bam_fragcounter_calling = alignment_bams_final
             .join(bam_fragcounter_inputs)
             .map{ it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
@@ -1521,7 +1519,7 @@ workflow NFCASEREPORTS {
         fragcounter_existing_outputs = inputs_unlaned
             .map { it -> [it.meta , it.frag_cov] }
             .filter { !it[1].isEmpty() }
-            .distinct()
+            .unique()
             .branch{
                 normal: it[0].status == 0
                 tumor:  it[0].status == 1
@@ -1560,9 +1558,9 @@ workflow NFCASEREPORTS {
 
     if (tools_used.contains("all") || tools_used.contains("dryclean")) {
         cov_dryclean_inputs = inputs_unlaned
-            .filter { it.dryclean_cov.isEmpty() }
+            .filter { it -> it.dryclean_cov.isEmpty() }
             .map { it -> [it.meta.sample, it.meta] }
-            .distinct()
+            .unique()
             .branch{
                 normal: it[1].status == 0
                 tumor:  it[1].status == 1
@@ -1574,8 +1572,8 @@ workflow NFCASEREPORTS {
 
         dryclean_existing_outputs = inputs_unlaned
             .map { it -> [it.meta, it.dryclean_cov] }
-            .filter { !it[1].isEmpty() }
-            .distinct()
+            .filter { it -> !it[1].isEmpty() }
+            .unique()
             .branch{
                 normal: it[0].status == 0
                 tumor:  it[0].status == 1
@@ -1595,7 +1593,7 @@ workflow NFCASEREPORTS {
 
         if (!params.tumor_only) {
             cov_dryclean_normal_input = normal_frag_cov_for_merge
-                .join(cov_dryclean_inputs.normal)
+                .join(cov_dryclean_inputs.normal) // join will get rid of duplicates, so any normals matched to multiple tumors will be removed
                 .map{ it -> [ it[1], it[2] ] } // meta, frag_cov
 
             NORMAL_DRYCLEAN(cov_dryclean_normal_input)
@@ -1604,8 +1602,20 @@ workflow NFCASEREPORTS {
                 .mix(NORMAL_DRYCLEAN.out.dryclean_cov)
                 .mix(dryclean_existing_outputs.normal)
 
+            
+            sample_meta_map = inputs_unlaned.map { it -> [ it.meta.sample, it.meta ]}.unique()
+
+            // dryclean_normal_cov_for_merge = dryclean_normal_cov
+            //     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, dryclean_cov
+
             dryclean_normal_cov_for_merge = dryclean_normal_cov
-                .map { it -> [ it[0].patient, it[1] ] } // meta.patient, dryclean_cov
+                .map { it -> [ it[0].sample, it[1] ] } // meta.sample, dryclean_cov
+                .cross(sample_meta_map)
+                .map { dryclean_normal, sample_meta ->
+                    def meta_complete = sample_meta[1]
+                    [ meta_complete.patient, dryclean_normal[1] ]
+                }
+                .dump(tag: "dryclean_normal_cov_for_merge", pretty: true)
         }
     }
 
@@ -1679,29 +1689,27 @@ workflow NFCASEREPORTS {
         if (params.tumor_only) {
             bam_snv_inputs = inputs_unlaned
                 .filter { it.snv_somatic_vcf.isEmpty() }
-                .map { it -> [it.meta.sample] }.distinct()
+                .map { it -> [it.meta.sample] }.unique()
         } else {
             bam_snv_inputs = inputs_unlaned
                 .filter { it.snv_somatic_vcf.isEmpty() || it.snv_germline_vcf.isEmpty() }
-                .map { it -> [it.meta.sample] }.distinct()
+                .map { it -> [it.meta.sample] }.unique()
         }
 
         bam_snv_calling = alignment_bams_final
-            .join(bam_snv_inputs)
+            .combine(bam_snv_inputs, by: 0) // .join(bam_snv_inputs) // join will remove any duplicated normals (if more than one tumor corresponds to a normal)
             .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
-
-		// bam_snv_calling.view{ "bam_snv_calling: $it" }
 
         snv_somatic_existing_outputs = inputs_unlaned
             .map { it -> [it.meta, it.snv_somatic_vcf, it.snv_somatic_tbi] }
             .filter { !it[1].isEmpty() && !it[2].isEmpty()}
-            .distinct()
+            .unique()
 
         if (!params.tumor_only) {
             snv_germline_existing_outputs = inputs_unlaned
                 .map { it -> [it.meta, it.snv_germline_vcf, it.snv_germline_tbi] }
                 .filter { !it[1].isEmpty() && !it[2].isEmpty()}
-                .distinct()
+                .unique()
         }
 
         // getting the tumor and normal bams separated
@@ -1750,17 +1758,17 @@ workflow NFCASEREPORTS {
         
         filtered_somatic_vcf_tumoronly_outputs = inputs_unlaned
             .map { it -> [it.meta, it.snv_somatic_vcf_tumoronly_filtered, it.snv_somatic_vcf_tumoronly_filtered_tbi] }
-            .distinct()
+            .unique()
         
         tumor_only_filter_input = filtered_somatic_vcf_sage
-            .map{
+            .map{ it ->
                 [it[0].patient] + it.toList()
             }
             .join(
                 filtered_somatic_vcf_tumoronly_outputs
                     .filter { it -> it[1].isEmpty() }
                     .map { it -> [it[0].patient] }
-                    .distinct()
+                    .unique()
             )
             .map { it[1..-1] }
 
@@ -1820,7 +1828,7 @@ workflow NFCASEREPORTS {
     if (tools_used.contains("all") || tools_used.contains("snpeff")) {
         variant_somatic_ann_inputs = inputs_unlaned
             .filter { it.variant_somatic_ann.isEmpty() || it.variant_somatic_bcf.isEmpty() }
-            .map { it -> [it.meta.patient, it.meta + [id: it.meta.sample ]] }.distinct()
+            .map { it -> [it.meta.patient, it.meta + [id: it.meta.sample ]] }.unique()
 
         variant_ann_input_somatic = variant_somatic_ann_inputs
             .join(filtered_somatic_vcf_for_merge)
@@ -1858,6 +1866,7 @@ workflow NFCASEREPORTS {
             variant_germline_ann_existing_outputs = inputs_unlaned.map { it -> [it.meta, it.variant_germline_ann] }.filter { !it[1].isEmpty() }
             variant_germline_bcf_existing_outputs = inputs_unlaned.map { it -> [it.meta, it.variant_germline_bcf] }.filter { !it[1].isEmpty() }
 
+            // FIXME: Duplicated normals will be run multiple times if they correspond to different tumors.
             VCF_SNPEFF_GERMLINE(
                 variant_ann_input_germline,
                 snpeff_db_full,
@@ -1879,15 +1888,15 @@ workflow NFCASEREPORTS {
     // COBALT
     // ##############################
     if (tools_used.contains("all") || tools_used.contains("cobalt")) {
-        bam_cobalt_inputs = inputs_unlaned.filter { it.cobalt_dir.isEmpty() }.map { it -> [it.meta.sample] }.distinct()
+        bam_cobalt_inputs = inputs_unlaned.filter { it.cobalt_dir.isEmpty() }.map { it -> [it.meta.sample] }.unique()
         bam_cobalt_calling = alignment_bams_final
-            .join(bam_cobalt_inputs)
+            .combine(bam_cobalt_inputs, by: 0) // .join(bam_cobalt_inputs) // join will remove any duplicated normals (if more than one tumor corresponds to a normal)
             .map{ it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
 
         cobalt_existing_outputs_cobalt_dirs = inputs_unlaned
             .map { it -> [it.meta, it.cobalt_dir] }
             .filter { !it[1].isEmpty() }
-            .distinct()
+            .unique()
             .branch{
                 normal: it[0].status == 0
                 tumor:  it[0].status == 1
@@ -1944,7 +1953,7 @@ workflow NFCASEREPORTS {
         purple_inputs_for_merge = inputs_unlaned
 			.filter { it.ploidy.isEmpty() }
 			.map { it -> [it.meta.patient, Utils.remove_lanes_from_meta(it.meta) - it.meta.subMap('tumor_id')] }
-			.distinct()
+			.unique()
 
 		// purple_inputs_for_merge.view{ "purple_inputs_for_merge: $it" }
 
@@ -2021,8 +2030,8 @@ workflow NFCASEREPORTS {
             }
         }
 
-        purple_existing_outputs_ploidy = inputs.branch{it -> tumor: it.meta.status == 1}.tumor.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.ploidy] }.filter { !it[1].isEmpty() }.distinct()
-        purple_existing_outputs_purity = inputs.branch{it -> tumor: it.meta.status == 1}.tumor.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.purity] }.filter { !it[1].isEmpty() }.distinct()
+        purple_existing_outputs_ploidy = inputs.branch{it -> tumor: it.meta.status == 1}.tumor.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.ploidy] }.filter { it -> !it[1].isEmpty() }.unique()
+        purple_existing_outputs_purity = inputs.branch{it -> tumor: it.meta.status == 1}.tumor.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.purity] }.filter { it -> !it[1].isEmpty() }.unique()
 
         BAM_COV_PURPLE(
             purple_inputs
@@ -2048,7 +2057,7 @@ workflow NFCASEREPORTS {
     // ##############################
 
     if (tools_used.contains("all") || tools_used.contains("jabba")) {
-        jabba_inputs = inputs_unlaned.filter { (it.jabba_gg.isEmpty() || it.jabba_rds.isEmpty()) && it.meta.status == 1}.map { it -> [it.meta.patient, it.meta] }.distinct()
+        jabba_inputs = inputs_unlaned.filter { (it.jabba_gg.isEmpty() || it.jabba_rds.isEmpty()) && it.meta.status == 1}.map { it -> [it.meta.patient, it.meta] }.unique()
 
 		// Dev block to retier either vcf or filtered retiered junctions
 		is_final_filtered_sv_rds_for_merge_retiered = params.is_retier_whitelist_junctions && params.tumor_only
@@ -2345,7 +2354,7 @@ workflow NFCASEREPORTS {
     // SNV Multiplicity
     // ##############################
     if (tools_used.contains("all") || tools_used.contains("snv_multiplicity")) {
-        snv_multiplicity_inputs = inputs.filter { it.snv_multiplicity.isEmpty() }.map { it -> [it.meta.patient, it.meta - it.meta.subMap('num_lanes', 'lane', 'read_group', 'id', 'tumor_id') + [id: it.meta.sample, tumor_id: it.meta.sample]] }.distinct()
+        snv_multiplicity_inputs = inputs.filter { it.snv_multiplicity.isEmpty() }.map { it -> [it.meta.patient, it.meta - it.meta.subMap('num_lanes', 'lane', 'read_group', 'id', 'tumor_id') + [id: it.meta.sample, tumor_id: it.meta.sample]] }.unique()
 
         snv_multiplicity_inputs_somatic_vcf = annotated_vcf_ffpe_impact_or_snpeff_for_merge
             .join(snv_multiplicity_inputs)

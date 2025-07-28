@@ -28,11 +28,19 @@ workflow BAM_MERGE_INDEX_SAMTOOLS {
     // Mix intervals and no_intervals channels together
     bam_all = MERGE_BAM.out.bam.mix(bam_to_merge.single)
 
+    bam_index_input = bam_all.unique { it -> it[0].sample }
+
     // Index bam
-    INDEX_MERGE_BAM(bam_all)
+    INDEX_MERGE_BAM(bam_index_input)
 
     // Join with the bai file
-    bam_bai = bam_all.join(INDEX_MERGE_BAM.out.bai, failOnDuplicate: true, failOnMismatch: true)
+    // bam_bai = bam_all.join(INDEX_MERGE_BAM.out.bai, failOnDuplicate: true, failOnMismatch: true)
+    bai_combine = INDEX_MERGE_BAM.out.bai.map{ meta, bai -> [ meta.sample, bai ] }
+    bam_bai = bam_all
+        .map{ it -> [it[0].sample] + it.toList() }
+        .combine(bai_combine, by: 0)
+        .map{ it -> it[1..-1] }
+        .dump(tag: "bam_bai", pretty: true)
 
     // Gather versions of all tools used
     versions = versions.mix(INDEX_MERGE_BAM.out.versions)

@@ -30,6 +30,9 @@ workflow CRAM_MERGE_INDEX_SAMTOOLS {
     // Mix intervals and no_intervals channels together
     cram_all = MERGE_CRAM.out.cram.mix(cram_to_merge.single)
 
+    cram_all = cram_all.dump(tag: "cram_all", pretty:true).distinct { it -> it[0].sample }
+
+
     // Index cram
     INDEX_CRAM(cram_all)
 

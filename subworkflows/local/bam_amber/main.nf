@@ -33,19 +33,21 @@ workflow BAM_AMBER {
     // or at the patient level.
 
     amber_existing_outputs_without_hets = inputs_unlaned
-        .filter { 
+        .filter { it ->
             it.hets.isEmpty() &&
             ! it.amber_dir.isEmpty() &&
             it.meta.status.toString() == "1" 
         }
-        .map { [ it.meta + [tumor_id: it.meta.sample ], it.amber_dir ] }
-        .distinct()
+        .map { it ->
+            [ it.meta + [tumor_id: it.meta.sample ], it.amber_dir ] 
+        }
+        .unique()
         
 
     // amber_existing_outputs_without_hets = inputs_unlaned
     //     .filter { it.hets.isEmpty() && ! it.amber_dir.isEmpty() && it.status.toString() == "1" }
     //     .map { [ it.meta, it.amber_dir ] }
-    //     .distinct()
+    //     .unique()
     //     .view { "amber_existing_outputs_without_hets: ${it}" }
 
     AMBER(

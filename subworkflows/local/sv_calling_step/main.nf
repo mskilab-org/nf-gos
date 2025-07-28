@@ -39,8 +39,8 @@ workflow SV_CALLING_STEP {
             normal: it.meta.status.toString() == "0"
         }
 
-    def normal_ids = inputs_unlaned_split.normal.map { it.meta.patient }.distinct().collect().ifEmpty(["NO_NORMALS_PRESENT___MD7cicQBtB"]).view { "Normal IDs: $it" }
-    def tumor_ids = inputs_unlaned_split.tumor.map { it.meta.patient }.distinct().collect().view { "Tumor IDs: $it" }
+    def normal_ids = inputs_unlaned_split.normal.map { it.meta.patient }.unique().collect().ifEmpty(["NO_NORMALS_PRESENT___MD7cicQBtB"]).view { "Normal IDs: $it" }
+    def tumor_ids = inputs_unlaned_split.tumor.map { it.meta.patient }.unique().collect().view { "Tumor IDs: $it" }
 
     def total_jobnodes = 4
 
@@ -69,9 +69,9 @@ workflow SV_CALLING_STEP {
 
         // Filter out bams for which SV calling has already been done
         // FIXME: vcf to vcf_raw
-        bam_sv_inputs = inputs_unlaned.filter { it.vcf_raw.isEmpty() }.map { it -> [it.meta.sample] }.distinct()
+        bam_sv_inputs = inputs_unlaned.filter { it.vcf_raw.isEmpty() }.map { it -> [it.meta.sample] }.unique()
         bam_sv_calling = alignment_bams_final // meta.sample, meta, bam, bai
-            .join(bam_sv_inputs) // 
+            .combine(bam_sv_inputs, by: 0) // 
             .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
             .view { "BAM SV calling input: $it" }
 
@@ -83,16 +83,26 @@ workflow SV_CALLING_STEP {
         if (parallelize_gridss) {
 
             gridss_preprocess_tumor = GRIDSS_PREPROCESS_TUMOR(bam_sv_calling_status.tumor, fasta, fasta_fai, bwa_index, blacklist_gridss)
-            gridss_preprocess_normal = GRIDSS_PREPROCESS_NORMAL(bam_sv_calling_status.normal, fasta, fasta_fai, bwa_index, blacklist_gridss)
+            gridss_preprocess_normal = GRIDSS_PREPROCESS_NORMAL(bam_sv_calling_status.normal.unique { it -> it[0].sample }, fasta, fasta_fai, bwa_index, blacklist_gridss)
             
             gridss_preprocess_tumor_for_merge = gridss_preprocess_tumor.gridss_preprocess_dir
                 .map { meta, gridss_preprocess_dir ->
                     [ meta.patient, gridss_preprocess_dir ]
                 }
 
+            sample_meta_map = bam_sv_calling_status.normal
+                .map { it -> [ it[0].sample, it[0] ] }
+                .unique()
+
             gridss_preprocess_normal_for_merge = gridss_preprocess_normal.gridss_preprocess_dir
                 .map { meta, gridss_preprocess_dir ->
-                    [ meta.patient, gridss_preprocess_dir ]
+                    [ meta.sample, gridss_preprocess_dir ]
+                }
+                .cross(sample_meta_map)
+                .map { preproc_out, sample_meta ->
+                    def meta_complete = sample_meta[1]
+                    def gridss_preprocess_dir = preproc_out[1]
+                    [ meta_complete.patient, gridss_preprocess_dir ]
                 }
 
             mixed_ids = tumor_ids

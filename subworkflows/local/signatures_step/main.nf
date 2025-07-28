@@ -52,18 +52,18 @@ workflow SIGNATURES_STEP {
 
 
   filtered_ffpe_impact_somatic_vcf_inputs = inputs_tumor_status.tumor
-   	  .filter { it.ffpe_impact_filtered_vcf.isEmpty() }
+   	  .filter { it -> it.ffpe_impact_filtered_vcf.isEmpty() }
 	  .map { it -> [ it.meta.patient, it.meta ] } // patient, meta
 	  .join(snv_somatic_annotations_for_merge) // patient, annotated_somatic_vcf
-	  .distinct()
+	  .unique()
   
   filtered_ffpe_impact_existing_outputs = inputs_tumor_status.tumor
-   	  .filter { ! it.ffpe_impact_filtered_vcf.isEmpty() }
+   	  .filter { it -> ! it.ffpe_impact_filtered_vcf.isEmpty() }
 	  .map { it -> [ it.meta, it.ffpe_impact_filtered_vcf, it.ffpe_impact_filtered_vcf_tbi ] }
-	  .distinct()
+	  .unique()
 
   
-  inputs_tumors_meta_for_merge = inputs_tumor_status.tumor.map{ it -> [ it.meta.patient, it.meta + [id: it.meta.sample]] }.distinct()
+  inputs_tumors_meta_for_merge = inputs_tumor_status.tumor.map{ it -> [ it.meta.patient, it.meta + [id: it.meta.sample]] }.unique()
   
   annotated_vcf_ffpe_impact_or_snpeff_for_merge = snv_somatic_annotations_for_merge // meta.patient, annotated somatic snv vcf
 

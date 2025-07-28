@@ -36,20 +36,21 @@ workflow BAM_QC {
         collect_wgs_metrics_inputs = inputs
             .filter { it.qc_coverage_metrics.isEmpty() }
             .map { it -> [it.meta.sample] }
+            .unique()
         collect_wgs_metrics_bam = collect_wgs_metrics_inputs
             .join(bam)
             .map { id, meta, bam, bai -> [ meta, bam, bai ] }
-		
+		ucollect_wgs_metrics_bam = collect_wgs_metrics_bam.unique { it -> it[0].sample }
 		if (use_gpu) {
 			process_wgsmetrics = PARABRICKS_BAMMETRICS(
-				collect_wgs_metrics_bam,
+				ucollect_wgs_metrics_bam,
 				fasta.map{ it -> [ [ id:'fasta' ], it ] },
 				fai.map{ it -> [ [ id:'fai' ], it ] },
 				intervals_file
 			)
 		} else {
 			process_wgsmetrics = PICARD_COLLECTWGSMETRICS(
-				collect_wgs_metrics_bam,
+				ucollect_wgs_metrics_bam,
 				fasta.map{ it -> [ [ id:'fasta' ], it ] },
 				fai.map{ it -> [ [ id:'fai' ], it ] },
 				intervals_file
@@ -70,6 +71,7 @@ workflow BAM_QC {
         collect_multiple_metrics_inputs = inputs
             .filter { it.qc_alignment_summary.isEmpty() || it.qc_insert_size.isEmpty() }
             .map { it -> [it.meta.sample] }
+            .unique()
         collect_multiple_metrics_bam = collect_multiple_metrics_inputs
             .join(bam)
             .map { id, meta, bam, bai -> [ meta, bam, bai ] }
