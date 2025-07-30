@@ -26,7 +26,7 @@ workflow FASTQ_PARABRICKS_FQ2BAM {
     duplicate_metrics = Channel.empty()
     versions = Channel.empty()
 
-      // if normals are present for multiple patients, these need to be deduplicated by removing patient
+      // if normals are present for multiple patients, these need to be deduplicated
     deduped_reads = reads
         .map { it ->
             def meta = it[0]
