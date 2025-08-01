@@ -2,6 +2,7 @@
 // QC on BAM
 //
 
+include { CONPAIR } from "${workflow.projectDir}/modules/local/conpair/main"
 include { PICARD_COLLECTWGSMETRICS } from "${workflow.projectDir}/modules/nf-core/picard/collectwgsmetrics/main"
 include { PARABRICKS_BAMMETRICS } from "${workflow.projectDir}/modules/local/bammetrics/main"
 include { PICARD_COLLECTMULTIPLEMETRICS } from "${workflow.projectDir}/modules/nf-core/picard/collectmultiplemetrics/main"
@@ -136,8 +137,8 @@ workflow BAM_QC {
     //         normal: it.meta.status.toString() == "0"
     //     }
 
-    // def normal_ids = inputs_unlaned_split.normal.map { it.meta.patient }.unique().collect().ifEmpty(["NO_NORMALS_PRESENT___MD7cicQBtB"]).view { "Normal IDs: $it" }
-    // def tumor_ids = inputs_unlaned_split.tumor.map { it.meta.patient }.unique().collect().view { "Tumor IDs: $it" }
+    // def normal_ids = inputs_unlaned_split.normal.map { it.meta.patient }.unique().collect().ifEmpty(["NO_NORMALS_PRESENT___MD7cicQBtB"])
+    // def tumor_ids = inputs_unlaned_split.tumor.map { it.meta.patient }.unique().collect()
 
     // mixed_ids = tumor_ids
     //     .concat(normal_ids)
@@ -163,18 +164,20 @@ workflow BAM_QC {
     // conpair_inputs_to_combine = tumor_paired_ids // A Should be unique.. no dups.
     //     .cross(bam_key_patient) // B can have dups, according to nextflow docs. This will inner join but allow for dups. Essentially a filter by merge step
     //     .map { patient, bam ->
-    //         def meta = bam[1]
+    //         def meta_bam = bam[1]
     //         def bam_file = bam[2]
     //         def bai_file = bam[3]
-    //         [ patient, meta, bam_file, bai_file ]
-    //     }.branch { it ->
-    //         tumor: it.meta.status.toString() == "1"
-    //         normal: it.meta.status.toString() == "0"
-    //     }.dump(tag: "conpair_inputs_to_combine", pretty: true)
+    //         [ patient, meta_bam, bam_file, bai_file ]
+    //     }
+    //     .dump(tag: "conpair_inputs_to_combine", pretty: true)
+    //     .branch { it ->
+    //         tumor: it[1].status.toString() == "1"
+    //         normal: it[1].status.toString() == "0"
+    //     }
     
     // conpair_inputs = conpair_inputs_to_combine.tumor
     //     .combine(conpair_inputs_to_combine.normal, by: 0)
-    //     .map { patient_tumor, meta_tumor, bam_tumor, bai_tumor, patient_normal, meta_normal, bam_normal, bai_normal ->
+    //     .map { patient_tumor, meta_tumor, bam_tumor, bai_tumor, meta_normal, bam_normal, bai_normal ->
     //         meta_tumor = meta_tumor + [id: meta_tumor.patient]
     //         meta_tumor = meta_tumor - meta_tumor.subMap('read_group')
     //         [ meta_tumor, bam_tumor, bai_tumor, bam_normal, bai_normal ]

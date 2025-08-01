@@ -58,7 +58,8 @@ process PARABRICKS_FQ2BAM {
     def mark_duplicates_output = mark_duplicates ? "--out-duplicate-metrics ${prefix}___duplicate-metrics.txt" : ""
     def optical_duplicate_pixel_distance_command = optical_duplicate_pixel_distance && mark_duplicates ? "--optical-duplicate-pixel-distance $optical_duplicate_pixel_distance" : ""
     def qc_metrics_output = "--out-qc-metrics-dir ${prefix}___qc_metrics"
-    def mem_limit = (task.memory.toGiga() * 0.5).toInteger() // Calculation is necessary for slurm to keep well under the requested memory limit
+    // def mem_limit = (task.memory.toGiga() * 0.25).toInteger() // Calculation is necessary for slurm to keep well under the requested memory limit
+    def mem_limit = task.ext.mem_limit
     // def low_memory_command = low_memory ? "--low-memory" : ""
     def low_memory_command = task.ext.low_memory_command ?: ""
     def bwa_queue_capacity = task.ext.normalized_queue_capacity ?: 10
@@ -75,6 +76,9 @@ process PARABRICKS_FQ2BAM {
     }
 
     """
+    export TMPDIR=/tmp
+    tdir=\$(mktemp -d)
+
     pbrun \\
         fq2bam \\
         --ref $fasta \\
@@ -94,6 +98,7 @@ process PARABRICKS_FQ2BAM {
         `#--bwa-nstreams $bwa_streams_val` `# this is for fq2bamfast` \\
         `#--bwa-normalized-queue-capacity $bwa_queue_capacity` `# this is for fq2bamfast` \\
         --verbose \\
+        --tmp-dir \$tdir \\
         $low_memory_command \\
         $args
 

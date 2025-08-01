@@ -306,7 +306,7 @@ workflow SV_CALLING_STEP {
             
             if (params.tumor_only) {
                 // bam_sv_calling_status = bam_sv_calling.branch{
-                //     tumor:  it[0].status == 1
+                //     tumor:  it[0].status.toString() == "1"ring() == "1"
                 // }
 
                 // add empty arrays to stand-in for normals
@@ -314,8 +314,8 @@ workflow SV_CALLING_STEP {
             } else {
                 // getting the tumor and normal cram files separated
                 // bam_sv_calling_status = bam_sv_calling.branch{
-                //     normal: it[0].status == 0
-                //     tumor:  it[0].status == 1
+                //     normal: it[0].status.toString() == "0"
+                //     tumor:  it[0].status.toString() == "1"
                 // }
 
                 // All normal samples

@@ -1049,8 +1049,8 @@ tumor_frag_cov_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.frag_cov] }
     .filter { !it[1].isEmpty() }
     .branch{
-        normal: it[0].status == 0
-        tumor:  it[0].status == 1
+        normal: it[0].status.toString() == "0"
+        tumor:  it[0].status.toString() == "1"
     }
     .tumor
     .map { meta, frag_cov -> [ meta.sample, meta - meta.subMap('num_lanes', 'lane', 'id', 'read_group', 'size', 'tumor_id') + [id: meta.sample], frag_cov ] }
@@ -1060,8 +1060,8 @@ normal_frag_cov_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.frag_cov] }
     .filter { !it[1].isEmpty() }
     .branch{
-        normal: it[0].status == 0
-        tumor:  it[0].status == 1
+        normal: it[0].status.toString() == "0"
+        tumor:  it[0].status.toString() == "1"
     }
     .normal
     .map { meta, frag_cov -> [ meta.sample, meta - meta.subMap('num_lanes', 'lane', 'id', 'read_group', 'size', 'tumor_id') + [id: meta.sample], frag_cov ] }
@@ -1071,8 +1071,8 @@ dryclean_tumor_cov_for_merge = inputs_unlaned
 	.map { it -> [it.meta, it.dryclean_cov] }
 	.filter { !it[1].isEmpty() }
 	.branch{
-		normal: it[0].status == 0
-		tumor:  it[0].status == 1
+		normal: it[0].status.toString() == "0"
+		tumor:  it[0].status.toString() == "1"
 	}
 	.tumor
 	.map { it -> [ it[0].patient, it[1] ] } // meta.patient, dryclean_cov
@@ -1082,8 +1082,8 @@ dryclean_normal_cov_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.dryclean_cov] }
     .filter { !it[1].isEmpty() }
     .branch{
-        normal: it[0].status == 0
-        tumor:  it[0].status == 1
+        normal: it[0].status.toString() == "0"
+        tumor:  it[0].status.toString() == "1"
     }
     .normal
     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, dryclean_cov
@@ -1334,8 +1334,12 @@ workflow NFCASEREPORTS {
     // ##############################
     if (tools_used.contains("all") || tools_used.contains("msisensorpro") && !params.tumor_only) {
 
-        bam_msi_inputs = inputs.filter { it.msi.isEmpty() }.map { it -> [it.meta.sample] }.unique()
-        bam_msi = alignment_bams_final
+        bam_msi_inputs = inputs_unlaned.filter { it.msi.isEmpty() }.map { it -> [it.meta.sample + "___sep___" + it.meta.patient] }.unique()
+
+        bam_msi = alignment_bams_final // reduped to have all tumor/normal pairs (even if normals are reused/duped)
+            .map { sample, meta, bam, bai ->
+                [ sample + "___sep___" + meta.patient, meta, bam, bai ]
+            }
             .join(bam_msi_inputs)
             .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
         msisensorpro_existing_outputs = inputs.map { it -> [it.meta, it.msi] }.filter { !it[1].isEmpty() }
@@ -1343,7 +1347,7 @@ workflow NFCASEREPORTS {
 
         if (params.tumor_only) {
             bam_msi_status = bam_msi.branch{
-                tumor:  it[0].status == 1
+                tumor:  it[0].status.toString() == "1"
             }
 
             // add empty arrays to stand-in for normals
@@ -1351,8 +1355,8 @@ workflow NFCASEREPORTS {
         } else {
             // getting the tumor and normal cram files separated
             bam_msi_status = bam_msi.branch{
-                normal: it[0].status == 0
-                tumor:  it[0].status == 1
+                normal: it[0].status.toString() == "0"
+                tumor:  it[0].status.toString() == "1"
             }
 
             // All normal samples
@@ -1446,22 +1450,22 @@ workflow NFCASEREPORTS {
             .filter { !it[1].isEmpty() }
             .unique()
             .branch{
-                normal: it[0].status == 0
-                tumor:  it[0].status == 1
+                normal: it[0].status.toString() == "0"
+                tumor:  it[0].status.toString() == "1"
             }.tumor
 
         amber_existing_outputs_amber_dirs = inputs_unlaned
             .map { it -> [it.meta, it.amber_dir] }
             .filter { !it[1].isEmpty() }
             .branch{
-                normal: it[0].status == 0
-                tumor:  it[0].status == 1
+                normal: it[0].status.toString() == "0"
+                tumor:  it[0].status.toString() == "1"
             }.tumor
 
         // getting the tumor and normal cram files separated
         bam_amber_status = bam_amber_calling.branch{
-            normal: it[0].status == 0
-            tumor:  it[0].status == 1
+            normal: it[0].status.toString() == "0"
+            tumor:  it[0].status.toString() == "1"
         }
 
         // All tumor samples
@@ -1511,24 +1515,27 @@ workflow NFCASEREPORTS {
     // ##############################
 
     if (tools_used.contains("all") || tools_used.contains("fragcounter")) {
-        bam_fragcounter_inputs = inputs_unlaned.filter { it.frag_cov.isEmpty() }.map { it -> [it.meta.sample] }.unique()
+        bam_fragcounter_inputs = inputs_unlaned.filter { it.frag_cov.isEmpty() }.map { it -> [it.meta.sample] }.unique().dump(tag: "bam_fragcounter_inputs", pretty: true)
         bam_fragcounter_calling = alignment_bams_final
+            .dump(tag: "bam_fragcounter_calling_before_join", pretty: true)
             .join(bam_fragcounter_inputs)
             .map{ it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
+            .dump(tag: "bam_fragcounter_calling_after_join", pretty: true)
 
         fragcounter_existing_outputs = inputs_unlaned
             .map { it -> [it.meta , it.frag_cov] }
+            .dump(tag: "wtf frag_cov", pretty: true)
             .filter { !it[1].isEmpty() }
             .unique()
             .branch{
-                normal: it[0].status == 0
-                tumor:  it[0].status == 1
+                normal: it[0].status.toString() == "0"
+                tumor:  it[0].status.toString() == "1"
             }
 
         // getting the tumor and normal bam files separated
         bam_fragcounter_status = bam_fragcounter_calling.branch{
-            normal: it[0].status == 0
-            tumor:  it[0].status == 1
+            normal: it[0].status.toString() == "0"
+            tumor:  it[0].status.toString() == "1"
         }
 
         if (!params.tumor_only) {
@@ -1540,7 +1547,7 @@ workflow NFCASEREPORTS {
             normal_frag_cov_for_merge = normal_frag_cov.map { meta, frag_cov -> [ meta.sample, meta, frag_cov ] }
         }
 
-        TUMOR_FRAGCOUNTER(bam_fragcounter_status.tumor)
+        TUMOR_FRAGCOUNTER(bam_fragcounter_status.tumor.dump(tag: "TUMOR_FRAGCOUNTER", pretty: true))
 
         tumor_frag_cov = Channel.empty()
             .mix(TUMOR_FRAGCOUNTER.out.fragcounter_cov)
@@ -1562,8 +1569,8 @@ workflow NFCASEREPORTS {
             .map { it -> [it.meta.sample, it.meta] }
             .unique()
             .branch{
-                normal: it[1].status == 0
-                tumor:  it[1].status == 1
+                normal: it[1].status.toString() == "0"
+                tumor:  it[1].status.toString() == "1"
             }
 
         cov_dryclean_tumor_input = tumor_frag_cov_for_merge
@@ -1575,8 +1582,8 @@ workflow NFCASEREPORTS {
             .filter { it -> !it[1].isEmpty() }
             .unique()
             .branch{
-                normal: it[0].status == 0
-                tumor:  it[0].status == 1
+                normal: it[0].status.toString() == "0"
+                tumor:  it[0].status.toString() == "1"
             }
 
         // Dryclean for both tumor & normal
@@ -1625,9 +1632,10 @@ workflow NFCASEREPORTS {
         cbs_inputs = inputs_unlaned
             .filter { it.seg.isEmpty() || it.nseg.isEmpty() }
             .map { it -> [it.meta.patient, it.meta] }
+            .unique{ it -> it[1].patient + "___sep___" + it[1].sample } // unique by patient and sample
             .branch{
-                normal: it[1].status == 0
-                tumor:  it[1].status == 1
+                normal: it[1].status.toString() == "0"
+                tumor:  it[1].status.toString() == "1"
             }
 
         cbs_tumor_input = cbs_inputs.tumor
@@ -1652,6 +1660,8 @@ workflow NFCASEREPORTS {
                         meta.tumor_id       = tumor[1].sample
 
                         [ meta, tumor[2], normal[2] ]
+                }.unique { meta, tumor_cov, normal_cov ->
+                    meta.patient
                 }
         }
 
@@ -1714,8 +1724,8 @@ workflow NFCASEREPORTS {
 
         // getting the tumor and normal bams separated
         bam_snv_calling_status = bam_snv_calling.branch{
-            normal: it[0].status == 0
-            tumor:  it[0].status == 1
+            normal: it[0].status.toString() == "0"
+            tumor:  it[0].status.toString() == "1"
         }
 
         if (params.tumor_only) {
@@ -1898,14 +1908,14 @@ workflow NFCASEREPORTS {
             .filter { !it[1].isEmpty() }
             .unique()
             .branch{
-                normal: it[0].status == 0
-                tumor:  it[0].status == 1
+                normal: it[0].status.toString() == "0"
+                tumor:  it[0].status.toString() == "1"
             }
 
         // getting the tumor and normal cram files separated
         bam_cobalt_status = bam_cobalt_calling.branch{
-            normal: it[0].status == 0
-            tumor:  it[0].status == 1
+            normal: it[0].status.toString() == "0"
+            tumor:  it[0].status.toString() == "1"
         }
 
         // All tumor samples
@@ -1959,8 +1969,8 @@ workflow NFCASEREPORTS {
 
         meta_purple = purple_inputs_for_merge
             .branch{
-                normal: it[1].status == 0
-                tumor:  it[1].status == 1
+                normal: it[1].status.toString() == "0"
+                tumor:  it[1].status.toString() == "1"
             }
             .tumor
             .map {
@@ -2030,8 +2040,8 @@ workflow NFCASEREPORTS {
             }
         }
 
-        purple_existing_outputs_ploidy = inputs.branch{it -> tumor: it.meta.status == 1}.tumor.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.ploidy] }.filter { it -> !it[1].isEmpty() }.unique()
-        purple_existing_outputs_purity = inputs.branch{it -> tumor: it.meta.status == 1}.tumor.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.purity] }.filter { it -> !it[1].isEmpty() }.unique()
+        purple_existing_outputs_ploidy = inputs.branch{it -> tumor: it.meta.status.toString() == "1"}.tumor.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.ploidy] }.filter { it -> !it[1].isEmpty() }.unique()
+        purple_existing_outputs_purity = inputs.branch{it -> tumor: it.meta.status.toString() == "1"}.tumor.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.purity] }.filter { it -> !it[1].isEmpty() }.unique()
 
         BAM_COV_PURPLE(
             purple_inputs
@@ -2057,7 +2067,7 @@ workflow NFCASEREPORTS {
     // ##############################
 
     if (tools_used.contains("all") || tools_used.contains("jabba")) {
-        jabba_inputs = inputs_unlaned.filter { (it.jabba_gg.isEmpty() || it.jabba_rds.isEmpty()) && it.meta.status == 1}.map { it -> [it.meta.patient, it.meta] }.unique()
+        jabba_inputs = inputs_unlaned.filter { (it.jabba_gg.isEmpty() || it.jabba_rds.isEmpty()) && it.meta.status.toString() == "1"}.map { it -> [it.meta.patient, it.meta] }.unique()
 
 		// Dev block to retier either vcf or filtered retiered junctions
 		is_final_filtered_sv_rds_for_merge_retiered = params.is_retier_whitelist_junctions && params.tumor_only
@@ -2373,7 +2383,7 @@ workflow NFCASEREPORTS {
         if (params.tumor_only) {
             // tumor/sample id is required for snv multiplicity
             snv_multiplicity_inputs_status = snv_multiplicity_inputs.branch{
-                tumor:  it[1].status == 1
+                tumor:  it[1].status.toString() == "1"
             }
 
             // add empty arrays to stand-in for normals
@@ -2390,8 +2400,8 @@ workflow NFCASEREPORTS {
         } else {
             // getting the tumor and normal cram files separated
             snv_multiplicity_inputs_status = snv_multiplicity_inputs.branch{
-                normal: it[1].status == 0
-                tumor:  it[1].status == 1
+                normal: it[1].status.toString() == "0"
+                tumor:  it[1].status.toString() == "1"
             }
 
             // Crossing the normal and tumor samples to create tumor and normal pairs

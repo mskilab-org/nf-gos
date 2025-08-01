@@ -45,7 +45,7 @@ workflow SIGNATURES_STEP {
 //     it + [meta: Utils.remove_lanes_from_meta(it.meta)]
 //   }
 
-  inputs_tumor_status = inputs_unlaned.branch{ tumor: it.meta.status == 1 }
+  inputs_tumor_status = inputs_unlaned.branch{ tumor: it.meta.status.toString() == "1" }
   
 
   versions = Channel.empty()
@@ -68,7 +68,7 @@ workflow SIGNATURES_STEP {
   annotated_vcf_ffpe_impact_or_snpeff_for_merge = snv_somatic_annotations_for_merge // meta.patient, annotated somatic snv vcf
 
   annotated_vcf_ffpe_impact_or_snpeff = inputs_tumors_meta_for_merge
-	.join(annotated_vcf_ffpe_impact_or_snpeff_for_merge, failOnDuplicate: true, failOnMismatch: true)
+	.join(annotated_vcf_ffpe_impact_or_snpeff_for_merge, failOnDuplicate: false, failOnMismatch: false)
 	.map { it -> [ it[1], it[2]] } // meta, annotated somatic snv vcf
 
 
@@ -88,9 +88,9 @@ workflow SIGNATURES_STEP {
 		.join(snv_somatic_annotations_for_merge)
 		.map { it -> [ it[1], it[2] ] } // meta, annotated somatic snv
 
-	sbs_signatures_existing_outputs = inputs_tumor_status.tumor.map { it -> [it.meta, it.sbs_signatures] }.filter { !it[1].isEmpty() && it[0].status == 1 }
-	indel_signatures_existing_outputs = inputs_tumor_status.tumor.map { it -> [it.meta, it.indel_signatures] }.filter { !it[1].isEmpty() && it[0].status == 1 }
-	signatures_matrix_existing_outputs = inputs_tumor_status.tumor.map { it -> [it.meta, it.signatures_matrix] }.filter { !it[1].isEmpty() && it[0].status == 1 }
+	sbs_signatures_existing_outputs = inputs_tumor_status.tumor.map { it -> [it.meta, it.sbs_signatures] }.filter { !it[1].isEmpty() && it[0].status.toString() == "1" }
+	indel_signatures_existing_outputs = inputs_tumor_status.tumor.map { it -> [it.meta, it.indel_signatures] }.filter { !it[1].isEmpty() && it[0].status.toString() == "1" }
+	signatures_matrix_existing_outputs = inputs_tumor_status.tumor.map { it -> [it.meta, it.signatures_matrix] }.filter { !it[1].isEmpty() && it[0].status.toString() == "1" }
 
 	VCF_SIGPROFILERASSIGNMENT(signatures_inputs_somatic_vcf)
 
