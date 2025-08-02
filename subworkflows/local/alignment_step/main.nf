@@ -77,6 +77,7 @@ workflow ALIGNMENT_STEP {
 		.filter { it -> ! it[1].isEmpty() }
 		.map { it -> [it[0].sample, it[0], it[1], it[2]] }
         .unique()
+        .dump(tag: "wtf alignment_bams", pretty: true)
     
     alignment_existing_outputs = inputs.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.bam] }.filter { it -> !it[1].isEmpty() }.unique()
 

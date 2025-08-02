@@ -1322,7 +1322,7 @@ workflow NFCASEREPORTS {
 		intervals_and_num_intervals
 	)
 
-	alignment_bams_final = alignment_bams_final.mix(ALIGNMENT_STEP.out.alignment_bams_final)
+	alignment_bams_final = ALIGNMENT_STEP.out.alignment_bams_final.dump(tag: 'alignment_bams_final', pretty: true)
 	// reports = reports.mix(ALIGNMENT_STEP.out.reports.collect{ meta, report -> report })
 	// versions = versions.mix(ALIGNMENT_STEP.out.versions)
 
@@ -2048,16 +2048,72 @@ workflow NFCASEREPORTS {
         )
 
         versions = versions.mix(BAM_COV_PURPLE.out.versions)
-        purity = Channel.empty()
-            .mix(BAM_COV_PURPLE.out.purity)
-            .mix(purple_existing_outputs_purity)
+        // // Allow purity to be overwritten by provided values from inputs
+        // purity = Channel.empty()
+        //     .mix(BAM_COV_PURPLE.out.purity)
+        //     .mix(purple_existing_outputs_purity)
+
+
+        def use_existing_purity = params.get("use_existing_purity", false)
+        purity = purple_existing_outputs_purity
+            .map {
+                [ it[0].patient ] + [ it.toList() ] // [patient, [meta, purity]]
+            }
+            .join(
+                BAM_COV_PURPLE.out.purity
+                    .map {
+                        [ it[0].patient ] + [ it.toList() ] // [patient, [meta, purity]]
+                    }
+                , 
+                remainder: true
+            )
+            .map { it -> // patient, meta_existing, purity_existing, meta_purple, purity_purple ->
+                def (key, existing, purple) = (it + [null, null])[0..2]
+                def (meta_existing, purity_existing) = existing ?: [null, null]
+                def (meta_purple, purity_purple) = purple ?: [null, null]
+                def purity_out = purity_existing ?: purity_purple
+                def meta_out = meta_existing ?: meta_purple
+                if (!use_existing_purity) {
+                    purity_out = purity_purple ?: purity_existing
+                }
+                [ meta_out, purity_out ]
+            }
+            .dump(tag: "purity", pretty: true)
 
         purity_for_merge = purity
             .map { it -> [ it[0].patient, it[1] ] } // meta.patient, purity
 
-        ploidy = Channel.empty()
-            .mix(BAM_COV_PURPLE.out.ploidy)
-            .mix(purple_existing_outputs_ploidy)
+        // // Allow ploidy to be overwritten by provided values from inputs
+        // ploidy = Channel.empty()
+        //     .mix(BAM_COV_PURPLE.out.ploidy)
+        //     .mix(purple_existing_outputs_ploidy)
+
+        def use_existing_ploidy = params.get("use_existing_ploidy", false)
+        ploidy = purple_existing_outputs_ploidy
+            .map {
+                [ it[0].patient ] + [ it.toList() ]
+            }
+            .join(
+                BAM_COV_PURPLE.out.ploidy
+                    .map {
+                        [ it[0].patient ] + [ it.toList() ]
+                    }
+                , 
+                remainder: true
+            )
+            .map { it -> // patient, meta_existing, ploidy_existing, meta_purple, ploidy_purple ->
+                def (key, existing, purple) = (it + [null, null])[0..2]
+                def (meta_existing, ploidy_existing) = existing ?: [null, null]
+                def (meta_purple, ploidy_purple) = purple ?: [null, null]
+                def ploidy_out = ploidy_existing ?: ploidy_purple
+                def meta_out = meta_existing ?: meta_purple
+                if (!use_existing_ploidy) {
+                    ploidy_out = ploidy_purple ?: ploidy_existing
+                }
+                [ meta_out, ploidy_out ]
+            }
+            .dump(tag: "ploidy", pretty: true)
+
 
         ploidy_for_merge = ploidy
             .map { it -> [ it[0].patient, it[1] ] } // meta.patient, ploidy
