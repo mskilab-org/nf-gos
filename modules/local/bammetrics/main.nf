@@ -27,12 +27,15 @@ process PARABRICKS_BAMMETRICS {
 	def interval  = intervallist ? "--interval ${intervallist}" : ''
 
     """
+    export TMPDIR=/tmp
+    tdir=\$(mktemp -d)
+
     pbrun bammetrics \\
         --ref ${fasta} \\
         --bam ${bam} \\
         --out-metrics-file ${prefix}.bammetrics.coverage_metrics \\
 		--coverage-cap 10000 \\
-		--tmp-dir ./ \\
+		--tmp-dir \$tdir \\
         $args \\
 		$interval
 
