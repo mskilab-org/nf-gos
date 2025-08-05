@@ -1594,6 +1594,7 @@ workflow NFCASEREPORTS {
             .mix(dryclean_existing_outputs.tumor)
         dryclean_tumor_cov_for_merge = dryclean_tumor_cov
             .map { it -> [ it[0].patient, it[1] ] } // meta.patient, dryclean_cov
+            .unique{ patient, dryclean_cov -> patient }
 
         // Only need one versions because it's one program (dryclean)
         versions = versions.mix(TUMOR_DRYCLEAN.out.versions)
@@ -1622,6 +1623,7 @@ workflow NFCASEREPORTS {
                     def meta_complete = sample_meta[1]
                     [ meta_complete.patient, dryclean_normal[1] ]
                 }
+                .unique{ patient, dryclean_cov -> patient }
                 .dump(tag: "dryclean_normal_cov_for_merge", pretty: true)
         }
     }

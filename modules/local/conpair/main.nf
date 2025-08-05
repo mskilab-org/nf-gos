@@ -10,6 +10,7 @@ process CONPAIR {
     tuple val(meta), path(bam_tumor), path(bai_tumor), path(bam_normal), path(bai_normal)
     path(fasta)
     path(fai)
+    path(dict)
 
     output:
     tuple val(meta), path("*contamination*"), path("*concordance*"), emit: conpair_metrics

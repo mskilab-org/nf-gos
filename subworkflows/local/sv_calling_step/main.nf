@@ -31,7 +31,7 @@ workflow SV_CALLING_STEP {
     vcf_raw_from_gridss_gridss = Channel.empty()
 
 
-    parallelize_gridss = params.parallelize_gridss ?: false
+    parallelize_gridss = params.parallelize_gridss ?: true
 
     inputs_unlaned_split = inputs_unlaned
         .branch { it -> 
@@ -42,7 +42,7 @@ workflow SV_CALLING_STEP {
     def normal_ids = inputs_unlaned_split.normal.map { it.meta.patient }.unique().collect().ifEmpty(["NO_NORMALS_PRESENT___MD7cicQBtB"]).view { "Normal IDs: $it" }
     def tumor_ids = inputs_unlaned_split.tumor.map { it.meta.patient }.unique().collect().view { "Tumor IDs: $it" }
 
-    def total_jobnodes = 4
+    def total_jobnodes = params.get("gridss_total_job_nodes", 4)
 
     // gridss_existing_outputs = inputs_unlaned.map {
     //         it -> [it.meta, it.vcf, it.vcf_tbi] }

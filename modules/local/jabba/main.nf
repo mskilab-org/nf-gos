@@ -60,6 +60,7 @@ process JABBA {
     def cbs_nseg_rds = cbs_nseg_rds == '/dev/null' || cbs_nseg_rds == 'NA' || cbs_nseg_rds == 'NULL' ? "" : "--nseg ${cbs_nseg_rds}"
     def het_pileups_wgs = het_pileups_wgs == '/dev/null' || het_pileups_wgs == 'NA' || het_pileups_wgs == 'NULL' ? "" : "--hets ${het_pileups_wgs}"
     def j_supp = j_supp == '/dev/null' || j_supp == 'NA' || j_supp == 'NULL' ? "" : "--j.supp ${j_supp}"
+    def trelim_mem = (task.memory.toGiga() * 0.80).toInteger()
 
 
     def VERSION    = '1.1'
@@ -124,6 +125,7 @@ process JABBA {
     --ism					$ism                    \\
     --filter_loose			$filter_loose           \\
     --gurobi				$gurobi                 \\
+    --mem                   $trelim_mem             \\
     $verbose_switch                                 \\
     "
 
