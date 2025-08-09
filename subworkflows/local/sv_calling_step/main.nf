@@ -50,6 +50,7 @@ workflow SV_CALLING_STEP {
     
     gridss_existing_outputs = inputs_unlaned.map {
             it -> [it.meta, it.vcf, it.vcf_tbi] }
+            .dump(tag: "gridss_existing_outputs", pretty: true)
             .filter { !it[1].isEmpty() && !it[2].isEmpty() }
     
     vcf_from_gridss_gridss = gridss_existing_outputs

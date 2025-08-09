@@ -5,8 +5,8 @@ process FUSIONS {
 
     // using events container since the dependencies are the same
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/unified:0.0.7-rcpp':
-        'mskilab/unified:0.0.7-rcpp' }"
+        'docker://mskilab/unified:0.0.10':
+        'mskilab/unified:0.0.10' }"
     // 0.0.6 and above do not require conda sourcing
 
     input:
