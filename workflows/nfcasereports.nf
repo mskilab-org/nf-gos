@@ -2629,9 +2629,10 @@ workflow NFCASEREPORTS {
     // OnenessTwoness
     // ##############################
     if ((tools_used.contains("all") || tools_used.contains("onenesstwoness"))) {
-        onenesstwoness_inputs = inputs
+        onenesstwoness_inputs = inputs_unlaned
             .filter { it.onenesstwoness.isEmpty() }
             .map { it -> [it.meta.patient, it.meta] }
+            .unique()
 
         onenesstwoness_inputs_events = events_for_merge
             .join(onenesstwoness_inputs)

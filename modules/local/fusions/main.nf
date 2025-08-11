@@ -31,7 +31,7 @@ process FUSIONS {
     """
     set +u  # Disable unbound variable check
 
-    export RSCRIPT_PATH=\$(echo "${baseDir}/bin/Fusions.R")
+    export RSCRIPT_PATH=\$(echo "\${NEXTFLOW_PROJECT_DIR}/bin/Fusions.R")
 
     Rscript \$RSCRIPT_PATH \\
 	--id $id \\
