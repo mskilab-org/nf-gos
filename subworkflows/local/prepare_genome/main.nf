@@ -47,7 +47,12 @@ workflow PREPARE_GENOME {
 
     GATK4_CREATESEQUENCEDICTIONARY(fasta)
     // only run msisensorpro_scan if the msisensorpro_list is an empty channel
-    if (msisensorpro_list.isEmpty()) {
+    def is_msisensorpro_ref_empty = (
+        msisensorpro == null
+        || ! ( ! msisensorpro ) // ( ! msisensorpro ) evaluates to false if msisensorpro is an empty value
+        || msisensorpro_list.isEmpty()
+    )
+    if (is_msisensorpro_ref_empty) {
         MSISENSORPRO_SCAN(fasta)
         msisensorpro_list = MSISENSORPRO_SCAN.out.list.map{ meta, list -> list }                // path: genome_msi.list
     }

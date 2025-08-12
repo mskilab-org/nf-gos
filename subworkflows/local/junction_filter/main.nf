@@ -3,8 +3,10 @@
 //
 
 include { JUNCTION_FILTER } from '../../../modules/local/junction_filter/main.nf'
+include { JUNCTION_FILTER_BEDTOOLS } from "${projectDir}/modules/local/junction_filter/main.nf"
 
 junction_pon_gridss                 = WorkflowNfcasereports.create_file_channel(params.junction_pon_gridss)
+junction_pon_gridss_dir = WorkflowNfcasereports.create_file_channel(params.junction_pon_gridss_dir)
 gnomAD_sv_db                        = WorkflowNfcasereports.create_file_channel(params.gnomAD_sv_db)
 padding                             = WorkflowNfcasereports.create_value_channel(params.pad_junc_filter)
 
@@ -22,6 +24,28 @@ workflow SV_JUNCTION_FILTER {
     final_filtered_sv_rds   = JUNCTION_FILTER.out.final_filtered_sv_rds
     pon_filtered_sv_rds     = JUNCTION_FILTER.out.pon_filtered_sv_rds
     versions                = JUNCTION_FILTER.out.versions
+
+    emit:
+    final_filtered_sv_rds
+    pon_filtered_sv_rds
+    versions
+}
+
+
+workflow SV_JUNCTION_FILTER_BEDTOOLS {
+    take:
+    input                  //format: [meta, filtered_sv_vcf, tbi]
+
+    main:
+    versions                = Channel.empty()
+    pon_filtered_sv_rds     = Channel.empty()
+    final_filtered_sv_rds   = Channel.empty()
+
+    JUNCTION_FILTER_BEDTOOLS(input, junction_pon_gridss_dir, padding)
+
+    final_filtered_sv_rds   = JUNCTION_FILTER_BEDTOOLS.out.final_filtered_sv_rds
+    pon_filtered_sv_rds     = JUNCTION_FILTER_BEDTOOLS.out.pon_filtered_sv_rds
+    versions                = JUNCTION_FILTER_BEDTOOLS.out.versions
 
     emit:
     final_filtered_sv_rds

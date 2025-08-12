@@ -1417,6 +1417,7 @@ workflow NFCASEREPORTS {
         vcf_from_gridss_gridss.dump(tag: "vcf_from_gridss_gridss", pretty: true)
 
         JUNCTION_FILTER(vcf_from_gridss_gridss)
+        // JUNCTION_FILTER_BEDTOOLS(vcf_raw_from_gridss_gridss)
 
         pon_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.pon_filtered_sv_rds)
         final_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.final_filtered_sv_rds)

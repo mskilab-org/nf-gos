@@ -42,7 +42,7 @@ workflow SV_CALLING_STEP {
     def normal_ids = inputs_unlaned_split.normal.map { it.meta.patient }.unique().collect().ifEmpty(["NO_NORMALS_PRESENT___MD7cicQBtB"]).view { "Normal IDs: $it" }
     def tumor_ids = inputs_unlaned_split.tumor.map { it.meta.patient }.unique().collect().view { "Tumor IDs: $it" }
 
-    def total_jobnodes = params.get("gridss_total_job_nodes", 4)
+    def total_jobnodes = params.get("gridss_total_job_nodes", 12)
 
     // gridss_existing_outputs = inputs_unlaned.map {
     //         it -> [it.meta, it.vcf, it.vcf_tbi] }
