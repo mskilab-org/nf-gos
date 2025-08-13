@@ -47,9 +47,11 @@ workflow PREPARE_GENOME {
 
     GATK4_CREATESEQUENCEDICTIONARY(fasta)
     // only run msisensorpro_scan if the msisensorpro_list is an empty channel
+    def have_msisensorpro_ref = params.get("msisensorpro_list")
     if (! params.get("msisensorpro_list")) {
         MSISENSORPRO_SCAN(fasta)
         msisensorpro_list = MSISENSORPRO_SCAN.out.list.map{ meta, list -> list }                // path: genome_msi.list
+        versions = versions.mix(MSISENSORPRO_SCAN.out.versions)
     }
 
     SAMTOOLS_FAIDX(fasta, [['id':null], []])
@@ -105,7 +107,6 @@ workflow PREPARE_GENOME {
     // Gather versions of all tools used
     versions = versions.mix(SAMTOOLS_FAIDX.out.versions)
     versions = versions.mix(GATK4_CREATESEQUENCEDICTIONARY.out.versions)
-    versions = versions.mix(MSISENSORPRO_SCAN.out.versions)
     versions = versions.mix(TABIX_DBSNP.out.versions)
     versions = versions.mix(TABIX_GERMLINE_RESOURCE.out.versions)
     versions = versions.mix(TABIX_KNOWN_SNPS.out.versions)
@@ -132,9 +133,3 @@ workflow PREPARE_GENOME {
 
     versions // channel: [ versions.yml ]
 }
-
-
-
-
-
-
