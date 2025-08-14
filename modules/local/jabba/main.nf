@@ -84,6 +84,17 @@ process JABBA {
     fi
 
     ## find R installation
+    ## echo "USING LIBRARIES: \$(Rscript -e 'print(.libPaths())')"
+    ## export jabPath=\$(Rscript --vanilla -e
+    ## echo "USING LIBRARIES: \$(Rscript --vanilla -e 'print(.libPaths())')"
+    ## export jabPath=\$(Rscript -e 'cat(suppressWarnings(find.package("JaBbA")))')
+    ## export jba=\${jabPath}/extdata/jba
+    ## echo \$jba
+    ## set +x
+
+    ## find R installation
+    unset R_HOME
+
     echo "USING LIBRARIES: \$(Rscript -e 'print(.libPaths())')"
 
     export jabPath=\$(Rscript -e 'cat(suppressWarnings(find.package("JaBbA")))')
@@ -253,7 +264,7 @@ process RETIER_WHITELIST_JUNCTIONS___OLD {
   	is_existent_path = is_possible_path && file.exists(jpath)
   	is_rds = is_possible_path && grepl(".rds\$", jpath)
 	is_vcf = is_possible_path && grepl(".vcf(.bgz|.gz){0,}\$", jpath)
-	
+
 	if (is_existent_path && is_rds) {
 		ra.all = readRDS(jpath)
 	} else if (is_existent_path && is_vcf) {
@@ -357,7 +368,7 @@ process RETIER_WHITELIST_JUNCTIONS {
   	is_existent_path = is_possible_path && file.exists(jpath)
   	is_rds = is_possible_path && grepl(".rds\$", jpath)
 	is_vcf = is_possible_path && grepl(".vcf(.bgz|.gz){0,}\$", jpath)
-	
+
 	if (is_existent_path && is_rds) {
 		ra.all = readRDS(jpath)
 	} else if (is_existent_path && is_vcf) {
@@ -383,7 +394,7 @@ process RETIER_WHITELIST_JUNCTIONS {
     default_tier = rep_len(2, NROW(mcols_ra.all))
     default_tier[mcols_ra.all[["FILTER"]] != "PASS"] = 3
     mcols_ra.all[["${tfield}"]] = default_tier
-    
+
     ix = unique(mcols(grl.unlist(ra.all) %&% heme_gen)[["grl.ix"]])
 
     if (NROW(ix)) {
@@ -397,7 +408,7 @@ process RETIER_WHITELIST_JUNCTIONS {
     }
 	mcols(ra.all) = mcols_ra.all
 
-    
+
     # Define the path to the raw junctions file
     jpath = "${junctions_raw}"
 
