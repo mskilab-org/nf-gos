@@ -116,7 +116,7 @@ params.input_restart = WorkflowNfcasereports.retrieveInput(params, log)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { validateParameters; paramsHelp } from 'plugin/nf-validation'
+include { validateParameters; paramsHelp } from 'plugin/nf-schema'
 
 // Print help message if needed
 if (params.help) {

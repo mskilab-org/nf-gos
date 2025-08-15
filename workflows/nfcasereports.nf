@@ -7,7 +7,8 @@
 import Utils
 
 include { test_robust_absence; test_robust_presence } from "${workflow.projectDir}/lib/NfUtils"
-include { paramsSummaryLog; paramsSummaryMap; fromSamplesheet } from 'plugin/nf-validation'
+// include { paramsSummaryLog; paramsSummaryMap; fromSamplesheet } from 'plugin/nf-validation'
+include { paramsSummaryLog; paramsSummaryMap; samplesheetToList } from 'plugin/nf-schema'
 def logo = NfcoreTemplate.logo(workflow, params.monochrome_logs)
 def citation = '\n' + WorkflowMain.citation(workflow) + '\n'
 def summary_params = paramsSummaryMap(workflow)
@@ -254,7 +255,14 @@ def flowcellLaneFromFastq(path) {
 }
 
 def inputType = params.input ? "input" : "input_restart"
-def ch_from_samplesheet = params.build_only_index ? Channel.empty() : Channel.fromSamplesheet(inputType)
+if (params.build_only_index) {
+    def ch_from_samplesheet = Channel.empty()
+    samplesheetList = []
+} else {
+    samplesheetList = samplesheetToList(params.get(inputType), "gos-assets/nf-gos/assets/schema_input.json")
+    ch_from_samplesheet = Channel.fromList(samplesheetList)
+}
+// def ch_from_samplesheet = params.build_only_index ? Channel.empty() : Channel.fromSamplesheet(inputType)
 
 inputs = ch_from_samplesheet.map {
     meta,
@@ -548,7 +556,7 @@ tool_input_output_map = [
     "onenesstwoness": [ inputs: ['events', 'hrdetect'], outputs: ['onenesstwoness'] ]
 ]
 
-def samplesheetToList(String filePath) {
+def samplesheetToListBespoke(String filePath) {
     def sampleList = []
     def lines = new File(filePath).readLines()
 
@@ -592,7 +600,7 @@ def samplesheetToList(String filePath) {
     return sampleList
 }
 
-def sampleList = samplesheetToList(params.input)
+def sampleList = samplesheetToListBespoke(params.input)
 def available_inputs = new HashSet()
 def present_outputs = new HashSet()
 
