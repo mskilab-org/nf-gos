@@ -8,6 +8,10 @@
 // Condition is based on params.step and params.tools
 // If and extra condition exists, it's specified in comments
 
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
+
 
 include { GATK4_CREATESEQUENCEDICTIONARY         } from '../../../modules/nf-core/gatk4/createsequencedictionary/main'
 include { MSISENSORPRO_SCAN                      } from '../../../modules/nf-core/msisensorpro/scan/main'
@@ -47,7 +51,9 @@ workflow PREPARE_GENOME {
 
     GATK4_CREATESEQUENCEDICTIONARY(fasta)
     // only run msisensorpro_scan if the msisensorpro_list is an empty channel
-    if (! params.get("msisensorpro_list")) {
+    def is_msisensorpro_list_present = params.msisensorpro_list ? Files.exists(Paths.get(params.msisensorpro_list)) : false
+    println "is_msisensorpro_list_present: ${is_msisensorpro_list_present}"
+    if (! is_msisensorpro_list_present) {
         MSISENSORPRO_SCAN(fasta)
         msisensorpro_list = MSISENSORPRO_SCAN.out.list.map{ meta, list -> list }                // path: genome_msi.list
     }
@@ -105,7 +111,7 @@ workflow PREPARE_GENOME {
     // Gather versions of all tools used
     versions = versions.mix(SAMTOOLS_FAIDX.out.versions)
     versions = versions.mix(GATK4_CREATESEQUENCEDICTIONARY.out.versions)
-    versions = versions.mix(MSISENSORPRO_SCAN.out.versions)
+    // versions = versions.mix(MSISENSORPRO_SCAN.out.versions)
     versions = versions.mix(TABIX_DBSNP.out.versions)
     versions = versions.mix(TABIX_GERMLINE_RESOURCE.out.versions)
     versions = versions.mix(TABIX_KNOWN_SNPS.out.versions)

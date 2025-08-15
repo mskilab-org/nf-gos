@@ -125,7 +125,7 @@ process GRIDSS_PREPROCESS {
     """
     ${bwa}
 
-    rm -f *gridss.working/*
+    rm -rf *gridss.working/*
 
     gridss \\
         --labels ${meta.sample} \\
