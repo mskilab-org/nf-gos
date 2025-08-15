@@ -102,6 +102,7 @@ process JABBA {
     echo \$jba
     set +x
 
+
     export cmd="Rscript \$jba $junction $cov_rds    \\
     $j_supp                                         \\
     $het_pileups_wgs                                \\
