@@ -12,6 +12,6 @@ class NextflowRunner:
     def run(self, command):
         """Run nextflow command with given command string"""
         try:
-            subprocess.run(command, shell=True, check=True)
+            subprocess.run(command, shell=True, check=True, executable = "/bin/bash")
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"Pipeline execution failed: {e}")

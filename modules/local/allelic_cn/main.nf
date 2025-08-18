@@ -51,6 +51,9 @@ process NON_INTEGER_BALANCE {
     """
     ${bwa}
 
+    unset R_HOME
+    echo "USING LIBRARIES: \$(Rscript -e 'print(.libPaths())')"
+
     export RSCRIPT_PATH=\$(echo "${baseDir}/bin/non_integer_balance.R")
 
     Rscript \$RSCRIPT_PATH \\
