@@ -632,79 +632,80 @@ def samplesheetToListBespoke(String filePath) {
     return sampleList
 }
 
-def sampleList = samplesheetToListBespoke(params.input)
+// def sampleList = samplesheetToListBespoke(params.input)
+def sampleList = rowsAsMaps
 def available_inputs = new HashSet()
 def present_outputs = new HashSet()
 
 
-smcollect = sampleList.collect { it -> [
-    meta: it.meta,
-    fastq_1: it.fastq_1,
-    fastq_2: it.fastq_2,
-    table: it.table,
-    cram: it.cram,
-    crai: it.cram ? it.cram + '.crai' : [],
-    bam: it.bam,
-    bai: it.bam ? it.bam + '.bai': [],
-    qc_dup_rate: it.qc_dup_rate,
-    qc_dup_rate_tumor: it.qc_dup_rate_tumor,
-    qc_dup_rate_normal: it.qc_dup_rate_normal,
-    qc_insert_size: it.qc_insert_size,
-    qc_insert_size_tumor: it.qc_insert_size_tumor,
-    qc_insert_size_normal: it.qc_insert_size_normal,
-    qc_alignment_summary: it.qc_alignment_summary,
-    qc_alignment_summary_tumor: it.qc_alignment_summary_tumor,
-    qc_alignment_summary_normal: it.qc_alignment_summary_normal,
-    qc_coverage_metrics: it.qc_coverage_metrics,
-    qc_coverage_metrics_tumor: it.qc_coverage_metrics_tumor,
-    qc_coverage_metrics_normal: it.qc_coverage_metrics_normal,
-    msi: it.msi,
-    msi_germline: it.msi_germline,
-    hets: it.hets,
-    amber_dir: it.amber_dir,
-    frag_cov: it.frag_cov,
-    dryclean_cov: it.dryclean_cov,
-    cobalt_dir: it.cobalt_dir,
-    purity: it.purity,
-    ploidy: it.ploidy,
-    seg: it.seg,
-    nseg: it.nseg,
-    vcf: it.vcf,
-    vcf_tbi: it.vcf ? it.vcf + '.tbi' : [],
-    vcf_raw: it.vcf_raw,
-    vcf_raw_tbi: it.vcf_raw ? it.vcf_raw + '.tbi' : [],
-    jabba_rds: it.jabba_rds,
-    jabba_gg: it.jabba_gg,
-    ni_balanced_gg: it.ni_balanced_gg,
-    lp_balanced_gg: it.lp_balanced_gg,
-    events: it.events,
-    fusions: it.fusions,
-    snv_somatic_vcf: it.snv_somatic_vcf,
-    snv_somatic_vcf_tumoronly_filtered: it.snv_somatic_vcf_tumoronly_filtered,
-    snv_somatic_vcf_tumoronly_filtered_tbi: it.snv_somatic_vcf_tumoronly_filtered ? it.snv_somatic_vcf_tumoronly_filtered + ".tbi" : [],
-    snv_somatic_vcf_rescue_ch_heme: it.snv_somatic_vcf_rescue_ch_heme,
-    snv_somatic_vcf_rescue_ch_heme_tbi: it.snv_somatic_vcf_rescue_ch_heme ? it.snv_somatic_vcf_rescue_ch_heme + '.tbi' : [],
-    snv_somatic_tbi: it.snv_somatic_vcf ? it.snv_somatic_vcf + '.tbi' : [],
-    snv_germline_vcf: it.snv_germline_vcf,
-    snv_germline_tbi: it.snv_germline_vcf ? it.snv_germline_vcf + '.tbi' : [],
-    variant_somatic_ann: it.variant_somatic_ann,
-    variant_somatic_bcf: it.variant_somatic_bcf,
-    variant_germline_ann: it.variant_germline_ann,
-    variant_germline_bcf: it.variant_germline_bcf,
-    snv_multiplicity: it.snv_multiplicity,
-    oncokb_maf: it.oncokb_maf,
-    oncokb_fusions: it.oncokb_fusions,
-    oncokb_cna: it.oncokb_cna,
-    sbs_signatures: it.sbs_signatures,
-    indel_signatures: it.indel_signatures,
-    signatures_matrix: it.signatures_matrix,
-    ffpe_impact_vcf: it.ffpe_impact_vcf,
-    ffpe_impact_vcf_tbi: it.ffpe_impact_vcf ? it.ffpe_impact_vcf + '.tbi' : [],
-    ffpe_impact_filtered_vcf: it.ffpe_impact_filtered_vcf,
-    ffpe_impact_filtered_vcf_tbi: it.ffpe_impact_filtered_vcf ? it.ffpe_impact_filtered_vcf + '.tbi' : [],
-    hrdetect: it.hrdetect,
-    onenesstwoness: it.onenesstwoness
-]}
+// smcollect = sampleList.collect { it -> [
+//     meta: it.meta,
+//     fastq_1: it.fastq_1,
+//     fastq_2: it.fastq_2,
+//     table: it.table,
+//     cram: it.cram,
+//     crai: it.cram ? it.cram + '.crai' : [],
+//     bam: it.bam,
+//     bai: it.bam ? it.bam + '.bai': [],
+//     qc_dup_rate: it.qc_dup_rate,
+//     qc_dup_rate_tumor: it.qc_dup_rate_tumor,
+//     qc_dup_rate_normal: it.qc_dup_rate_normal,
+//     qc_insert_size: it.qc_insert_size,
+//     qc_insert_size_tumor: it.qc_insert_size_tumor,
+//     qc_insert_size_normal: it.qc_insert_size_normal,
+//     qc_alignment_summary: it.qc_alignment_summary,
+//     qc_alignment_summary_tumor: it.qc_alignment_summary_tumor,
+//     qc_alignment_summary_normal: it.qc_alignment_summary_normal,
+//     qc_coverage_metrics: it.qc_coverage_metrics,
+//     qc_coverage_metrics_tumor: it.qc_coverage_metrics_tumor,
+//     qc_coverage_metrics_normal: it.qc_coverage_metrics_normal,
+//     msi: it.msi,
+//     msi_germline: it.msi_germline,
+//     hets: it.hets,
+//     amber_dir: it.amber_dir,
+//     frag_cov: it.frag_cov,
+//     dryclean_cov: it.dryclean_cov,
+//     cobalt_dir: it.cobalt_dir,
+//     purity: it.purity,
+//     ploidy: it.ploidy,
+//     seg: it.seg,
+//     nseg: it.nseg,
+//     vcf: it.vcf,
+//     vcf_tbi: it.vcf ? it.vcf + '.tbi' : [],
+//     vcf_raw: it.vcf_raw,
+//     vcf_raw_tbi: it.vcf_raw ? it.vcf_raw + '.tbi' : [],
+//     jabba_rds: it.jabba_rds,
+//     jabba_gg: it.jabba_gg,
+//     ni_balanced_gg: it.ni_balanced_gg,
+//     lp_balanced_gg: it.lp_balanced_gg,
+//     events: it.events,
+//     fusions: it.fusions,
+//     snv_somatic_vcf: it.snv_somatic_vcf,
+//     snv_somatic_vcf_tumoronly_filtered: it.snv_somatic_vcf_tumoronly_filtered,
+//     snv_somatic_vcf_tumoronly_filtered_tbi: it.snv_somatic_vcf_tumoronly_filtered ? it.snv_somatic_vcf_tumoronly_filtered + ".tbi" : [],
+//     snv_somatic_vcf_rescue_ch_heme: it.snv_somatic_vcf_rescue_ch_heme,
+//     snv_somatic_vcf_rescue_ch_heme_tbi: it.snv_somatic_vcf_rescue_ch_heme ? it.snv_somatic_vcf_rescue_ch_heme + '.tbi' : [],
+//     snv_somatic_tbi: it.snv_somatic_vcf ? it.snv_somatic_vcf + '.tbi' : [],
+//     snv_germline_vcf: it.snv_germline_vcf,
+//     snv_germline_tbi: it.snv_germline_vcf ? it.snv_germline_vcf + '.tbi' : [],
+//     variant_somatic_ann: it.variant_somatic_ann,
+//     variant_somatic_bcf: it.variant_somatic_bcf,
+//     variant_germline_ann: it.variant_germline_ann,
+//     variant_germline_bcf: it.variant_germline_bcf,
+//     snv_multiplicity: it.snv_multiplicity,
+//     oncokb_maf: it.oncokb_maf,
+//     oncokb_fusions: it.oncokb_fusions,
+//     oncokb_cna: it.oncokb_cna,
+//     sbs_signatures: it.sbs_signatures,
+//     indel_signatures: it.indel_signatures,
+//     signatures_matrix: it.signatures_matrix,
+//     ffpe_impact_vcf: it.ffpe_impact_vcf,
+//     ffpe_impact_vcf_tbi: it.ffpe_impact_vcf ? it.ffpe_impact_vcf + '.tbi' : [],
+//     ffpe_impact_filtered_vcf: it.ffpe_impact_filtered_vcf,
+//     ffpe_impact_filtered_vcf_tbi: it.ffpe_impact_filtered_vcf ? it.ffpe_impact_filtered_vcf + '.tbi' : [],
+//     hrdetect: it.hrdetect,
+//     onenesstwoness: it.onenesstwoness
+// ]}
 
 
 sampleList.each { input_map ->
@@ -1254,18 +1255,6 @@ snv_germline_annotations_for_merge = inputs_unlaned
 	.map { it -> [ it[0].patient, it[1] ] } // meta.patient, annotated germline snv vcf
 	.unique()
 
-purity_for_merge = inputs_unlaned
-	.map { it -> [it.meta, it.purity] }
-	.filter { !it[1].isEmpty() }
-	.map { it -> [ it[0].patient, it[1] ] } // meta.patient, purity
-	.unique()
-
-ploidy_for_merge = inputs_unlaned
-	.map { it -> [it.meta, it.ploidy] }
-	.filter { !it[1].isEmpty() }
-	.map { it -> [ it[0].patient, it[1] ] } // meta.patient, ploidy
-	.unique()
-
 cbs_seg_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.seg] }
     .filter { !it[1].isEmpty() }
@@ -1304,13 +1293,13 @@ cobalt_dir_for_merge = inputs_unlaned
 
 purity_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.purity] }
-    .filter { !it[1].isEmpty() }
+    .filter { !(it[1] instanceof List && it[1].isEmpty()) }
     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, purity
 	.unique()
 
 ploidy_for_merge = inputs_unlaned
     .map { it -> [it.meta, it.ploidy] }
-    .filter { !it[1].isEmpty() }
+    .filter { !(it[1] instanceof List && it[1].isEmpty()) }
     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, ploidy
 	.unique()
 
@@ -2165,8 +2154,29 @@ workflow NFCASEREPORTS {
             }
         }
 
-        purple_existing_outputs_ploidy = inputs.branch{it -> tumor: it.meta.status.toString() == "1"}.tumor.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.ploidy] }.filter { it -> !it[1].isEmpty() }.unique()
-        purple_existing_outputs_purity = inputs.branch{it -> tumor: it.meta.status.toString() == "1"}.tumor.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.purity] }.filter { it -> !it[1].isEmpty() }.unique()
+        purple_existing_outputs_ploidy = inputs_unlaned
+            .branch{ it -> 
+                tumor: it.meta.status.toString() == "1"
+            }
+            .tumor
+            .map { it -> 
+                [it.meta, it.ploidy] 
+            }
+            .filter { it -> 
+                !(it[1] instanceof List && it[1].isEmpty())
+            }.unique()
+        purple_existing_outputs_purity = inputs_unlaned
+            .branch{it -> 
+                tumor: it.meta.status.toString() == "1"
+            }
+            .tumor
+            .map { it -> 
+                [it.meta, it.purity] 
+            }
+            .filter { it -> 
+                !(it[1] instanceof List && it[1].isEmpty())
+            }
+            .unique()
 
         BAM_COV_PURPLE(
             purple_inputs

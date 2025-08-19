@@ -45,12 +45,14 @@ msisensorpro_list                   = WorkflowNfcasereports.create_file_channel(
 workflow PREPARE_GENOME {
 
     main:
-    fasta = fasta.map{ fasta -> [ [ id:fasta.baseName ], fasta ] }
+    fasta = fasta.map{ fasta -> [ [ id:fasta.baseName[0] ], fasta ] }
+    fasta.dump(tag: "fasta in PREPARE_GENOME", pretty: true)
 
     versions = Channel.empty()
 
     GATK4_CREATESEQUENCEDICTIONARY(fasta)
     // only run msisensorpro_scan if the msisensorpro_list is an empty channel
+    println "params.msisensorpro_list: ${params.msisensorpro_list}"
     def is_msisensorpro_list_present = params.msisensorpro_list ? Files.exists(Paths.get(params.msisensorpro_list)) : false
     println "is_msisensorpro_list_present: ${is_msisensorpro_list_present}"
     if (! is_msisensorpro_list_present) {

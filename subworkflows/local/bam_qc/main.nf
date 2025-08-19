@@ -155,6 +155,14 @@ workflow BAM_QC {
             tumor.findAll { normal.contains(it) }
         }
         .flatten()
+
+    ids_without_conpair = inputs_unlaned.filter { it ->
+        it.conpair_contamination.isEmpty() || it.conpair_concordance.isEmpty()
+    }.map { it -> 
+        [ it.meta.patient ]
+    }.unique()
+
+    tumor_paired_ids = tumor_paired_ids.join(ids_without_conpair)
     
     
     bam_key_patient = bam.map { meta_sample, meta, bam, bai ->

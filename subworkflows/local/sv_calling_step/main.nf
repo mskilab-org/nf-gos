@@ -48,14 +48,14 @@ workflow SV_CALLING_STEP {
     //         it -> [it.meta, it.vcf, it.vcf_tbi] }
     //         .filter { !it[1].isEmpty() && !it[2].isEmpty() }
     
-    gridss_existing_outputs = inputs_unlaned.map {
+    gridss_existing_outputs = inputs_unlaned_split.tumor.map {
             it -> [it.meta, it.vcf, it.vcf_tbi] }
             .dump(tag: "gridss_existing_outputs", pretty: true)
             .filter { !it[1].isEmpty() && !it[2].isEmpty() }
     
     vcf_from_gridss_gridss = gridss_existing_outputs
         
-    gridss_raw_existing_outputs = inputs_unlaned.map {
+    gridss_raw_existing_outputs = inputs_unlaned_split.tumor.map {
         it -> [it.meta, it.vcf_raw, it.vcf_raw_tbi] }
         .filter { !it[1].isEmpty() && !it[2].isEmpty() }
     
