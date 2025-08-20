@@ -9,7 +9,7 @@ process HRDETECT {
 
     input:
     tuple val(meta), path(junctions), path(hets), path(snv_somatic), path(jabba_rds)
-    path(ref_fasta)
+    path(fasta)
     val(genome_version)
 
     output:
@@ -42,7 +42,7 @@ process HRDETECT {
     --hets $hets \\
     --snv $snv_somatic_bgz \\
     --jabba $jabba_rds \\
-    --ref $ref_fasta \\
+    --ref $fasta \\
     --genome $genome_version
 
     cat <<-END_VERSIONS > versions.yml
