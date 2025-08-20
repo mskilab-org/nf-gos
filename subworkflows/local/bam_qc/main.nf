@@ -160,7 +160,7 @@ workflow BAM_QC {
         it.conpair_contamination.isEmpty() || it.conpair_concordance.isEmpty()
     }.map { it -> 
         [ it.meta.patient ]
-    }.unique()
+    }.unique().dump(tag: "ids_without_conpair", pretty: true)
 
     tumor_paired_ids = tumor_paired_ids.join(ids_without_conpair)
     
