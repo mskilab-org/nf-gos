@@ -7,13 +7,15 @@ def get_environment_defaults():
         'pipeline-dir': "/gpfs/data/imielinskilab/git/mskilab/nf-gos",
         'profile': "nyu",
         'nextflow_module': "nextflow/23.04.4",
-        'JAVA_HOME': '/gpfs/share/apps/jdk/17u028'
+        'JAVA_HOME': '/gpfs/share/apps/jdk/17u028',
+        'aws_module': 'aws-cli'
     }
     nygc_defaults = {
         'pipeline-dir': "/gpfs/commons/groups/imielinski_lab/git/nf-gos",
         'profile': "nygc",
         'nextflow_module': "nextflow/23.10.0",
-        'JAVA_HOME': '/nfs/sw/java/jdk-17.0.4'
+        'JAVA_HOME': '/nfs/sw/easybuild/software/Java/17.0.6',
+        'aws_module': 'awscli'
     }
     mapping = {
         'fn-': nyu_defaults,
@@ -53,8 +55,9 @@ def load_required_modules(env_defaults):
 
     # Check for 'aws' command
     if shutil.which('aws') is None:
-        modules_to_load.append('aws-cli')
-        print("'aws' command not found. Loading module 'aws-cli'.")
+        aws_module = env_defaults.get('aws_module', 'aws-cli')
+        modules_to_load.append(aws_module)
+        print(f"'aws' command not found. Loading module '{aws_module}'.")
     else:
         print("'aws' command is already available.")
 

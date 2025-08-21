@@ -117,7 +117,7 @@ Instantiate derivative parameters for the workflow.
 
 */
 
-params.is_heme = params.is_retier_whitelist_junctions 
+params.is_heme = params.is_retier_whitelist_junctions
 
 println "params.mski_base: ${params.mski_base}"
 
@@ -342,26 +342,26 @@ inputs_unlaned = inputs.map { it ->
 
 tool_input_output_map = [
     "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
-	"collect_wgs_metrics": [ 
-		inputs: ['bam'], 
-		outputs: ['qc_coverage_metrics'] 
+	"collect_wgs_metrics": [
+		inputs: ['bam'],
+		outputs: ['qc_coverage_metrics']
 	],
-	"collect_multiple_metrics": [ 
-		inputs: ['bam'], 
+	"collect_multiple_metrics": [
+		inputs: ['bam'],
 		outputs: [
 			['qc_alignment_summary'],
 			['qc_insert_size']
-		] 
+		]
 	],
 	"estimate_library_complexity": [ inputs: ['bam'], outputs: ['qc_dup_rate'] ],
     // "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics', "estimate_library_complexity"] ],
 	"postprocessing": [ inputs: ['bam'], outputs: [] ], // FIXME: Postprocessing will never be selected as a tool given the current set of inputs/outputs, empty output means tool will not be selected. postprocessing tool must be controlled by params.is_run_post_processing.
     "msisensorpro": [ inputs: ['bam'], outputs: [
-		'msi' 
+		'msi'
 		// 'msi_germline'
-		] 
+		]
 	],
-	// TODO: figure out what the best way to 
+	// TODO: figure out what the best way to
     // "gridss": [ inputs: ['bam'], outputs: ['vcf_raw'] ],
 	// "junctionfilter": [ inputs: ['vcf_raw'], outputs: ['vcf'] ],
 	// "retiered_filtered_junctions": [ inputs: ['vcf'], outputs: ['sv_retier'] ], // ?
@@ -373,12 +373,12 @@ tool_input_output_map = [
     "sage": [ inputs: ['bam'], outputs: ['snv_somatic_vcf', 'snv_germline_vcf'] ],
     "cobalt": [ inputs: ['bam'], outputs: ['cobalt_dir'] ],
     "purple": [ inputs: ['cobalt_dir', 'amber_dir'], outputs: ['purity', 'ploidy'] ],
-	// "jabba": [ 
-	// 	inputs: [ 
-	// 		['vcf', 'sv_retier'], 
+	// "jabba": [
+	// 	inputs: [
+	// 		['vcf', 'sv_retier'],
 	// 		['hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg']
-	// 	], 
-	// 	outputs: ['jabba_rds', 'jabba_gg'] 
+	// 	],
+	// 	outputs: ['jabba_rds', 'jabba_gg']
 	// ],
     "jabba": [ inputs: [ 'vcf', 'hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
     "non_integer_balance": [ inputs: ['jabba_gg'], outputs: ['ni_balanced_gg'] ],
@@ -416,8 +416,8 @@ def missing_outputs = requiredFields.findAll { field ->
         // !value || (value instanceof Collection && value.empty) || value.toString() == ""
         def truthy_val = (
             (!value) ||
-            (value == null) || 
-            (value instanceof Collection && value.empty) || 
+            (value == null) ||
+            (value instanceof Collection && value.empty) ||
             (value.toString().trim() == "") ||
             (value instanceof String && value.replaceAll(/["']/, "").trim() == "")
         )
@@ -439,7 +439,7 @@ tool_input_output_map.each { tool, io ->
 		def inputsRequired = io.inputs
 		def inputsPresent = inputsRequired.every { available_inputs.contains(it) }
 		def outputsNeeded = io.outputs.any { missing_outputs.contains(it) }
-		
+
 		// special cases
 		def is_sage_tumor_only = tool == "sage" && params.tumor_only
         def is_sage_heme = is_sage_tumor_only && params.is_heme
@@ -450,7 +450,7 @@ tool_input_output_map.each { tool, io ->
 		def is_output_nested_list = io.outputs instanceof List && io.outputs.every { it instanceof List }
 		def is_output_generic_case = !is_sage_tumor_only && !is_current_tool_qc_multiple_metrics
 		def is_input_generic_case = !is_current_tool_jabba
-		
+
 		// Treat special cases
 		if (is_sage_tumor_only) {
 			outputsNeeded = ["snv_somatic_vcf", "snv_somatic_vcf_tumoronly_filtered"].any {
@@ -465,7 +465,7 @@ tool_input_output_map.each { tool, io ->
 		}
 
 		if (is_current_tool_qc_multiple_metrics) {
-			def is_any_alignment_summary_absent = io.outputs[0].any { 
+			def is_any_alignment_summary_absent = io.outputs[0].any {
 				missing_outputs.contains(it)
 			}
 			def is_any_insert_size_absent = io.outputs[1].any {
@@ -480,38 +480,38 @@ tool_input_output_map.each { tool, io ->
 		}
 
 
-		
+
 
 		// selected_tools_map[tool] = inputs.filter { sample ->
 		// 	def is_all_input_col_present = false
 		// 	def is_any_output_col_empty = false
 
-		// 	is_all_input_col_present = io.inputs.every { field -> 
+		// 	is_all_input_col_present = io.inputs.every { field ->
 		// 		test_robust_presence(sample[field], test_file = false) // Tests if file exists and is nonzero file size
 		// 	}
 
 		// 	// if (is_input_generic_case) {
-		// 	// 	is_all_input_col_present = io.inputs.every { field -> 
+		// 	// 	is_all_input_col_present = io.inputs.every { field ->
 		// 	// 		! sample[field].isEmpty() // Tests if file exists and is nonzero file size
 		// 	// 	}
 		// 	// }
 		// 	// if (is_current_tool_jabba) {
-		// 	// 	is_any_sv_input_col_present = io.inputs[0].any { field -> 
+		// 	// 	is_any_sv_input_col_present = io.inputs[0].any { field ->
 		// 	// 		! sample[field].isEmpty() // Tests if file exists and is nonzero file size
 		// 	// 	}
-		// 	// 	is_all_remaining_input_col_present = io.inputs[1].every { field -> 
+		// 	// 	is_all_remaining_input_col_present = io.inputs[1].every { field ->
 		// 	// 		! sample[field].isEmpty() // Tests if file exists and is nonzero file size
 		// 	// 	}
 		// 	// 	is_all_input_col_present = is_any_sv_input_col_present && is_all_remaining_input_col_present
 		// 	// }
 
 
-			
+
 		// 	// Generic output case
 		// 	if (is_output_generic_case) {
 		// 		is_any_output_col_empty = io.outputs.any { field ->
 		// 			test_robust_absence(sample[field], test_file = false)
-		// 		}	
+		// 		}
 		// 	}
 
 
@@ -542,12 +542,12 @@ tool_input_output_map.each { tool, io ->
 		// 		is_any_output_col_empty = is_any_alignment_summary_absent || is_any_insert_size_absent
 		// 	}
 		// 	// End Treat special cases
-			
+
 		// 	return is_any_output_col_empty && is_all_input_col_present
 		// 	// return [tool, is_any_output_col_empty && is_all_input_col_present, sample]
 		// }
-		
-		
+
+
 	}
 }
 
@@ -1205,7 +1205,8 @@ workflow NFCASEREPORTS {
 
         vcf_from_gridss_gridss.dump(tag: "vcf_from_gridss_gridss", pretty: true)
 
-        JUNCTION_FILTER(vcf_from_gridss_gridss)
+        // JUNCTION_FILTER(vcf_from_gridss_gridss)
+        JUNCTION_FILTER(vcf_raw_from_gridss_gridss)
         // JUNCTION_FILTER_BEDTOOLS(vcf_raw_from_gridss_gridss)
 
         pon_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.pon_filtered_sv_rds)
@@ -1402,7 +1403,7 @@ workflow NFCASEREPORTS {
                 .mix(NORMAL_DRYCLEAN.out.dryclean_cov)
                 .mix(dryclean_existing_outputs.normal)
 
-            
+
             sample_meta_map = inputs_unlaned.map { it -> [ it.meta.sample, it.meta ]}.unique()
 
             // dryclean_normal_cov_for_merge = dryclean_normal_cov
@@ -1559,11 +1560,11 @@ workflow NFCASEREPORTS {
         filtered_somatic_vcf_sage = Channel.empty()
             .mix(BAM_SAGE.out.sage_pass_filtered_somatic_vcf)
             .mix(snv_somatic_existing_outputs)
-        
+
         filtered_somatic_vcf_tumoronly_outputs = inputs_unlaned
             .map { it -> [it.meta, it.snv_somatic_vcf_tumoronly_filtered, it.snv_somatic_vcf_tumoronly_filtered_tbi] }
             .unique()
-        
+
         tumor_only_filter_input = filtered_somatic_vcf_sage
             .map{ it ->
                 [it[0].patient] + it.toList()
@@ -1600,7 +1601,7 @@ workflow NFCASEREPORTS {
                 )
 
             filtered_somatic_vcf = filtered_somatic_vcf_tumor_only
-            
+
             if (params.is_heme) {
                 heme_rescue_input = filtered_somatic_vcf_sage
                     .map { [it[0].patient, it[0], it[1], it[2]] } // meta.patient, meta, sage vcf, sage tbi
@@ -1617,7 +1618,7 @@ workflow NFCASEREPORTS {
                 filtered_somatic_vcf = RESCUE_CH_HEME_STEP.out.sage_tumor_only_rescue_ch_vcf
             }
 
-            
+
         } else {
             filtered_somatic_vcf = filtered_somatic_vcf_sage
         }
@@ -1883,7 +1884,7 @@ workflow NFCASEREPORTS {
         //             .map {
         //                 [ it[0].patient ] + [ it.toList() ] // [patient, [meta, purity]]
         //             }
-        //         , 
+        //         ,
         //         remainder: true
         //     )
         //     .map { it -> // patient, meta_existing, purity_existing, meta_purple, purity_purple ->
@@ -1918,7 +1919,7 @@ workflow NFCASEREPORTS {
         //             .map {
         //                 [ it[0].patient ] + [ it.toList() ]
         //             }
-        //         , 
+        //         ,
         //         remainder: true
         //     )
         //     .map { it -> // patient, meta_existing, ploidy_existing, meta_purple, ploidy_purple ->
@@ -1956,7 +1957,7 @@ workflow NFCASEREPORTS {
             .map {
                 [ it[0].patient ] + it[1..-1].toList() // patient, vcf_raw, vcf_tbi_raw
             }
-        
+
 		// Variable exists in case retiering is done
 		untiered_junctions_for_merge = vcf_from_sv_calling_for_merge
         println "is_final_filtered_sv_rds_for_merge_retiered: ${is_final_filtered_sv_rds_for_merge_retiered}"
@@ -2218,9 +2219,9 @@ workflow NFCASEREPORTS {
 
     }
 
-	
+
 	SIGNATURES_STEP(
-		inputs_unlaned, 
+		inputs_unlaned,
 		snv_somatic_annotations_for_merge, // meta.patient, annotated somatic snv vcf
 		tools_used
 	)

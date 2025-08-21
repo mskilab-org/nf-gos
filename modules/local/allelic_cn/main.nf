@@ -43,13 +43,22 @@ process NON_INTEGER_BALANCE {
     def args        = task.ext.args ?: ''
     def prefix      = task.ext.prefix ?: "${meta.id}"
     def id          = "${meta.sample}"
-    def bwa = bwa_index ? "ln -nfs \$(readlink -f ${bwa_index})/* \$(dirname \$(readlink -f $fasta))/" : ""
+    // caused issues with soft linking and errored out
+    // def bwa = bwa_index ? "ln -nfs \$(readlink -f ${bwa_index})/* \$(dirname \$(readlink -f $fasta))/" : ""
+    def bwa = bwa_index ? """
+    B=\$(readlink -f ${bwa_index})
+    F=\$(dirname \$(readlink -f $fasta))
+    [[ "\$B" != "\$F" ]] && ln -sft "\$F" "\$B"/* 2>/dev/null || true
+    """ : ""
     def hets_flag = het_pileups_wgs ? "--hets ${het_pileups_wgs}" : ""
     def hets_thres_flag = het_pileups_wgs ? "--hets_thresh ${hets_thresh}" : ""
     def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
     """
     ${bwa}
+
+    unset R_HOME
+    echo "USING LIBRARIES: \$(Rscript -e 'print(.libPaths())')"
 
     export RSCRIPT_PATH=\$(echo "${baseDir}/bin/non_integer_balance.R")
 

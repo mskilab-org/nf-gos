@@ -58,6 +58,7 @@ workflow PREPARE_GENOME {
     if (! is_msisensorpro_list_present) {
         MSISENSORPRO_SCAN(fasta)
         msisensorpro_list = MSISENSORPRO_SCAN.out.list.map{ meta, list -> list }                // path: genome_msi.list
+        versions = versions.mix(MSISENSORPRO_SCAN.out.versions)
     }
 
     SAMTOOLS_FAIDX(fasta, [['id':null], []])
@@ -140,9 +141,3 @@ workflow PREPARE_GENOME {
 
     versions // channel: [ versions.yml ]
 }
-
-
-
-
-
-

@@ -751,7 +751,14 @@
                       message("Finished!")
                   })
 
-    segs = do.call(grbind, segs)
+    ## segs = do.call(grbind, segs)
+    segs = tryCatch(
+        do.call(grbind, segs),
+        error = function(e) {
+            message("grbind failed: ", e$message)
+            NULL
+        }
+    )
 
     if (is.null(segs)) {
         message("No extra breakends")
