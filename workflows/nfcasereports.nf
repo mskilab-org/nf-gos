@@ -1414,6 +1414,8 @@ workflow NFCASEREPORTS {
         vcf_from_sv_calling_for_merge = vcf_from_gridss_gridss
             .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
 
+        vcf_from_gridss_gridss.dump(tag: "vcf_from_gridss_gridss", pretty: true)
+
         JUNCTION_FILTER(vcf_from_gridss_gridss)
 
         pon_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.pon_filtered_sv_rds)
@@ -2051,70 +2053,72 @@ workflow NFCASEREPORTS {
 
         versions = versions.mix(BAM_COV_PURPLE.out.versions)
         // // Allow purity to be overwritten by provided values from inputs
-        // purity = Channel.empty()
-        //     .mix(BAM_COV_PURPLE.out.purity)
-        //     .mix(purple_existing_outputs_purity)
+        purity = Channel.empty()
+            .mix(BAM_COV_PURPLE.out.purity)
+            .mix(purple_existing_outputs_purity)
+            .unique{ it -> it[0].patient}
 
 
-        def use_existing_purity = params.get("use_existing_purity", false)
-        purity = purple_existing_outputs_purity
-            .map {
-                [ it[0].patient ] + [ it.toList() ] // [patient, [meta, purity]]
-            }
-            .join(
-                BAM_COV_PURPLE.out.purity
-                    .map {
-                        [ it[0].patient ] + [ it.toList() ] // [patient, [meta, purity]]
-                    }
-                , 
-                remainder: true
-            )
-            .map { it -> // patient, meta_existing, purity_existing, meta_purple, purity_purple ->
-                def (key, existing, purple) = (it + [null, null])[0..2]
-                def (meta_existing, purity_existing) = existing ?: [null, null]
-                def (meta_purple, purity_purple) = purple ?: [null, null]
-                def purity_out = purity_existing ?: purity_purple
-                def meta_out = meta_existing ?: meta_purple
-                if (!use_existing_purity) {
-                    purity_out = purity_purple ?: purity_existing
-                }
-                [ meta_out, purity_out ]
-            }
-            .dump(tag: "purity", pretty: true)
+        // def use_existing_purity = params.get("use_existing_purity", false)
+        // purity = purple_existing_outputs_purity
+        //     .map {
+        //         [ it[0].patient ] + [ it.toList() ] // [patient, [meta, purity]]
+        //     }
+        //     .join(
+        //         BAM_COV_PURPLE.out.purity
+        //             .map {
+        //                 [ it[0].patient ] + [ it.toList() ] // [patient, [meta, purity]]
+        //             }
+        //         , 
+        //         remainder: true
+        //     )
+        //     .map { it -> // patient, meta_existing, purity_existing, meta_purple, purity_purple ->
+        //         def (key, existing, purple) = (it + [null, null])[0..2]
+        //         def (meta_existing, purity_existing) = existing ?: [null, null]
+        //         def (meta_purple, purity_purple) = purple ?: [null, null]
+        //         def purity_out = purity_existing ?: purity_purple
+        //         def meta_out = meta_existing ?: meta_purple
+        //         if (!use_existing_purity) {
+        //             purity_out = purity_purple ?: purity_existing
+        //         }
+        //         [ meta_out, purity_out ]
+        //     }
+        //     .dump(tag: "purity", pretty: true)
 
         purity_for_merge = purity
             .map { it -> [ it[0].patient, it[1] ] } // meta.patient, purity
 
         // // Allow ploidy to be overwritten by provided values from inputs
-        // ploidy = Channel.empty()
-        //     .mix(BAM_COV_PURPLE.out.ploidy)
-        //     .mix(purple_existing_outputs_ploidy)
+        ploidy = Channel.empty()
+            .mix(BAM_COV_PURPLE.out.ploidy)
+            .mix(purple_existing_outputs_ploidy)
+            .unique{ it -> it[0].patient}
 
-        def use_existing_ploidy = params.get("use_existing_ploidy", false)
-        ploidy = purple_existing_outputs_ploidy
-            .map {
-                [ it[0].patient ] + [ it.toList() ]
-            }
-            .join(
-                BAM_COV_PURPLE.out.ploidy
-                    .map {
-                        [ it[0].patient ] + [ it.toList() ]
-                    }
-                , 
-                remainder: true
-            )
-            .map { it -> // patient, meta_existing, ploidy_existing, meta_purple, ploidy_purple ->
-                def (key, existing, purple) = (it + [null, null])[0..2]
-                def (meta_existing, ploidy_existing) = existing ?: [null, null]
-                def (meta_purple, ploidy_purple) = purple ?: [null, null]
-                def ploidy_out = ploidy_existing ?: ploidy_purple
-                def meta_out = meta_existing ?: meta_purple
-                if (!use_existing_ploidy) {
-                    ploidy_out = ploidy_purple ?: ploidy_existing
-                }
-                [ meta_out, ploidy_out ]
-            }
-            .dump(tag: "ploidy", pretty: true)
+        // def use_existing_ploidy = params.get("use_existing_ploidy", false)
+        // ploidy = purple_existing_outputs_ploidy
+        //     .map {
+        //         [ it[0].patient ] + [ it.toList() ]
+        //     }
+        //     .join(
+        //         BAM_COV_PURPLE.out.ploidy
+        //             .map {
+        //                 [ it[0].patient ] + [ it.toList() ]
+        //             }
+        //         , 
+        //         remainder: true
+        //     )
+        //     .map { it -> // patient, meta_existing, ploidy_existing, meta_purple, ploidy_purple ->
+        //         def (key, existing, purple) = (it + [null, null])[0..2]
+        //         def (meta_existing, ploidy_existing) = existing ?: [null, null]
+        //         def (meta_purple, ploidy_purple) = purple ?: [null, null]
+        //         def ploidy_out = ploidy_existing ?: ploidy_purple
+        //         def meta_out = meta_existing ?: meta_purple
+        //         if (!use_existing_ploidy) {
+        //             ploidy_out = ploidy_purple ?: ploidy_existing
+        //         }
+        //         [ meta_out, ploidy_out ]
+        //     }
+        //     .dump(tag: "ploidy", pretty: true)
 
 
         ploidy_for_merge = ploidy

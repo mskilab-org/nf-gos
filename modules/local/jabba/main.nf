@@ -338,6 +338,13 @@ process RETIER_WHITELIST_JUNCTIONS {
     # Load the whitelist genes
     heme_gen = readRDS("${whitelist_genes}")
 
+    heme_gen = IRanges::resize(
+        heme_gen,
+        width = as.integer(width(heme_gen)) + 150000,
+        fix = "end",
+        ignore.strand = FALSE
+    )
+
     # Define the path to the junctions file
     jpath = "${junctions}"
     jpath_tiered = glue::glue('{tools::file_path_sans_ext(jpath)}___tiered.rds')
