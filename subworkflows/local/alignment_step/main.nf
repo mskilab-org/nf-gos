@@ -77,6 +77,7 @@ workflow ALIGNMENT_STEP {
 		.filter { it -> ! it[1].isEmpty() }
 		.map { it -> [it[0].sample, it[0], it[1], it[2]] }
         .unique()
+        .dump(tag: "wtf alignment_bams", pretty: true)
     
     alignment_existing_outputs = inputs.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.bam] }.filter { it -> !it[1].isEmpty() }.unique()
 
@@ -172,7 +173,7 @@ workflow ALIGNMENT_STEP {
 				// out
 				[ meta + [ id:meta.sample ], fastq_1s, fastq_2s, rg ]
 			}
-            .view{ "grouped_reads_for_alignment: $it" }
+            .dump(tag: "grouped_reads_for_alignment", pretty: true)
 
         // GPU Alignment
         if (params.aligner == "fq2bam") {
@@ -194,13 +195,13 @@ workflow ALIGNMENT_STEP {
 				}
 				tuple(meta, reads)
 			}
-			inputs_for_cat_fastq.view { log.info "inputs_for_cat_fastq: $it" }
+			inputs_for_cat_fastq.dump(tag: "inputs_for_cat_fastq", pretty: true)
 			// Merge fastq files for each sample
 			// Note that the RG used in FASTQ_ALIGN
 			// will only contain the first RG from the set of fastqs.
 			// Which is a desired side effect.
 			CAT_FASTQ(inputs_for_cat_fastq)
-			index_alignment.view { log.info "index_alignment: $it" }
+			index_alignment.dump(tag: "index_alignment", pretty: true)
             FASTQ_ALIGN_BWAMEM_MEM2(
                 // reads_for_alignment,
 				CAT_FASTQ.out.reads,

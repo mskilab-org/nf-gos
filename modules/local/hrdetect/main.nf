@@ -35,7 +35,7 @@ process HRDETECT {
     # gunzip -c $snv_somatic | bgzip > $bgzipped_snv_somatic;
     # tabix -p vcf $bgzipped_snv_somatic;
 
-    export RSCRIPT_PATH=\$(echo "${baseDir}/bin/HRDetect.R")
+    export RSCRIPT_PATH=\$(echo "\${NEXTFLOW_PROJECT_DIR}/bin/HRDetect.R")
 
     Rscript \$RSCRIPT_PATH \\
     --sv $junctions \\

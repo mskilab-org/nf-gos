@@ -92,8 +92,8 @@ workflow BAM_SVCALLING_GRIDSS_PARALLEL {
 
     bam_sv_calling_status = bam_sv_calling // meta, bam, bai
         .branch{
-            tumor:  it[0].status == 1
-            normal: it[0].status == 0
+            tumor:  it[0].status.toString() == "1"
+            normal: it[0].status.toString() == "0"
         }
     
     

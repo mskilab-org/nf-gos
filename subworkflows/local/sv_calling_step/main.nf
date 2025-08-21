@@ -31,7 +31,7 @@ workflow SV_CALLING_STEP {
     vcf_raw_from_gridss_gridss = Channel.empty()
 
 
-    parallelize_gridss = params.parallelize_gridss ?: false
+    parallelize_gridss = params.parallelize_gridss ?: true
 
     inputs_unlaned_split = inputs_unlaned
         .branch { it -> 
@@ -42,19 +42,20 @@ workflow SV_CALLING_STEP {
     def normal_ids = inputs_unlaned_split.normal.map { it.meta.patient }.unique().collect().ifEmpty(["NO_NORMALS_PRESENT___MD7cicQBtB"]).view { "Normal IDs: $it" }
     def tumor_ids = inputs_unlaned_split.tumor.map { it.meta.patient }.unique().collect().view { "Tumor IDs: $it" }
 
-    def total_jobnodes = 4
+    def total_jobnodes = params.get("gridss_total_job_nodes", 12)
 
     // gridss_existing_outputs = inputs_unlaned.map {
     //         it -> [it.meta, it.vcf, it.vcf_tbi] }
     //         .filter { !it[1].isEmpty() && !it[2].isEmpty() }
     
-    gridss_existing_outputs = inputs_unlaned.map {
+    gridss_existing_outputs = inputs_unlaned_split.tumor.map {
             it -> [it.meta, it.vcf, it.vcf_tbi] }
+            .dump(tag: "gridss_existing_outputs", pretty: true)
             .filter { !it[1].isEmpty() && !it[2].isEmpty() }
     
     vcf_from_gridss_gridss = gridss_existing_outputs
         
-    gridss_raw_existing_outputs = inputs_unlaned.map {
+    gridss_raw_existing_outputs = inputs_unlaned_split.tumor.map {
         it -> [it.meta, it.vcf_raw, it.vcf_raw_tbi] }
         .filter { !it[1].isEmpty() && !it[2].isEmpty() }
     
@@ -73,7 +74,7 @@ workflow SV_CALLING_STEP {
         bam_sv_calling = alignment_bams_final // meta.sample, meta, bam, bai
             .combine(bam_sv_inputs, by: 0) // 
             .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
-            .view { "BAM SV calling input: $it" }
+            .dump ( tag: "BAM SV calling input", pretty: true )
 
         bam_sv_calling_status = bam_sv_calling.branch{
             normal: it[0].status.toString() == "0"
@@ -166,7 +167,7 @@ workflow SV_CALLING_STEP {
                 .map{ it ->
                     [it[0].patient, it[0], it[1], it[2]]
                 }
-                .view { "bam_sv_calling_status.tumor.map: ${it}" }
+                .dump(tag: "bam_sv_calling_status.tumor.map", pretty: true)
                 .join(tumor_only_ids)
                 .join(gridss_preprocess_tumor_for_merge)
                 .flatMap { tumor ->
@@ -296,7 +297,7 @@ workflow SV_CALLING_STEP {
                     def tbi = tbi_list[i_t]
                     [ meta, vcf, tbi ]
                 }
-                .view {"raw vcf: $it"}
+                .dump (tag: "raw vcf", pretty: true)
             
             vcf_raw_from_gridss_gridss = raw_vcf
                 .mix(gridss_raw_existing_outputs)
@@ -306,7 +307,7 @@ workflow SV_CALLING_STEP {
             
             if (params.tumor_only) {
                 // bam_sv_calling_status = bam_sv_calling.branch{
-                //     tumor:  it[0].status == 1
+                //     tumor:  it[0].status.toString() == "1"ring() == "1"
                 // }
 
                 // add empty arrays to stand-in for normals
@@ -314,15 +315,15 @@ workflow SV_CALLING_STEP {
             } else {
                 // getting the tumor and normal cram files separated
                 // bam_sv_calling_status = bam_sv_calling.branch{
-                //     normal: it[0].status == 0
-                //     tumor:  it[0].status == 1
+                //     normal: it[0].status.toString() == "0"
+                //     tumor:  it[0].status.toString() == "1"
                 // }
 
                 // All normal samples
-                bam_sv_calling_normal_for_crossing = bam_sv_calling_status.normal.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }.view{" Normal samples for crossing: $it" }
+                bam_sv_calling_normal_for_crossing = bam_sv_calling_status.normal.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }.dump(tag: " Normal samples for crossing:", pretty: true)
 
                 // All tumor samples
-                bam_sv_calling_tumor_for_crossing = bam_sv_calling_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }.view{" Tumor samples for crossing: $it" }
+                bam_sv_calling_tumor_for_crossing = bam_sv_calling_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }.dump(tag: " Tumor samples for crossing", pretty: true)
 
                 // Crossing the normal and tumor samples to create tumor and normal pairs
                 bam_sv_calling_pair = bam_sv_calling_normal_for_crossing.cross(bam_sv_calling_tumor_for_crossing)

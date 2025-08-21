@@ -28,12 +28,8 @@ workflow FASTQ_PARABRICKS_FQ2BAM {
 
       // if normals are present for multiple patients, these need to be deduplicated
     deduped_reads = reads
-        .map { it ->
-            def meta = it[0]
-            [ meta - meta.subMap("patient") ] + it[1..-1].toList()
-        }
         .unique { it -> it[0].sample }
-        .view{ "deduped_reads: ${it}" }
+        .dump(tag: "deduped_reads", pretty: true)
     
     patient_sample_map = reads
         .map { it ->
@@ -41,7 +37,7 @@ workflow FASTQ_PARABRICKS_FQ2BAM {
             [ meta.sample, meta ]
         }
         .unique()
-        .view { "patient_sample_map: ${it}" }
+        .dump(tag: "patient_sample_map", pretty: true)
 
     PARABRICKS_FQ2BAM(
         deduped_reads,

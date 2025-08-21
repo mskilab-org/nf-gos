@@ -35,6 +35,8 @@ process GRIDSS_GRIDSS {
     def assembly_bam = "--assembly ${meta.id}.assembly.bam"
     def bwa = bwa_index ? "cp -s ${bwa_index}/* . || true" : ""
     def blacklist = blacklist_gridss ? "--blacklist ${blacklist_gridss}" : ""
+    def jvmheap_mem = (task.memory.toGiga() * 0.9).toInteger() // 
+    def otherjvmheap_mem = (task.memory.toGiga() * 0.75).toInteger() // 
 
     """
     ${bwa}
@@ -47,8 +49,8 @@ process GRIDSS_GRIDSS {
         $assembly_bam \\
         $blacklist \\
         --picardoptions VALIDATION_STRINGENCY=LENIENT \\
-        --jvmheap 32g \\
-        --otherjvmheap 32g \\
+        --jvmheap ${jvmheap_mem}g \\
+        --otherjvmheap ${otherjvmheap_mem}g \\
         ${normalbam} \\
         ${tumorbam}
 
@@ -117,9 +119,13 @@ process GRIDSS_PREPROCESS {
     def assembly_bam = "--assembly ${meta.id}.assembly.bam"
     def bwa = bwa_index ? "cp -s ${bwa_index}/* . || true" : ""
     def blacklist = blacklist_gridss ? "--blacklist ${blacklist_gridss}" : ""
+    def jvmheap_mem = (task.memory.toGiga() * 0.9).toInteger() // 
+    def otherjvmheap_mem = (task.memory.toGiga() * 0.75).toInteger() // 
 
     """
     ${bwa}
+
+    rm -rf *gridss.working/*
 
     gridss \\
         --labels ${meta.sample} \\
@@ -128,8 +134,8 @@ process GRIDSS_PREPROCESS {
         --steps preprocess \\
         $blacklist \\
         --picardoptions VALIDATION_STRINGENCY=LENIENT \\
-        --jvmheap 32g \\
-        --otherjvmheap 32g \\
+        --jvmheap ${jvmheap_mem}g \\
+        --otherjvmheap ${otherjvmheap_mem}g \\
         ${bam} \\
 
     cat <<-END_VERSIONS > versions.yml
@@ -194,6 +200,8 @@ process GRIDSS_ASSEMBLE_SCATTER {
     def assembly_bam = "--assembly ${meta.id}.assembly.bam"
     def bwa = bwa_index ? "cp -s ${bwa_index}/* . || true" : ""
     def blacklist = blacklist_gridss ? "--blacklist ${blacklist_gridss}" : ""
+    def jvmheap_mem = (task.memory.toGiga() * 0.9).toInteger() // 
+    def otherjvmheap_mem = (task.memory.toGiga() * 0.75).toInteger() // 
 
     """
     ${bwa}
@@ -206,8 +214,8 @@ process GRIDSS_ASSEMBLE_SCATTER {
         --steps assemble \\
         $blacklist \\
         --picardoptions VALIDATION_STRINGENCY=LENIENT \\
-        --jvmheap 32g \\
-        --otherjvmheap 32g \\
+        --jvmheap ${jvmheap_mem}g \\
+        --otherjvmheap ${otherjvmheap_mem}g \\
         --jobindex ${jobindex} \\
         --jobnodes ${jobnodes} \\
         ${normalbam} \\
@@ -275,6 +283,8 @@ process GRIDSS_ASSEMBLE_GATHER {
     def assembly_bam = "--assembly ${meta.id}.assembly.bam"
     def bwa = bwa_index ? "cp -s ${bwa_index}/* . || true" : ""
     def blacklist = blacklist_gridss ? "--blacklist ${blacklist_gridss}" : ""
+    def jvmheap_mem = (task.memory.toGiga() * 0.9).toInteger() // 
+    def otherjvmheap_mem = (task.memory.toGiga() * 0.75).toInteger() // 
 
     """
     mkdir -p ${gridss_assembly_dir}
@@ -295,8 +305,8 @@ process GRIDSS_ASSEMBLE_GATHER {
         --steps assemble \\
         $blacklist \\
         --picardoptions VALIDATION_STRINGENCY=LENIENT \\
-        --jvmheap 32g \\
-        --otherjvmheap 32g \\
+        --jvmheap ${jvmheap_mem}g \\
+        --otherjvmheap ${otherjvmheap_mem}g \\
         ${normalbam} \\
         ${tumorbam}
 
@@ -365,6 +375,8 @@ process GRIDSS_CALL {
     def assembly_bam = "--assembly ${meta.id}.assembly.bam"
     def bwa = bwa_index ? "cp -s ${bwa_index}/* . || true" : ""
     def blacklist = blacklist_gridss ? "--blacklist ${blacklist_gridss}" : ""
+    def jvmheap_mem = (task.memory.toGiga() * 0.9).toInteger() // 
+    def otherjvmheap_mem = (task.memory.toGiga() * 0.75).toInteger() // 
 
     """
     mkdir -p ${gridss_assembly_dir}
@@ -384,8 +396,8 @@ process GRIDSS_CALL {
         $assembly_bam \\
         $blacklist \\
         --picardoptions VALIDATION_STRINGENCY=LENIENT \\
-        --jvmheap 32g \\
-        --otherjvmheap 32g \\
+        --jvmheap ${jvmheap_mem}g \\
+        --otherjvmheap ${otherjvmheap_mem}g \\
         --steps call \\
         ${normalbam} \\
         ${tumorbam}

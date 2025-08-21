@@ -10,6 +10,7 @@ process CONPAIR {
     tuple val(meta), path(bam_tumor), path(bai_tumor), path(bam_normal), path(bai_normal)
     path(fasta)
     path(fai)
+    path(dict)
 
     output:
     tuple val(meta), path("*contamination*"), path("*concordance*"), emit: conpair_metrics
@@ -21,8 +22,6 @@ process CONPAIR {
     script:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
-    def metrics_file = "${prefix}.bammetrics.txt"
-	def interval  = intervallist ? "--interval ${intervallist}" : ''
 
     """
 
@@ -49,9 +48,9 @@ process CONPAIR {
 
     stub:
     def prefix = task.ext.prefix ?: "${meta.id}"
-    def metrics_file = "${prefix}.bammetrics.txt"
     """
-    touch ${metrics_file}
+    touch ./concordance.txt
+    touch ./contamination.txt
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
