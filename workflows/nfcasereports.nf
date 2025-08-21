@@ -5,6 +5,7 @@
 */
 
 import Utils
+import groovy.json.JsonSlurper
 
 include { test_robust_absence; test_robust_presence } from "${workflow.projectDir}/lib/NfUtils"
 // include { paramsSummaryLog; paramsSummaryMap; fromSamplesheet } from 'plugin/nf-validation'
@@ -408,6 +409,14 @@ sampleList.each { input_map ->
 }
 
 println "Provided inputs: ${available_inputs}"
+
+def schemaFile = file("$projectDir/gos-assets/nf-gos/assets/schema_input.json")
+def schema = new JsonSlurper().parse(schemaFile)
+
+
+def props = schema.items.properties
+def requiredFields = props.findAll { !it.value.containsKey('meta') }.keySet()
+println "requiredFields: $requiredFields"
 
 def missing_outputs = requiredFields.findAll { field ->
     // Check if this field is missing (null or empty collection) in any sample
