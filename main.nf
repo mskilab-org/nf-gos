@@ -118,21 +118,6 @@ params.input_restart = WorkflowNfcasereports.retrieveInput(params, log)
 
 include { validateParameters; paramsHelp } from 'plugin/nf-schema'
 
-// Print help message if needed
-if (params.help) {
-    def logo = NfcoreTemplate.logo(workflow, params.monochrome_logs)
-    def citation = '\n' + WorkflowMain.citation(workflow) + '\n'
-    def String command = "nextflow run ${workflow.manifest.name} --input samplesheet.csv --genome GRCh37 -profile docker"
-    log.info logo + paramsHelp(command) + citation + NfcoreTemplate.dashedLine(params.monochrome_logs)
-    System.exit(0)
-}
-
-// Validate input parameters
-if (params.validate_params) {
-    validateParameters()
-}
-
-WorkflowMain.initialise(workflow, params, log)
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -140,12 +125,28 @@ WorkflowMain.initialise(workflow, params, log)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { NFCASEREPORTS } from './workflows/nfcasereports'
+include { NFCASEREPORTS } from 'workflows/nfcasereports'
 
 //
 // WORKFLOW: Run main mskilab-org/nf-jabba analysis pipeline
 //
 workflow MSKILABORG_NFCASEREPORTS {
+    // Print help message if needed
+    if (params.help) {
+        def logo = NfcoreTemplate.logo(workflow, params.monochrome_logs)
+        def citation = '\n' + WorkflowMain.citation(workflow) + '\n'
+        def String command = "nextflow run ${workflow.manifest.name} --input samplesheet.csv --genome GRCh37 -profile docker"
+        log.info logo + paramsHelp(command) + citation + NfcoreTemplate.dashedLine(params.monochrome_logs)
+        System.exit(0)
+    }
+
+    // Validate input parameters
+    if (params.validate_params) {
+        validateParameters()
+    }
+
+    WorkflowMain.initialise(workflow, params, log)
+
     NFCASEREPORTS ()
 }
 

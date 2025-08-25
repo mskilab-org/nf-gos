@@ -4,10 +4,7 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-import Utils
-import groovy.json.JsonSlurper
-
-include { test_robust_absence; test_robust_presence } from "${workflow.projectDir}/lib/NfUtils"
+include { test_robust_absence; test_robust_presence } from '../lib/NfUtils'
 // include { paramsSummaryLog; paramsSummaryMap; fromSamplesheet } from 'plugin/nf-validation'
 include { paramsSummaryLog; paramsSummaryMap; samplesheetToList } from 'plugin/nf-schema'
 def logo = NfcoreTemplate.logo(workflow, params.monochrome_logs)
@@ -129,7 +126,7 @@ println "params.mski_base: ${params.mski_base}"
 */
 
 // Check if the path parameters exist
-@Grab(group='org.codehaus.gpars', module='gpars', version='1.2.1')
+// @Grab(group='org.codehaus.gpars', module='gpars', version='1.2.1')
 import groovyx.gpars.GParsPool
 
 def isAwsCliInstalled() {
@@ -742,11 +739,13 @@ include { BAM_COBALT } from '../subworkflows/local/bam_cobalt/main'
 include { BAM_COV_PURPLE } from '../subworkflows/local/bam_cov_purple/main'
 
 // JaBbA
-if (params.tumor_only) {
-    include { COV_JUNC_TUMOR_ONLY_JABBA as JABBA } from '../subworkflows/local/jabba/main'
-} else {
-    include { COV_JUNC_JABBA as JABBA } from '../subworkflows/local/jabba/main'
-}
+include { COV_JUNC_TUMOR_ONLY_JABBA as JABBA_TUMOR_ONLY } from '../subworkflows/local/jabba/main'
+include { COV_JUNC_JABBA as JABBA } from '../subworkflows/local/jabba/main'
+// if (params.tumor_only) {
+//     include { COV_JUNC_TUMOR_ONLY_JABBA as JABBA } from '../subworkflows/local/jabba/main'
+// } else {
+//     include { COV_JUNC_JABBA as JABBA } from '../subworkflows/local/jabba/main'
+// }
 include { RETIER_JUNCTIONS } from '../subworkflows/local/jabba/main'
 
 // Events
@@ -2081,7 +2080,12 @@ workflow NFCASEREPORTS {
                 }
         }
 
-        JABBA(jabba_input)
+        if (params.tumor_only) {
+            JABBA_TUMOR_ONLY(jabba_input)
+        } else {
+            JABBA(jabba_input)
+        }
+        
 
         jabba_rds = Channel.empty()
             .mix(JABBA.out.jabba_rds)
