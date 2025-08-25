@@ -126,8 +126,6 @@ println "params.mski_base: ${params.mski_base}"
 */
 
 // Check if the path parameters exist
-// @Grab(group='org.codehaus.gpars', module='gpars', version='1.2.1')
-import groovyx.gpars.GParsPool
 
 def isAwsCliInstalled() {
     def command = "aws --version"
@@ -190,7 +188,7 @@ def expandBraces(String path) {
     return expandedPaths
 }
 
-GParsPool.withPool(numThreads) {
+groovyx.gpars.GParsPool.withPool(numThreads) {
     checkPathParamList.eachParallel { param ->
         if (param == null) {
             println "Skipping null path"
@@ -643,55 +641,8 @@ include { PREPARE_GENOME } from '../subworkflows/local/prepare_genome/main'
 // Build intervals if needed
 include { PREPARE_INTERVALS } from '../subworkflows/local/prepare_intervals/main'
 
-// // Convert BAM files to FASTQ files
-// include { BAM_CONVERT_SAMTOOLS as CONVERT_FASTQ_INPUT } from '../subworkflows/local/bam_convert_samtools/main'
-
-// // Run FASTQC
-// include { FASTQC } from '../modules/nf-core/fastqc/main'
-
-// // TRIM/SPLIT FASTQ Files
-// include { FASTP } from '../modules/nf-core/fastp/main'
-
-// // Loading the MULTIQC module
-// include { MULTIQC } from '../modules/nf-core/multiqc/main'
-
-// // Loading the module that dumps the versions of software being used
-// include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../modules/nf-core/custom/dumpsoftwareversions/main'
-
-// // Map input reads to reference genome
-// include { FASTQ_ALIGN_BWAMEM_MEM2 } from '../subworkflows/local/fastq_align_bwamem_mem2/main'
-// include { FASTQ_PARABRICKS_FQ2BAM } from '../subworkflows/local/fastq_parabricks_fq2bam/main'
-
-// // Merge and index BAM files (optional)
-// include { BAM_MERGE_INDEX_SAMTOOLS } from '../subworkflows/local/bam_merge_index_samtools/main'
-
-// // Convert BAM files
-// include { SAMTOOLS_CONVERT as BAM_TO_CRAM } from '../modules/nf-core/samtools/convert/main'
-// include { SAMTOOLS_CONVERT as BAM_TO_CRAM_MAPPING } from '../modules/nf-core/samtools/convert/main'
-
-// // Convert CRAM files (optional)
-// include { SAMTOOLS_CONVERT as CRAM_TO_BAM } from '../modules/nf-core/samtools/convert/main'
-// include { SAMTOOLS_CONVERT as CRAM_TO_BAM_RECAL } from '../modules/nf-core/samtools/convert/main'
-// include { SAMTOOLS_CONVERT as CRAM_TO_BAM_FINAL } from '../modules/nf-core/samtools/convert/main'
-
-// // Mark Duplicates (+QC)
-// include { BAM_MARKDUPLICATES } from '../subworkflows/local/bam_markduplicates/main'
-
-// // QC on CRAM
-// include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_NO_MD } from '../subworkflows/local/cram_qc_mosdepth_samtools/main'
-// include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_RECAL } from '../subworkflows/local/cram_qc_mosdepth_samtools/main'
-
 // BAM Picard QC
 include { BAM_QC } from '../subworkflows/local/bam_qc/main'
-// include { BAM_QC_PICARD_COLLECTMULTIPLEMETRICS } from '../subworkflows/local/bam_qc/main'
-// include { BAM_QC_PICARD_COLLECTWGSMETRICS } from '../subworkflows/local/bam_qc/main'
-// include { BAM_QC_GATK4_ESTIMATELIBRARYCOMPLEXITY } from '../subworkflows/local/bam_qc/main'
-
-// // Create recalibration tables
-// include { BAM_BASERECALIBRATOR } from '../subworkflows/local/bam_baserecalibrator/main'
-
-// // Create recalibrated cram files to use for variant calling (+QC)
-// include { BAM_APPLYBQSR } from '../subworkflows/local/bam_applybqsr/main'
 
 // Svaba
 include { BAM_SVCALLING_SVABA } from '../subworkflows/local/bam_svcalling_svaba/main'
@@ -2080,25 +2031,26 @@ workflow NFCASEREPORTS {
                 }
         }
 
+        def jabbaOut = Channel.empty()
         if (params.tumor_only) {
-            JABBA_TUMOR_ONLY(jabba_input)
+            jabbaOut = JABBA_TUMOR_ONLY(jabba_input)
         } else {
-            JABBA(jabba_input)
+            jabbaOut = JABBA(jabba_input)
         }
         
 
         jabba_rds = Channel.empty()
-            .mix(JABBA.out.jabba_rds)
+            .mix(jabbaOut.jabba_rds)
             .mix(jabba_rds_existing_outputs)
         jabba_rds_for_merge = jabba_rds
             .map { it -> [ it[0].patient, it[1] ] } // meta.patient, jabba rds
 
         jabba_gg = Channel.empty()
-            .mix(JABBA.out.jabba_gg)
+            .mix(jabbaOut.jabba_gg)
             .mix(jabba_gg_existing_outputs)
         jabba_gg_for_merge = jabba_gg
             .map { it -> [ it[0].patient, it[1] ] } // meta.patient, jabba.gg.rds
-        versions = versions.mix(JABBA.out.versions)
+        versions = versions.mix(jabbaOut.versions)
     }
 
     // Non-integer balance
