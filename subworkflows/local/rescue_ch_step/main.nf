@@ -1,6 +1,6 @@
-include { RESCUE_CH_HEME } from "${workflow.projectDir}/modules/local/sage/somatic/main.nf"
+include { RESCUE_CH_HEME } from '../../../modules/local/sage/somatic/main.nf'
 
-heme_ref                               = WorkflowNfcasereports.create_file_channel(params.heme_db)
+
 
 workflow RESCUE_CH_HEME_STEP {
     // defining inputs
@@ -9,6 +9,7 @@ workflow RESCUE_CH_HEME_STEP {
 
     //Creating empty channels for output
     main:
+    heme_ref = WorkflowNfcasereports.create_file_channel(params.heme_db)
     sage_tumor_only_rescue_ch_vcf = Channel.empty()
 
     RESCUE_CH_HEME(

@@ -1,53 +1,51 @@
-import Utils
-
 // This is the main workflow for the alignment step of the pipeline.
 
-include { test_robust_absence; test_robust_presence } from "${workflow.projectDir}/lib/NfUtils"
+include { test_robust_absence; test_robust_presence } from '../../../lib/NfUtils'
 
 // Run FASTQC
-include { FASTQC } from "${workflow.projectDir}/modules/nf-core/fastqc/main"
+include { FASTQC } from '../../../modules/nf-core/fastqc/main'
 
 // TRIM/SPLIT FASTQ Files
-include { FASTP } from "${workflow.projectDir}/modules/nf-core/fastp/main"
+include { FASTP } from '../../../modules/nf-core/fastp/main'
 
 // Loading the MULTIQC module
-include { MULTIQC } from "${workflow.projectDir}/modules/nf-core/multiqc/main"
+include { MULTIQC } from '../../../modules/nf-core/multiqc/main'
 
 // Loading the module that dumps the versions of software being used
-include { CUSTOM_DUMPSOFTWAREVERSIONS } from "${workflow.projectDir}/modules/nf-core/custom/dumpsoftwareversions/main"
+include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../../../modules/nf-core/custom/dumpsoftwareversions/main'
 
 // FASTQ Concatenation
-include { CAT_FASTQ } from "${workflow.projectDir}/modules/nf-core/cat/fastq/main"
+include { CAT_FASTQ } from '../../../modules/nf-core/cat/fastq/main'
 
 // Map input reads to reference genome
-include { FASTQ_ALIGN_BWAMEM_MEM2 } from "${workflow.projectDir}/subworkflows/local/fastq_align_bwamem_mem2/main"
-include { FASTQ_PARABRICKS_FQ2BAM } from "${workflow.projectDir}/subworkflows/local/fastq_parabricks_fq2bam/main"
+include { FASTQ_ALIGN_BWAMEM_MEM2 } from '../../../subworkflows/local/fastq_align_bwamem_mem2/main'
+include { FASTQ_PARABRICKS_FQ2BAM } from '../../../subworkflows/local/fastq_parabricks_fq2bam/main'
 
 // Merge and index BAM files (optional)
-include { BAM_MERGE_INDEX_SAMTOOLS } from "${workflow.projectDir}/subworkflows/local/bam_merge_index_samtools/main"
+include { BAM_MERGE_INDEX_SAMTOOLS } from '../../../subworkflows/local/bam_merge_index_samtools/main'
 
 // Convert BAM files
-include { SAMTOOLS_CONVERT as BAM_TO_CRAM } from "${workflow.projectDir}/modules/nf-core/samtools/convert/main"
-include { SAMTOOLS_CONVERT as BAM_TO_CRAM_MAPPING } from "${workflow.projectDir}/modules/nf-core/samtools/convert/main"
+include { SAMTOOLS_CONVERT as BAM_TO_CRAM } from '../../../modules/nf-core/samtools/convert/main'
+include { SAMTOOLS_CONVERT as BAM_TO_CRAM_MAPPING } from '../../../modules/nf-core/samtools/convert/main'
 
 // Convert CRAM files (optional)
-include { SAMTOOLS_CONVERT as CRAM_TO_BAM } from "${workflow.projectDir}/modules/nf-core/samtools/convert/main"
-include { SAMTOOLS_CONVERT as CRAM_TO_BAM_RECAL } from "${workflow.projectDir}/modules/nf-core/samtools/convert/main"
-include { SAMTOOLS_CONVERT as CRAM_TO_BAM_FINAL } from "${workflow.projectDir}/modules/nf-core/samtools/convert/main"
+include { SAMTOOLS_CONVERT as CRAM_TO_BAM } from '../../../modules/nf-core/samtools/convert/main'
+include { SAMTOOLS_CONVERT as CRAM_TO_BAM_RECAL } from '../../../modules/nf-core/samtools/convert/main'
+include { SAMTOOLS_CONVERT as CRAM_TO_BAM_FINAL } from '../../../modules/nf-core/samtools/convert/main'
 
 // Mark Duplicates (+QC)
-include { BAM_MARKDUPLICATES } from "${workflow.projectDir}/subworkflows/local/bam_markduplicates/main"
+include { BAM_MARKDUPLICATES } from '../../../subworkflows/local/bam_markduplicates/main'
 
 // QC on CRAM
-include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_NO_MD } from "${workflow.projectDir}/subworkflows/local/cram_qc_mosdepth_samtools/main"
-include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_RECAL } from "${workflow.projectDir}/subworkflows/local/cram_qc_mosdepth_samtools/main"
+include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_NO_MD } from '../../../subworkflows/local/cram_qc_mosdepth_samtools/main'
+include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_RECAL } from '../../../subworkflows/local/cram_qc_mosdepth_samtools/main'
 
 
 // Create recalibration tables
-include { BAM_BASERECALIBRATOR } from "${workflow.projectDir}/subworkflows/local/bam_baserecalibrator/main"
+include { BAM_BASERECALIBRATOR } from '../../../subworkflows/local/bam_baserecalibrator/main'
 
 // Create recalibrated cram files to use for variant calling (+QC)
-include { BAM_APPLYBQSR } from "${workflow.projectDir}/subworkflows/local/bam_applybqsr/main"
+include { BAM_APPLYBQSR } from '../../../subworkflows/local/bam_applybqsr/main'
 
 workflow ALIGNMENT_STEP {
 	take:
@@ -70,7 +68,7 @@ workflow ALIGNMENT_STEP {
 	input_fastq = inputs.filter { it -> it.bam.isEmpty() }.map { it -> [it.meta, it.fastq_1, it.fastq_2, it.meta.read_group] }
 	
 	
-	input_fastq_qc = input_fastq.map { it -> [it[0], [it[1], it[2]]] }
+	// input_fastq_qc = input_fastq.map { it -> [it[0], [it[1], it[2]]] }
 
 	alignment_bams_final = inputs
 		.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.bam, it.bai] }
@@ -117,7 +115,7 @@ workflow ALIGNMENT_STEP {
             if (params.split_fastq) {
                 log.warn "You have mentioned split_fastq to `$params.split_fastq`, will do splitting"
                 reads_for_alignment = FASTP.out.reads.map{ meta, reads ->
-                    read_files = reads.sort(false) { a,b -> a.getName().tokenize('.')[0] <=> b.getName().tokenize('.')[0] }.collate(2)
+                    def read_files = reads.sort(false) { a,b -> a.getName().tokenize('.')[0] <=> b.getName().tokenize('.')[0] }.collate(2)
                     [ meta + [ size:read_files.size() ], read_files ]
                 }.transpose()
             } else reads_for_alignment = FASTP.out.reads
@@ -149,7 +147,7 @@ workflow ALIGNMENT_STEP {
 				[meta.patient + "___sep___" + meta.sample, [meta, fastq_1, fastq_2, rg]]
 			}
 			.groupTuple()
-			.map { sample, items ->
+			.map { _sample, items ->
 				// items: list of [meta, fastq_1, fastq_2, rg] for each lane
 				def metas = items.collect { it[0] }
 				def fastq_1s = items.collect { it[1] }.flatten().collect { file(it) }
@@ -189,7 +187,7 @@ workflow ALIGNMENT_STEP {
 			// inputs_for_cat_fastq = reads_for_alignment.map { meta, fastq_1s, fastq_2s, rg ->
 			// 	[meta, [fastq_1s, fastq_2s] ]
 			// }
-			inputs_for_cat_fastq = reads_for_alignment.map { meta, fastq_1s, fastq_2s, rg ->
+			inputs_for_cat_fastq = reads_for_alignment.map { meta, fastq_1s, fastq_2s, _rg ->
 				def reads = (0..<fastq_1s.size()).collectMany { i ->
 					[file(fastq_1s[i]), file(fastq_2s[i])]
 				}
@@ -234,7 +232,7 @@ workflow ALIGNMENT_STEP {
                 // Use groupKey to make sure that the correct group can advance as soon as it is complete
                 // and not stall the workflow until all reads from all channels are mapped
 				// cleanedMeta = meta.subMap('patient', 'sample', 'sex', 'status', 'id') + [ id: meta.sample]
-				cleanedMeta = meta - meta.subMap('num_lanes', 'read_group', 'size', 'tumor_id', 'lanes') + [ id:meta.sample ]
+				def cleanedMeta = meta - meta.subMap('num_lanes', 'read_group', 'size', 'tumor_id', 'lanes') + [ id:meta.sample ]
                 [ groupKey( cleanedMeta, numReads), bam ]
             }
         .groupTuple()
@@ -258,7 +256,7 @@ workflow ALIGNMENT_STEP {
     if (do_post_processing_bc_aligner_not_fq2bam || do_post_processing_bc_of_tool_or_flag) { // fq2bam does not need postprocessing
 		
 		bam_mapped = alignment_bams_final
-            .map { id, meta, bam, bai -> [meta + [data_type: "bam"], bam] }
+            .map { _id, meta, bam, _bai -> [meta + [data_type: "bam"], bam] }
         cram_markduplicates_no_spark = Channel.empty()
 
         // STEP 2: markduplicates (+QC) + convert to CRAM

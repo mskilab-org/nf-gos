@@ -2,17 +2,13 @@
 // QC on BAM
 //
 
-include { CONPAIR } from "${workflow.projectDir}/modules/local/conpair/main"
-include { PICARD_COLLECTWGSMETRICS } from "${workflow.projectDir}/modules/nf-core/picard/collectwgsmetrics/main"
-include { PARABRICKS_BAMMETRICS } from "${workflow.projectDir}/modules/local/bammetrics/main"
-include { PICARD_COLLECTMULTIPLEMETRICS } from "${workflow.projectDir}/modules/nf-core/picard/collectmultiplemetrics/main"
-include { GPU_COLLECTMULTIPLEMETRICS } from "${workflow.projectDir}/modules/local/gpu_collectmultiplemetrics/main"
-include { GATK4_ESTIMATELIBRARYCOMPLEXITY } from "${workflow.projectDir}/modules/nf-core/gatk4/estimatelibrarycomplexity/main"
-include { SAMTOOLS_SUBSAMPLE } from "${workflow.projectDir}/modules/local/subsample_reads/main"
-
-fasta = WorkflowNfcasereports.create_file_channel(params.fasta)
-fai = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
-intervals = WorkflowNfcasereports.create_file_channel(params.intervals)
+include { CONPAIR } from '../../../modules/local/conpair/main.nf'
+include { PICARD_COLLECTWGSMETRICS } from '../../../modules/nf-core/picard/collectwgsmetrics/main'
+include { PARABRICKS_BAMMETRICS } from '../../../modules/local/bammetrics/main'
+include { PICARD_COLLECTMULTIPLEMETRICS } from '../../../modules/nf-core/picard/collectmultiplemetrics/main'
+include { GPU_COLLECTMULTIPLEMETRICS } from '../../../modules/local/gpu_collectmultiplemetrics/main'
+include { GATK4_ESTIMATELIBRARYCOMPLEXITY } from '../../../modules/nf-core/gatk4/estimatelibrarycomplexity/main'
+include { SAMTOOLS_SUBSAMPLE } from '../../../modules/local/subsample_reads/main'
 
 // tools_to_run = WorkflowNfcasereports.toolsToRun
 
@@ -24,6 +20,10 @@ workflow BAM_QC {
 	tools_used
 
     main:
+    def fasta = WorkflowNfcasereports.create_file_channel(params.fasta)
+    def fai = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
+    // def intervals = WorkflowNfcasereports.create_file_channel(params.intervals)
+
     versions = Channel.empty()
     reports = Channel.empty()
 
@@ -40,7 +40,7 @@ workflow BAM_QC {
             .unique()
         collect_wgs_metrics_bam = collect_wgs_metrics_inputs
             .join(bam)
-            .map { id, meta, bam, bai -> [ meta, bam, bai ] }
+            .map { _id, meta, bamPath, bai -> [ meta, bamPath, bai ] }
 		ucollect_wgs_metrics_bam = collect_wgs_metrics_bam.unique { it -> it[0].sample }
 		if (use_gpu) {
 			process_wgsmetrics = PARABRICKS_BAMMETRICS(
@@ -75,7 +75,7 @@ workflow BAM_QC {
             .unique()
         collect_multiple_metrics_bam = collect_multiple_metrics_inputs
             .join(bam)
-            .map { id, meta, bam, bai -> [ meta, bam, bai ] }
+            .map { _id, meta, bamPath, bai -> [ meta, bamPath, bai ] }
 
 		process_mm_qc = [metrics: Channel.empty(), versions: Channel.empty()]
 		// FIXME: GPU multiple metrics failing to pick up GPU
@@ -105,7 +105,7 @@ workflow BAM_QC {
             .map { it -> [it.meta.sample] }
         estimate_library_complexity_bam = estimate_library_complexity_inputs
             .join(bam)
-            .map { id, meta, bam, bai -> [ meta, bam, bai ] }
+            .map { _id, meta, bamPath, bai -> [ meta, bamPath, bai ] }
         // Subsample BAMs for faster estimation of library complexity
         // SAMTOOLS_SUBSAMPLE(
         //     estimate_library_complexity_bam,
@@ -115,7 +115,7 @@ workflow BAM_QC {
         // bams_subsampled = SAMTOOLS_SUBSAMPLE.out.bam_subsampled
 
         // bam_only = bams_subsampled.map{ meta, bam, bai -> [ meta, bam ] }
-		bam_only = estimate_library_complexity_bam.map{ meta, bam, bai -> [ meta, bam ] }
+		bam_only = estimate_library_complexity_bam.map{ meta, bamPath, _bai -> [ meta, bamPath ] }
         GATK4_ESTIMATELIBRARYCOMPLEXITY(
             bam_only,
             fasta,
@@ -140,23 +140,17 @@ workflow BAM_QC {
     def normal_ids = inputs_unlaned_split.normal.map { it.meta.patient }.unique().collect().ifEmpty(["NO_NORMALS_PRESENT___MD7cicQBtB"])
     def tumor_ids = inputs_unlaned_split.tumor.map { it.meta.patient }.unique().collect()
 
-    mixed_ids = tumor_ids
+    def mixed_ids = tumor_ids
         .concat(normal_ids)
         .collect(flat: false)
-
-    tumor_only_ids = mixed_ids
-        .map{ tumor, normal ->
-            tumor.findAll { !normal.contains(it) }
-        }
-        .flatten()
     
-    tumor_paired_ids = mixed_ids
+    def tumor_paired_ids = mixed_ids
         .map{ tumor, normal ->
             tumor.findAll { normal.contains(it) }
         }
         .flatten()
 
-    ids_without_conpair = inputs_unlaned.filter { it ->
+    def ids_without_conpair = inputs_unlaned.filter { it ->
         it.conpair_contamination.isEmpty() || it.conpair_concordance.isEmpty()
     }.map { it -> 
         [ it.meta.patient ]
@@ -165,16 +159,16 @@ workflow BAM_QC {
     tumor_paired_ids = tumor_paired_ids.join(ids_without_conpair)
     
     
-    bam_key_patient = bam.map { meta_sample, meta, bam, bai ->
-        [ meta.patient, meta, bam, bai ]
+    bam_key_patient = bam.map { _meta_sample, meta, bamPath, bai ->
+        [ meta.patient, meta, bamPath, bai ]
     } // Note patient keys will be duplicated
 
     conpair_inputs_to_combine = tumor_paired_ids // A Should be unique.. no dups.
         .cross(bam_key_patient) // B can have dups, according to nextflow docs. This will inner join but allow for dups. Essentially a filter by merge step
-        .map { patient, bam ->
-            def meta_bam = bam[1]
-            def bam_file = bam[2]
-            def bai_file = bam[3]
+        .map { patient, bamList ->
+            def meta_bam = bamList[1]
+            def bam_file = bamList[2]
+            def bai_file = bamList[3]
             [ patient, meta_bam, bam_file, bai_file ]
         }
         .dump(tag: "conpair_inputs_to_combine", pretty: true)
@@ -185,7 +179,7 @@ workflow BAM_QC {
     
     conpair_inputs = conpair_inputs_to_combine.tumor
         .combine(conpair_inputs_to_combine.normal, by: 0)
-        .map { patient_tumor, meta_tumor, bam_tumor, bai_tumor, meta_normal, bam_normal, bai_normal ->
+        .map { _patient_tumor, meta_tumor, bam_tumor, bai_tumor, _meta_normal, bam_normal, bai_normal ->
             def meta_tumor_out = meta_tumor + [id: meta_tumor.patient]
             meta_tumor_out = meta_tumor_out - meta_tumor_out.subMap('read_group')
             [ meta_tumor_out, bam_tumor, bai_tumor, bam_normal, bai_normal ]

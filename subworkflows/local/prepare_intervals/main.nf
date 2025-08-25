@@ -69,7 +69,7 @@ workflow PREPARE_INTERVALS {
             .map{ intervalFile ->
                 def duration = 0.0
                 for (line in intervalFile.readLines()) {
-                    final fields = line.split('\t')
+                    def fields = line.split('\t')
                     if (fields.size() >= 5) duration += fields[4].toFloat()
                     else {
                         start = fields[1].toInteger()
