@@ -1,8 +1,8 @@
 // SigProfilerAssignment
-include { VCF_SIGPROFILERASSIGNMENT } from "${workflow.projectDir}/subworkflows/local/vcf_sigprofilerassignment/main"
+include { VCF_SIGPROFILERASSIGNMENT } from '../../../subworkflows/local/vcf_sigprofilerassignment/main'
 
 // FFPE IMPACT Filter
-include { FFPE_IMPACT_FILTER } from "${workflow.projectDir}/modules/local/ffpe_impact_filter/main"
+include { FFPE_IMPACT_FILTER } from '../../../modules/local/ffpe_impact_filter/main'
 
 
 workflow SIGNATURES_STEP {
@@ -39,7 +39,7 @@ workflow SIGNATURES_STEP {
   sbs_posterior_prob_existing_outputs = Channel.empty()
   indel_posterior_prob_existing_outputs = Channel.empty()
 
-  ffpe_filtered_existing_vcf = Channel.empty()
+//   ffpe_filtered_existing_vcf = Channel.empty()
 
 //   inputs_unlaned = inputs.map { it ->
 //     it + [meta: Utils.remove_lanes_from_meta(it.meta)]
@@ -48,7 +48,7 @@ workflow SIGNATURES_STEP {
   inputs_tumor_status = inputs_unlaned.branch{ tumor: it.meta.status.toString() == "1" }
   
 
-  versions = Channel.empty()
+//   versions = Channel.empty()
 
 
   filtered_ffpe_impact_somatic_vcf_inputs = inputs_tumor_status.tumor
@@ -76,9 +76,9 @@ workflow SIGNATURES_STEP {
 
   if (tools_used.contains("all") || tools_used.contains("signatures")) {
 	// filtered_ffpe_impact_somatic_vcf_for_merge = Channel.empty()
-	filtered_ffpe_impact_somatic_vcf_for_merge = inputs_tumor_status.tumor
-   	  .filter { ! it.ffpe_impact_filtered_vcf.isEmpty() }
-	  .map { it -> [ it.meta, it.ffpe_impact_filtered_vcf, it.ffpe_impact_filtered_vcf_tbi ] }
+	// filtered_ffpe_impact_somatic_vcf_for_merge = inputs_tumor_status.tumor
+   	//   .filter { ! it.ffpe_impact_filtered_vcf.isEmpty() }
+	//   .map { it -> [ it.meta, it.ffpe_impact_filtered_vcf, it.ffpe_impact_filtered_vcf_tbi ] }
 	
 	signatures_inputs = inputs_tumor_status.tumor
 		.filter { it.sbs_signatures.isEmpty() || it.indel_signatures.isEmpty() || it.signatures_matrix.isEmpty()}
@@ -131,8 +131,8 @@ workflow SIGNATURES_STEP {
 	merged_inputs = filtered_ffpe_impact_somatic_vcf_inputs // patient, meta, annotated somatic_mut_vcf
 		.join(sbs_posterior_prob_join) // patient, sbs_posterior_prob
 		.join(indel_posterior_prob_join) // patient, indel_posterior_prob
-		.map { patient, meta, annotated_vcf, sbs_posterior_prob, indel_posterior_prob -> 
-			[meta, annotated_vcf, sbs_posterior_prob, indel_posterior_prob ] 
+		.map { _patient, meta, annotated_vcf, sbs_posterior_prob_path, indel_posterior_prob_path -> 
+			[meta, annotated_vcf, sbs_posterior_prob_path, indel_posterior_prob_path ] 
 		} // meta, annotated somatic_mut_vcf, sbs_posterior_prob, indel_posterior_prob
 
 	if (is_filter_ffpe_impact) {

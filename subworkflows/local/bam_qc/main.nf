@@ -137,20 +137,20 @@ workflow BAM_QC {
             normal: it.meta.status.toString() == "0"
         }
 
-    def normal_ids = inputs_unlaned_split.normal.map { it.meta.patient }.unique().collect().ifEmpty(["NO_NORMALS_PRESENT___MD7cicQBtB"])
-    def tumor_ids = inputs_unlaned_split.tumor.map { it.meta.patient }.unique().collect()
+    normal_ids = inputs_unlaned_split.normal.map { it.meta.patient }.unique().collect().ifEmpty(["NO_NORMALS_PRESENT___MD7cicQBtB"])
+    tumor_ids = inputs_unlaned_split.tumor.map { it.meta.patient }.unique().collect()
 
-    def mixed_ids = tumor_ids
+    mixed_ids = tumor_ids
         .concat(normal_ids)
         .collect(flat: false)
     
-    def tumor_paired_ids = mixed_ids
+    tumor_paired_ids = mixed_ids
         .map{ tumor, normal ->
             tumor.findAll { normal.contains(it) }
         }
         .flatten()
 
-    def ids_without_conpair = inputs_unlaned.filter { it ->
+    ids_without_conpair = inputs_unlaned.filter { it ->
         it.conpair_contamination.isEmpty() || it.conpair_concordance.isEmpty()
     }.map { it -> 
         [ it.meta.patient ]

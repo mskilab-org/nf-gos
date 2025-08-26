@@ -188,7 +188,8 @@ def expandBraces(String path) {
     return expandedPaths
 }
 
-groovyx.gpars.GParsPool.withPool(numThreads) {
+GParsPool = Class.forName('groovyx.gpars.GParsPool')
+GParsPool.withPool(numThreads) {
     checkPathParamList.eachParallel { param ->
         if (param == null) {
             println "Skipping null path"
@@ -406,7 +407,7 @@ sampleList.each { input_map ->
 println "Provided inputs: ${available_inputs}"
 
 def schemaFile = file("$projectDir/gos-assets/nf-gos/assets/schema_input.json")
-def schema = new JsonSlurper().parse(schemaFile)
+def schema = new groovy.json.JsonSlurper().parse(schemaFile)
 
 
 def props = schema.items.properties
@@ -648,7 +649,7 @@ include { BAM_QC } from '../subworkflows/local/bam_qc/main'
 include { BAM_SVCALLING_SVABA } from '../subworkflows/local/bam_svcalling_svaba/main'
 
 // MSISensor Pro
-include { BAM_MSISENSORPRO } from '../subworkflows/local/bam_msisensorpro/main'
+include { MSISENSORPRO_STEP } from '../subworkflows/local/steps/main'
 
 //GRIDSS
 include { BAM_SVCALLING_GRIDSS } from '../subworkflows/local/bam_svcalling_gridss/main'
@@ -1080,71 +1081,14 @@ workflow NFCASEREPORTS {
 
     // MSISensorPro
     // ##############################
-    if (tools_used.contains("all") || tools_used.contains("msisensorpro") && !params.tumor_only) {
-
-        bam_msi_inputs = inputs_unlaned.filter { it.msi.isEmpty() }.map { it -> [it.meta.sample + "___sep___" + it.meta.patient] }.unique()
-
-        bam_msi = alignment_bams_final // reduped to have all tumor/normal pairs (even if normals are reused/duped)
-            .map { sample, meta, bam, bai ->
-                [ sample + "___sep___" + meta.patient, meta, bam, bai ]
-            }
-            .join(bam_msi_inputs)
-            .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
-        msisensorpro_existing_outputs = inputs.map { it -> [it.meta, it.msi] }.filter { !it[1].isEmpty() }
-        msisensorpro_existing_outputs_germline = inputs.map { it -> [it.meta, it.msi_germline] }.filter { !it[1].isEmpty() }
-
-        if (params.tumor_only) {
-            bam_msi_status = bam_msi.branch{
-                tumor:  it[0].status.toString() == "1"
-            }
-
-            // add empty arrays to stand-in for normals
-            bam_msi_pair = bam_msi_status.tumor.map{ meta, bam, bai -> [ meta + [tumor_id: meta.sample], [], [], bam, bai, [] ] }
-        } else {
-            // getting the tumor and normal cram files separated
-            bam_msi_status = bam_msi.branch{
-                normal: it[0].status.toString() == "0"
-                tumor:  it[0].status.toString() == "1"
-            }
-
-            // All normal samples
-            bam_msi_normal_for_crossing = bam_msi_status.normal.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
-
-            // All tumor samples
-            bam_msi_tumor_for_crossing = bam_msi_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
-
-            // Crossing the normal and tumor samples to create tumor and normal pairs
-            bam_msi_pair = bam_msi_normal_for_crossing.cross(bam_msi_tumor_for_crossing)
-                .map { normal, tumor ->
-                    def meta = [:]
-
-                    meta.id         = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
-                    meta.normal_id  = normal[1].sample
-                    meta.patient    = normal[0]
-                    meta.sex        = normal[1].sex
-                    meta.tumor_id   = tumor[1].sample
-
-                    [ meta, normal[2], normal[3], tumor[2], tumor[3], [] ] // add empty array for intervals
-            }
-        }
-
-        BAM_MSISENSORPRO(
-            bam_msi_pair,
-            msisensorpro_scan
-        )
-
-        msi_from_msisensorpro = Channel.empty()
-            .mix(BAM_MSISENSORPRO.out.msi_somatic)
-            .mix(msisensorpro_existing_outputs)
-        versions = versions.mix(BAM_MSISENSORPRO.out.versions)
-
-        if (!params.tumor_only) {
-            germline_msi_from_msisensorpro = Channel.empty()
-                .mix(BAM_MSISENSORPRO.out.msi_germline)
-                .mix(msisensorpro_existing_outputs_germline)
-        }
-
-    }
+    MSISENSORPRO_STEP(
+        inputs_unlaned,
+        alignment_bams_final,
+        tools_used,
+        msisensorpro_scan
+    )
+    msi_from_msisensorpro = MSISENSORPRO_STEP.out.msi_from_msisensorpro
+    germline_msi_from_msisensorpro = MSISENSORPRO_STEP.out.germline_msi_from_msisensorpro
 
     // SV Calling
     // ##############################
@@ -2031,7 +1975,7 @@ workflow NFCASEREPORTS {
                 }
         }
 
-        def jabbaOut = Channel.empty()
+        jabbaOut = Channel.empty()
         if (params.tumor_only) {
             jabbaOut = JABBA_TUMOR_ONLY(jabba_input)
         } else {

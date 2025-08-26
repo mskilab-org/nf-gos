@@ -1,18 +1,12 @@
 //GRIDSS
-include { BAM_SVCALLING_GRIDSS } from "${workflow.projectDir}/subworkflows/local/bam_svcalling_gridss/main"
-include { BAM_SVCALLING_GRIDSS_SOMATIC } from "${workflow.projectDir}/subworkflows/local/bam_svcalling_gridss/main"
+include { BAM_SVCALLING_GRIDSS } from '../../../subworkflows/local/bam_svcalling_gridss/main'
+include { BAM_SVCALLING_GRIDSS_SOMATIC } from '../../../subworkflows/local/bam_svcalling_gridss/main'
 
-include { GRIDSS_PREPROCESS as GRIDSS_PREPROCESS_TUMOR   } from "${workflow.projectDir}/modules/local/gridss/gridss/main.nf"
-include { GRIDSS_PREPROCESS as GRIDSS_PREPROCESS_NORMAL   } from "${workflow.projectDir}/modules/local/gridss/gridss/main.nf"
-include { GRIDSS_ASSEMBLE_SCATTER   } from "${workflow.projectDir}/modules/local/gridss/gridss/main.nf"
-include { GRIDSS_ASSEMBLE_GATHER   } from "${workflow.projectDir}/modules/local/gridss/gridss/main.nf"
-include { GRIDSS_CALL   } from "${workflow.projectDir}/modules/local/gridss/gridss/main.nf"
-
-
-fasta                               = WorkflowNfcasereports.create_file_channel(params.fasta)
-fasta_fai                           = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
-blacklist_gridss                    = WorkflowNfcasereports.create_file_channel(params.blacklist_gridss)
-
+include { GRIDSS_PREPROCESS as GRIDSS_PREPROCESS_TUMOR   } from '../../../modules/local/gridss/gridss/main.nf'
+include { GRIDSS_PREPROCESS as GRIDSS_PREPROCESS_NORMAL   } from '../../../modules/local/gridss/gridss/main.nf'
+include { GRIDSS_ASSEMBLE_SCATTER   } from '../../../modules/local/gridss/gridss/main.nf'
+include { GRIDSS_ASSEMBLE_GATHER   } from '../../../modules/local/gridss/gridss/main.nf'
+include { GRIDSS_CALL   } from '../../../modules/local/gridss/gridss/main.nf'
 
 workflow SV_CALLING_STEP {
     take:
@@ -22,11 +16,15 @@ workflow SV_CALLING_STEP {
     tools_used
 
     main:
+    fasta                               = WorkflowNfcasereports.create_file_channel(params.fasta)
+    fasta_fai                           = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
+    blacklist_gridss                    = WorkflowNfcasereports.create_file_channel(params.blacklist_gridss)
 
-    versions               = Channel.empty()
-    vcf                    = Channel.empty()
-    vcf_index              = Channel.empty()
-    assembly_bam           = Channel.empty()
+
+    // versions               = Channel.empty()
+    // vcf                    = Channel.empty()
+    // vcf_index              = Channel.empty()
+    // assembly_bam           = Channel.empty()
     vcf_from_gridss_gridss = Channel.empty()
     vcf_raw_from_gridss_gridss = Channel.empty()
 
@@ -204,14 +202,14 @@ workflow SV_CALLING_STEP {
                 .groupTuple(by: 0, size: total_jobnodes) // [meta.patient, list[workdirs0, workdirs1, ...]]
                 .map { patient, list_of_gridss_scatter_assembly_paths ->
                     def gridss_scatter_assembly_paths = list_of_gridss_scatter_assembly_paths.flatten()
-                    assembly_dir = gridss_scatter_assembly_paths.collect{ it.getParent().getName().toString() }.unique()[0]
+                    def assembly_dir = gridss_scatter_assembly_paths.collect{ it.getParent().getName().toString() }.unique()[0]
                     gridss_scatter_assembly_paths = gridss_scatter_assembly_paths.findAll { it =~ /.*chunk.*\.(bam|bai)$/ }
                     [patient, assembly_dir, gridss_scatter_assembly_paths]
                 }
                 // .view { "collected_assembly_dirs: $it" }
             
             gatherassembly_mixed_input = assembly_mixed_input
-                .map{ meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, jobnodes, jobindex ->
+                .map{ meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, _jobnodes, _jobindex ->
                     [
                         meta.patient, 
                         meta, 
@@ -227,7 +225,7 @@ workflow SV_CALLING_STEP {
                 .join(
                     collected_assembly_dirs
                 )
-                .map{ patient, meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths ->
+                .map{ _patient, meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths ->
                     [
                         meta, 
                         tumor_bam, 
@@ -266,7 +264,7 @@ workflow SV_CALLING_STEP {
                             [meta.patient, gridss_final_assembly, gridss_gather_assembly_paths]
                         }
                 )
-                .map{ patient, meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths, gridss_final_assembly, gridss_gather_assembly_paths ->
+                .map{ _patient, meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths, gridss_final_assembly, gridss_gather_assembly_paths ->
                     [
                         meta, 
                         tumor_bam, 
@@ -293,9 +291,9 @@ workflow SV_CALLING_STEP {
                     def i_v = vcf_list.findIndexOf { it.name.contains('gridss.vcf.gz') } 
                     def i_t = tbi_list.findIndexOf { it.name.contains('gridss.vcf.gz.tbi') } 
 
-                    def vcf = vcf_list[i_v]
+                    def vcfOut = vcf_list[i_v]
                     def tbi = tbi_list[i_t]
-                    [ meta, vcf, tbi ]
+                    [ meta, vcfOut, tbi ]
                 }
                 .dump (tag: "raw vcf", pretty: true)
             

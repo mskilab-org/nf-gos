@@ -27,7 +27,7 @@ process SNV_MULTIPLICITY {
     def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
     """
-    export RSCRIPT_PATH=\$(echo "${baseDir}/bin/snv_multiplicity.R")
+    export RSCRIPT_PATH=\$(echo "\${NEXTFLOW_PROJECT_DIR}/bin/snv_multiplicity.R")
 
     Rscript \$RSCRIPT_PATH \\
         --somatic_snv ${somatic_snv} \\
@@ -45,6 +45,7 @@ process SNV_MULTIPLICITY {
     """
 
     stub:
+    def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
     """
     touch est_snv_cn_somatic.rds
     touch est_snv_cn_germline.rds
