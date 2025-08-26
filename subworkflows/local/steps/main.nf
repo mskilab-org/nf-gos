@@ -298,22 +298,6 @@ workflow DRYCLEAN_STEP {
             dryclean_normal_cov = Channel.empty()
                 .mix(NORMAL_DRYCLEAN.out.dryclean_cov)
                 .mix(dryclean_existing_outputs.normal)
-
-
-            sample_meta_map = inputs_unlaned.map { it -> [ it.meta.sample, it.meta ]}.unique()
-
-            // dryclean_normal_cov_for_merge = dryclean_normal_cov
-            //     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, dryclean_cov
-
-            dryclean_normal_cov_for_merge = dryclean_normal_cov
-                .map { it -> [ it[0].sample, it[1] ] } // meta.sample, dryclean_cov
-                .cross(sample_meta_map)
-                .map { dryclean_normal, sample_meta ->
-                    def meta_complete = sample_meta[1]
-                    [ meta_complete.patient, dryclean_normal[1] ]
-                }
-                .unique{ patient, dryclean_cov -> patient }
-                .dump(tag: "dryclean_normal_cov_for_merge", pretty: true)
         }
     }
 
@@ -333,14 +317,7 @@ workflow CBS_STEP {
 
     main:
     versions = Channel.empty()
-    cbs_inputs = inputs_unlaned
-        .filter { it.seg.isEmpty() || it.nseg.isEmpty() }
-        .map { it -> [it.meta.patient, it.meta] }
-        .unique{ it -> it[1].patient + "___sep___" + it[1].sample } // unique by patient and sample
-        .branch{
-            normal: it[1].status.toString() == "0"
-            tumor:  it[1].status.toString() == "1"
-        }
+
     cbs_existing_seg = inputs_unlaned
         .map { it -> [it.meta, it.seg] }
         .filter { !it[1].isEmpty() }
@@ -351,6 +328,16 @@ workflow CBS_STEP {
 
     cbs_seg_rds = cbs_existing_seg
     cbs_nseg_rds = cbs_existing_nseg
+
+    cbs_inputs = inputs_unlaned
+        .filter { it.seg.isEmpty() || it.nseg.isEmpty() }
+        .map { it -> [it.meta.patient, it.meta] }
+        .unique{ it -> it[1].patient + "___sep___" + it[1].sample } // unique by patient and sample
+        .branch{
+            normal: it[1].status.toString() == "0"
+            tumor:  it[1].status.toString() == "1"
+        }
+    
     
     if (tools_used.contains("all") || tools_used.contains("cbs")) {
         cbs_tumor_input = cbs_inputs.tumor

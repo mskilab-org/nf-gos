@@ -457,26 +457,26 @@ workflow SETUP {
         .map { patient_sample, num_lanes, ch_items ->
 
             if (ch_items.meta.lane && ch_items.fastq_2) {
-                ch_items.meta   = ch_items.meta + [id: "${ch_items.meta.sample}-${ch_items.meta.lane}".toString()]
-                def CN         = params.seq_center ? "CN:${params.seq_center}\\t" : ''
+                ch_items.meta =  ch_items.meta + [id: "${ch_items.meta.sample}-${ch_items.meta.lane}".toString()]
+                def CN =  params.seq_center ? "CN:${params.seq_center}\\t" : ''
 
-                def flowcell   = flowcellLaneFromFastq(ch_items.fastq_1)
+                def flowcell =  flowcellLaneFromFastq(ch_items.fastq_1)
                 // Don't use a random element for ID, it breaks resuming
                 def read_group = "\"@RG\\tID:${flowcell}.${ch_items.meta.sample}.${ch_items.meta.lane}\\t${CN}PU:${ch_items.meta.lane}\\tSM:${ch_items.meta.patient}_${ch_items.meta.sample}\\tLB:${ch_items.meta.sample}\\tDS:${params.fasta}\\tPL:${params.seq_platform}\""
 
-                ch_items.meta           = ch_items.meta - ch_items.meta.subMap('lane') + [num_lanes: num_lanes.toInteger(), read_group: read_group.toString(), size: 1]
+                ch_items.meta =  ch_items.meta - ch_items.meta.subMap('lane') + [num_lanes: num_lanes.toInteger(), read_group: read_group.toString(), size: 1]
 
             } else if (ch_items.fastq_2) {
-                ch_items.meta   = ch_items.meta + [id: ch_items.meta.sample.toString()]
-                def CN         = params.seq_center ? "CN:${params.seq_center}\\t" : ''
+                ch_items.meta =  ch_items.meta + [id: ch_items.meta.sample.toString()]
+                def CN =  params.seq_center ? "CN:${params.seq_center}\\t" : ''
 
-                def flowcell   = flowcellLaneFromFastq(ch_items.fastq_1)
+                def flowcell =  flowcellLaneFromFastq(ch_items.fastq_1)
                 def read_group = "\"@RG\\tID:${flowcell}.${ch_items.meta.sample}\\t${CN}PU:${ch_items.meta.sample}\\tSM:${ch_items.meta.patient}_${ch_items.meta.sample}\\tLB:${ch_items.meta.sample}\\tDS:${params.fasta}\\tPL:${params.seq_platform}\""
 
                 ch_items.meta = ch_items.meta + [num_lanes: num_lanes.toInteger(), read_group: read_group.toString(), size: 1]
             } else if (ch_items.meta.lane && ch_items.bam) {
-                ch_items.meta   = ch_items.meta + [id: "${ch_items.meta.sample}-${ch_items.meta.lane}".toString()]
-                def CN          = params.seq_center ? "CN:${params.seq_center}\\t" : ''
+                ch_items.meta =  ch_items.meta + [id: "${ch_items.meta.sample}-${ch_items.meta.lane}".toString()]
+                def CN =  params.seq_center ? "CN:${params.seq_center}\\t" : ''
                 def read_group  = "\"@RG\\tID:${ch_items.meta.sample}_${ch_items.meta.lane}\\t${CN}PU:${ch_items.meta.lane}\\tSM:${ch_items.meta.patient}_${ch_items.meta.sample}\\tLB:${ch_items.meta.sample}\\tDS:${params.fasta}\\tPL:${params.seq_platform}\""
 
                 ch_items.meta = ch_items.meta - ch_items.meta.subMap('lane') + [num_lanes: num_lanes.toInteger(), read_group: read_group.toString(), size: 1]
@@ -652,10 +652,10 @@ workflow TOOLS {
 
             // 	if (is_current_tool_qc_multiple_metrics) {
             // 		is_any_alignment_summary_absent = io.outputs[0].any { field ->
-            // 			test_robust_absence(sample[field], test_file = false)  // Tests if file exists and is nonzero file size
+            // 			test_robust_absence(sample[field], test_file = false) // Tests if file exists and is nonzero file size
             // 		}
             // 		def is_any_insert_size_absent = io.outputs[1].any { field ->
-            // 			test_robust_absence(sample[field], test_file = false)  // Tests if file exists and is nonzero file size
+            // 			test_robust_absence(sample[field], test_file = false) // Tests if file exists and is nonzero file size
             // 		}
             // 		is_any_output_col_empty = is_any_alignment_summary_absent || is_any_insert_size_absent
             // 	}
@@ -780,7 +780,7 @@ workflow NFGOS {
 
     // Gather built indices or get them from the params
     // Built from the fasta file:
-    dict       = params.dict        ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect()
+    dict =  params.dict        ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect()
                                     : PREPARE_GENOME.out.dict
     fasta_fai  = WorkflowNfcasereports.create_file_channel(params.fasta_fai, PREPARE_GENOME.out.fasta_fai)
     bwa = WorkflowNfcasereports.create_file_channel(params.bwa)
@@ -789,29 +789,29 @@ workflow NFGOS {
     index_alignment = bwa
 
     // TODO: add a params for msisensorpro_scan
-    msisensorpro_scan      = PREPARE_GENOME.out.msisensorpro_scan
+    msisensorpro_scan =  PREPARE_GENOME.out.msisensorpro_scan
 
-    dbsnp_tbi              = WorkflowNfcasereports.create_index_channel(params.dbsnp, params.dbsnp_tbi, PREPARE_GENOME.out.dbsnp_tbi)
+    dbsnp_tbi =  WorkflowNfcasereports.create_index_channel(params.dbsnp, params.dbsnp_tbi, PREPARE_GENOME.out.dbsnp_tbi)
     //do not change to Channel.value([]), the check for its existence then fails for Getpileupsumamries
     germline_resource_tbi  = params.germline_resource ? params.germline_resource_tbi ? Channel.fromPath(params.germline_resource_tbi).collect() : PREPARE_GENOME.out.germline_resource_tbi : []
-    known_indels_tbi       = WorkflowNfcasereports.create_index_channel(params.known_indels, params.known_indels_tbi, PREPARE_GENOME.out.known_indels_tbi)
-    known_snps_tbi         = WorkflowNfcasereports.create_index_channel(params.known_snps, params.known_snps_tbi, PREPARE_GENOME.out.known_snps_tbi)
-    pon_tbi                = WorkflowNfcasereports.create_index_channel(params.pon, params.pon_tbi, PREPARE_GENOME.out.pon_tbi)
+    known_indels_tbi =  WorkflowNfcasereports.create_index_channel(params.known_indels, params.known_indels_tbi, PREPARE_GENOME.out.known_indels_tbi)
+    known_snps_tbi =  WorkflowNfcasereports.create_index_channel(params.known_snps, params.known_snps_tbi, PREPARE_GENOME.out.known_snps_tbi)
+    pon_tbi =  WorkflowNfcasereports.create_index_channel(params.pon, params.pon_tbi, PREPARE_GENOME.out.pon_tbi)
 
     // known_sites is made by grouping both the dbsnp and the known snps/indels resources
     // Which can either or both be optional
-    known_sites_indels     = dbsnp.concat(known_indels).collect()
+    known_sites_indels =  dbsnp.concat(known_indels).collect()
     known_sites_indels_tbi = dbsnp_tbi.concat(known_indels_tbi).collect()
 
-    known_sites_snps       = dbsnp.concat(known_snps).collect()
-    known_sites_snps_tbi   = dbsnp_tbi.concat(known_snps_tbi).collect()
+    known_sites_snps =  dbsnp.concat(known_snps).collect()
+    known_sites_snps_tbi =  dbsnp_tbi.concat(known_snps_tbi).collect()
 
     // Build intervals if needed
     PREPARE_INTERVALS(fasta_fai, params.intervals, params.no_intervals)
 
     // Intervals for speed up preprocessing/variant calling by spread/gather
     // [interval.bed] all intervals in one file
-    intervals_bed_combined         = WorkflowNfcasereports.create_file_channel(params.no_intervals, PREPARE_INTERVALS.out.intervals_bed_combined)
+    intervals_bed_combined =  WorkflowNfcasereports.create_file_channel(params.no_intervals, PREPARE_INTERVALS.out.intervals_bed_combined)
     intervals_bed_gz_tbi_combined  = WorkflowNfcasereports.create_file_channel(params.no_intervals, PREPARE_INTERVALS.out.intervals_bed_gz_tbi_combined)
 
     // For QC during preprocessing, we don't need any intervals (MOSDEPTH doesn't take them for WGS)
@@ -819,7 +819,7 @@ workflow NFGOS {
         intervals_bed_combined.map{it -> [ [ id:it.baseName ], it ]}.collect() :
         Channel.value([ [ id:'null' ], [] ])
 
-    intervals            = PREPARE_INTERVALS.out.intervals_bed        // [ interval, num_intervals ] multiple interval.bed files, divided by useful intervals for scatter/gather
+    intervals =  PREPARE_INTERVALS.out.intervals_bed // [ interval, num_intervals ] multiple interval.bed files, divided by useful intervals for scatter/gather
     intervals_bed_gz_tbi = PREPARE_INTERVALS.out.intervals_bed_gz_tbi // [ interval_bed, tbi, num_intervals ] multiple interval.bed.gz/.tbi files, divided by useful intervals for scatter/gather
 
     intervals_and_num_intervals = intervals.map{ interval, num_intervals ->
@@ -946,7 +946,7 @@ workflow NFGOS {
 
     FRAGCOUNTER_STEP(
         inputs_unlaned,
-        alignment_bams_final,  // [meta, bam, bai]
+        alignment_bams_final, // [meta, bam, bai]
         tools_used
     )
     tumor_frag_cov_for_merge = FRAGCOUNTER_STEP.out.tumor_frag_cov.map { meta, frag_cov -> [ meta.sample, meta, frag_cov ] }
@@ -963,7 +963,7 @@ workflow NFGOS {
 
      dryclean_tumor_cov_for_merge = DRYCLEAN_STEP.out.dryclean_tumor_cov
             .map { it -> [ it[0].patient, it[1] ] } // meta.patient, dryclean_cov
-            .unique{ patient, dryclean_cov -> patient }
+            .unique{ patient, _dryclean_cov -> patient }
 
     // Need to recombine normals here with full metadata if a normal is matched across multiple tumor/normal pairs.
      dryclean_normal_cov_for_merge = DRYCLEAN_STEP.out.dryclean_normal_cov
