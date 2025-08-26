@@ -163,6 +163,11 @@ workflow MSKILABORG_NFCASEREPORTS {
 //
 workflow {
     MSKILABORG_NFCASEREPORTS ()
+
+    workflow.onComplete {
+        NfcoreTemplate.summary(workflow, params, log)
+    }
+
 }
 
 /*
