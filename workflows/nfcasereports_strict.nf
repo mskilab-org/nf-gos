@@ -780,39 +780,39 @@ workflow NFGOS {
 
     // Gather built indices or get them from the params
     // Built from the fasta file:
-    dict =  params.dict        ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect()
+    dict = params.dict ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect()
                                     : PREPARE_GENOME.out.dict
-    fasta_fai  = WorkflowNfcasereports.create_file_channel(params.fasta_fai, PREPARE_GENOME.out.fasta_fai)
+    fasta_fai = WorkflowNfcasereports.create_file_channel(params.fasta_fai, PREPARE_GENOME.out.fasta_fai)
     bwa = WorkflowNfcasereports.create_file_channel(params.bwa)
 
     // Gather index for mapping given the chosen aligner
     index_alignment = bwa
 
     // TODO: add a params for msisensorpro_scan
-    msisensorpro_scan =  PREPARE_GENOME.out.msisensorpro_scan
+    msisensorpro_scan = PREPARE_GENOME.out.msisensorpro_scan
 
     dbsnp_tbi =  WorkflowNfcasereports.create_index_channel(params.dbsnp, params.dbsnp_tbi, PREPARE_GENOME.out.dbsnp_tbi)
     //do not change to Channel.value([]), the check for its existence then fails for Getpileupsumamries
-    germline_resource_tbi  = params.germline_resource ? params.germline_resource_tbi ? Channel.fromPath(params.germline_resource_tbi).collect() : PREPARE_GENOME.out.germline_resource_tbi : []
-    known_indels_tbi =  WorkflowNfcasereports.create_index_channel(params.known_indels, params.known_indels_tbi, PREPARE_GENOME.out.known_indels_tbi)
-    known_snps_tbi =  WorkflowNfcasereports.create_index_channel(params.known_snps, params.known_snps_tbi, PREPARE_GENOME.out.known_snps_tbi)
-    pon_tbi =  WorkflowNfcasereports.create_index_channel(params.pon, params.pon_tbi, PREPARE_GENOME.out.pon_tbi)
+    germline_resource_tbi = params.germline_resource ? params.germline_resource_tbi ? Channel.fromPath(params.germline_resource_tbi).collect() : PREPARE_GENOME.out.germline_resource_tbi : []
+    known_indels_tbi = WorkflowNfcasereports.create_index_channel(params.known_indels, params.known_indels_tbi, PREPARE_GENOME.out.known_indels_tbi)
+    known_snps_tbi = WorkflowNfcasereports.create_index_channel(params.known_snps, params.known_snps_tbi, PREPARE_GENOME.out.known_snps_tbi)
+    pon_tbi = WorkflowNfcasereports.create_index_channel(params.pon, params.pon_tbi, PREPARE_GENOME.out.pon_tbi)
 
     // known_sites is made by grouping both the dbsnp and the known snps/indels resources
     // Which can either or both be optional
-    known_sites_indels =  dbsnp.concat(known_indels).collect()
+    known_sites_indels = dbsnp.concat(known_indels).collect()
     known_sites_indels_tbi = dbsnp_tbi.concat(known_indels_tbi).collect()
 
-    known_sites_snps =  dbsnp.concat(known_snps).collect()
-    known_sites_snps_tbi =  dbsnp_tbi.concat(known_snps_tbi).collect()
+    known_sites_snps = dbsnp.concat(known_snps).collect()
+    known_sites_snps_tbi = dbsnp_tbi.concat(known_snps_tbi).collect()
 
     // Build intervals if needed
     PREPARE_INTERVALS(fasta_fai, params.intervals, params.no_intervals)
 
     // Intervals for speed up preprocessing/variant calling by spread/gather
     // [interval.bed] all intervals in one file
-    intervals_bed_combined =  WorkflowNfcasereports.create_file_channel(params.no_intervals, PREPARE_INTERVALS.out.intervals_bed_combined)
-    intervals_bed_gz_tbi_combined  = WorkflowNfcasereports.create_file_channel(params.no_intervals, PREPARE_INTERVALS.out.intervals_bed_gz_tbi_combined)
+    intervals_bed_combined = WorkflowNfcasereports.create_file_channel(params.no_intervals, PREPARE_INTERVALS.out.intervals_bed_combined)
+    intervals_bed_gz_tbi_combined = WorkflowNfcasereports.create_file_channel(params.no_intervals, PREPARE_INTERVALS.out.intervals_bed_gz_tbi_combined)
 
     // For QC during preprocessing, we don't need any intervals (MOSDEPTH doesn't take them for WGS)
     intervals_for_preprocessing = params.wes ?
