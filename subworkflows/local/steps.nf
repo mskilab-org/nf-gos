@@ -1,4 +1,575 @@
-include { BAM_MSISENSORPRO } from '../bam_msisensorpro/main'
+// This is the main workflow for the alignment step of the pipeline.
+
+include { test_robust_absence; test_robust_presence } from '../../lib/NfUtils.nf'
+// Run FASTQC
+include { FASTQC } from '../../modules/nf-core/fastqc/main'
+
+// TRIM/SPLIT FASTQ Files
+include { FASTP } from '../../modules/nf-core/fastp/main'
+
+// Loading the MULTIQC module
+include { MULTIQC } from '../../modules/nf-core/multiqc/main'
+
+// Loading the module that dumps the versions of software being used
+include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../../modules/nf-core/custom/dumpsoftwareversions/main'
+
+// FASTQ Concatenation
+include { CAT_FASTQ } from '../../modules/nf-core/cat/fastq/main'
+
+// FFPE Chimera Filter
+include { CHIMERA_FILTER } from '../../modules/local/ffpe_bam_filter/main'
+
+// Map input reads to reference genome
+include { FASTQ_ALIGN_BWAMEM_MEM2 } from '../../subworkflows/local/fastq_align_bwamem_mem2/main'
+include { FASTQ_PARABRICKS_FQ2BAM } from '../../subworkflows/local/fastq_parabricks_fq2bam/main'
+
+// Merge and index BAM files (optional)
+include { BAM_MERGE_INDEX_SAMTOOLS } from '../../subworkflows/local/bam_merge_index_samtools/main'
+
+// Convert BAM files
+include { 
+    SAMTOOLS_CONVERT as BAM_TO_CRAM;
+    SAMTOOLS_CONVERT as BAM_TO_CRAM_MAPPING
+} from '../../modules/nf-core/samtools/convert/main'
+// include { SAMTOOLS_CONVERT as BAM_TO_CRAM_MAPPING } from '../../modules/nf-core/samtools/convert/main'
+
+// Convert CRAM files (optional)
+include { 
+    SAMTOOLS_CONVERT as CRAM_TO_BAM;
+    SAMTOOLS_CONVERT as CRAM_TO_BAM_RECAL;
+    SAMTOOLS_CONVERT as CRAM_TO_BAM_FINAL
+ } from '../../modules/nf-core/samtools/convert/main'
+// include {  } from '../../modules/nf-core/samtools/convert/main'
+// include { SAMTOOLS_CONVERT as CRAM_TO_BAM_FINAL } from '../../modules/nf-core/samtools/convert/main'
+
+// Mark Duplicates (+QC)
+include { BAM_MARKDUPLICATES } from '../../subworkflows/local/bam_markduplicates/main'
+
+// QC on CRAM
+include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_NO_MD } from '../../subworkflows/local/cram_qc_mosdepth_samtools/main'
+include { CRAM_QC_MOSDEPTH_SAMTOOLS as CRAM_QC_RECAL } from '../../subworkflows/local/cram_qc_mosdepth_samtools/main'
+
+
+// Create recalibration tables
+include { BAM_BASERECALIBRATOR } from '../../subworkflows/local/bam_baserecalibrator/main'
+
+// Create recalibrated cram files to use for variant calling (+QC)
+include { BAM_APPLYBQSR } from '../../subworkflows/local/bam_applybqsr/main'
+
+workflow ALIGNMENT_STEP {
+	take:
+	inputs
+	selected_tools_map
+	tools_used
+	known_sites_indels
+	known_sites_indels_tbi
+	index_alignment
+	fasta
+	fasta_fai
+	dict
+	intervals_for_preprocessing
+	intervals_and_num_intervals
+
+	main:
+	reports = Channel.empty()
+	versions = Channel.empty()
+
+	input_fastq = inputs.filter { it -> it.bam.isEmpty() }.map { it -> [it.meta, it.fastq_1, it.fastq_2, it.meta.read_group] }
+	
+	
+	// input_fastq_qc = input_fastq.map { it -> [it[0], [it[1], it[2]]] }
+
+	alignment_bams_final = inputs
+		.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.bam, it.bai] }
+		.filter { it -> ! it[1].isEmpty() }
+		.map { it -> [it[0].sample, it[0], it[1], it[2]] }
+        .unique()
+        .dump(tag: "wtf alignment_bams", pretty: true)
+    
+    alignment_existing_outputs = inputs.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.bam] }.filter { it -> !it[1].isEmpty() }.unique()
+
+	
+
+
+	if (tools_used.contains("all") || tools_used.contains("aligner")) {
+        
+        
+
+        // // QC
+        // FASTQC(input_fastq_qc)
+
+        // reports = reports.mix(FASTQC.out.zip.collect{ meta, logs -> logs })
+        // versions = versions.mix(FASTQC.out.versions.first())
+
+        //skipping the UMI Conscensus calling step for now
+        reads_for_fastp = input_fastq
+
+        // Trimming and/or splitting
+        if (params.trim_fastq || params.split_fastq > 0) {
+            if (params.trim_fastq) {
+                log.warn "You have mentioned trim_fastq to `$params.trim_fastq`, will do trimming"
+            }
+            save_trimmed_fail = false
+            save_merged = false
+            FASTP(
+                reads_for_fastp,
+                [], // we are not using any adapter fastas at the moment
+                save_trimmed_fail,
+                save_merged
+            )
+
+            // reports = reports.mix(FASTP.out.json.collect{ meta, json -> json })
+            // reports = reports.mix(FASTP.out.html.collect{ meta, html -> html })
+
+            if (params.split_fastq) {
+                log.warn "You have mentioned split_fastq to `$params.split_fastq`, will do splitting"
+                reads_for_alignment = FASTP.out.reads.map{ meta, reads ->
+                    def read_files = reads.sort(false) { a,b -> a.getName().tokenize('.')[0] <=> b.getName().tokenize('.')[0] }.collate(2)
+                    [ meta + [ size:read_files.size() ], read_files ]
+                }.transpose()
+            } else reads_for_alignment = FASTP.out.reads
+
+            // versions = versions.mix(FASTP.out.versions)
+
+        } else {
+            println "Skipping fastp since trim_fastq and split_fastq are false"
+            reads_for_alignment = reads_for_fastp
+        }
+
+		// GPU vs non-GPU alignment
+
+		
+
+		// // STEP 1: MAPPING READS TO REFERENCE GENOME
+        // // reads will be sorted
+        // reads_for_alignment = reads_for_alignment
+        //     .map{ meta, reads, rg ->
+        //     // Update meta.id to meta.sample if no multiple lanes or splitted fastqs
+        //     if (meta.num_lanes == null || meta.size * meta.num_lanes == 1) [ meta + [ id:meta.sample ], reads, rg ]
+        //     else [ meta, reads, rg ]
+        // }
+
+		// Group fastqs by sample to provide all lanes per sample for fq2bam
+		reads_for_alignment = reads_for_alignment
+			.map { meta, fastq_1, fastq_2, rg ->
+				// Ensure meta.sample exists and is used as grouping key
+				[meta.patient + "___sep___" + meta.sample, [meta, fastq_1, fastq_2, rg]]
+			}
+			.groupTuple()
+			.map { _sample, items ->
+				// items: list of [meta, fastq_1, fastq_2, rg] for each lane
+				def metas = items.collect { it[0] }
+				def fastq_1s = items.collect { it[1] }.flatten().collect { file(it) }
+				def fastq_2s = items.collect { it[2] }.flatten().collect { file(it) }
+				def rg_list = items.collect { it[3] }
+
+				// Use first meta as representative, add lanes info
+				// def meta = metas[0] + [lanes: metas.size()]
+                def meta = metas[0] + [lanes: metas[0].num_lanes]
+
+				// Return: meta, fastq_1s, fastq_2s, RGs
+				[meta, fastq_1s, fastq_2s, rg_list.flatten()]
+			}
+			.map { meta, fastq_1s, fastq_2s, rg ->
+				// Optional: Update meta.id if needed
+				// if (meta.num_lanes == null || meta.size * meta.num_lanes == 1) {
+				// 	out = [ meta + [ id:meta.sample ], fastq_1s, fastq_2s, rg ]
+				// } else {
+				// 	out = [ meta + [ id:meta.sample ], fastq_1s, fastq_2s, rg ]
+				// }
+				// out
+				[ meta + [ id:meta.sample ], fastq_1s, fastq_2s, rg ]
+			}
+            .dump(tag: "grouped_reads_for_alignment", pretty: true)
+
+        // GPU Alignment
+        if (params.aligner == "fq2bam") {
+            FASTQ_PARABRICKS_FQ2BAM(
+                reads_for_alignment,
+                known_sites_indels,
+                known_sites_indels_tbi
+            )
+            // merge existing BAMs with newly mapped ones
+            bam_mapped = alignment_existing_outputs.mix(FASTQ_PARABRICKS_FQ2BAM.out.bam)
+			// bam_mapped = FASTQ_PARABRICKS_FQ2BAM.out.bam}
+        } else {
+			// inputs_for_cat_fastq = reads_for_alignment.map { meta, fastq_1s, fastq_2s, rg ->
+			// 	[meta, [fastq_1s, fastq_2s] ]
+			// }
+			inputs_for_cat_fastq = reads_for_alignment.map { meta, fastq_1s, fastq_2s, _rg ->
+				def reads = (0..<fastq_1s.size()).collectMany { i ->
+					[file(fastq_1s[i]), file(fastq_2s[i])]
+				}
+				tuple(meta, reads)
+			}
+			inputs_for_cat_fastq.dump(tag: "inputs_for_cat_fastq", pretty: true)
+			// Merge fastq files for each sample
+			// Note that the RG used in FASTQ_ALIGN
+			// will only contain the first RG from the set of fastqs.
+			// Which is a desired side effect.
+			CAT_FASTQ(inputs_for_cat_fastq)
+			index_alignment.dump(tag: "index_alignment", pretty: true)
+            FASTQ_ALIGN_BWAMEM_MEM2(
+                // reads_for_alignment,
+				CAT_FASTQ.out.reads,
+                index_alignment
+            )
+            // merge existing BAMs with newly mapped ones
+            bam_mapped = alignment_existing_outputs.mix(FASTQ_ALIGN_BWAMEM_MEM2.out.bam)
+        }
+
+
+        // Grouping the bams from the same samples not to stall the workflow
+
+
+        bam_mapped = bam_mapped
+            .map { meta, bam ->
+
+                // Update meta.id to be meta.sample, ditching sample-lane that is not needed anymore
+                // Update meta.data_type
+                // Remove no longer necessary fields:
+                //   read_group: Now in the BAM header
+                //    num_lanes: only needed for mapping
+                //         size: only needed for mapping
+
+                // Ensure meta.size and meta.num_lanes are integers and handle null values
+                int numLanes = (meta.num_lanes != null && meta.num_lanes > 1 ? meta.num_lanes : 1) as int
+                int numSplits = (meta.size ?: 1) as int
+                // int numReads = numLanes * numSplits
+				int numReads = 1
+
+                // Use groupKey to make sure that the correct group can advance as soon as it is complete
+                // and not stall the workflow until all reads from all channels are mapped
+				// cleanedMeta = meta.subMap('patient', 'sample', 'sex', 'status', 'id') + [ id: meta.sample]
+				def cleanedMeta = meta - meta.subMap('num_lanes', 'read_group', 'size', 'tumor_id', 'lanes') + [ id:meta.sample ]
+                [ groupKey( cleanedMeta, numReads), bam ]
+            }
+        .groupTuple()
+
+        
+		
+
+        // bams are merged (when multiple lanes from the same sample) and indexed
+        BAM_MERGE_INDEX_SAMTOOLS(bam_mapped)
+
+        
+
+        alignment_bams_final = BAM_MERGE_INDEX_SAMTOOLS.out.bam_bai.map({ meta, bam, bai -> [ meta.sample, Utils.remove_lanes_from_meta(meta), bam, bai ] })
+
+        // Gather used softwares versions
+        // versions = versions.mix(BAM_MERGE_INDEX_SAMTOOLS.out.versions)
+        do_filter_ffpe_chimera = params.filter_ffpe_chimera ?: false
+        println "params.filter_ffpe_chimera: ${params.filter_ffpe_chimera}"
+        if (do_filter_ffpe_chimera) {
+            println "You have set params.filter_ffpe_chimera: ${params.filter_ffpe_chimera}, will do FFPE chimera filtering"
+            CHIMERA_FILTER(alignment_bams_final.map { _sample, meta, bam, bai -> [meta, bam, bai] })
+            alignment_bams_final = CHIMERA_FILTER.out.bambai.map { meta, bam, bai -> [ meta.sample, meta, bam, bai ]}
+        }
+		// alignment_bams_final.view{ log.info "alignment_bams_final: $it" }
+    }
+
+    // BAM Postprocessing
+    // ##############################
+	do_post_processing_bc_aligner_not_fq2bam = (tools_used.contains("all") || tools_used.contains("aligner")) && params.aligner != "fq2bam"
+	do_post_processing_bc_of_tool_or_flag = tools_used.contains("all") || tools_used.contains("postprocessing") || params.is_run_post_processing // FIXME: If bam is provided as input, tools_used currently will never contain postprocessing and only controlled by params, but leaving here as a reminder.
+    if (do_post_processing_bc_aligner_not_fq2bam || do_post_processing_bc_of_tool_or_flag) { // fq2bam does not need postprocessing
+		
+		bam_mapped = alignment_bams_final
+            .map { _id, meta, bam, _bai -> [meta + [data_type: "bam"], bam] }
+        cram_markduplicates_no_spark = Channel.empty()
+
+        // STEP 2: markduplicates (+QC) + convert to CRAM
+
+        BAM_MARKDUPLICATES(
+            bam_mapped,
+            fasta,
+            fasta_fai,
+            intervals_for_preprocessing
+        )
+
+        cram_markduplicates_no_spark = BAM_MARKDUPLICATES.out.cram
+
+        // Gather QC reports
+        // reports = reports.mix(BAM_MARKDUPLICATES.out.reports.collect{ meta, report -> report })
+
+        // Gather used softwares versions
+        // versions = versions.mix(BAM_MARKDUPLICATES.out.versions)
+
+        // STEP 3: BASE RECALIBRATION
+        ch_cram_for_bam_baserecalibrator = Channel.empty().mix(cram_markduplicates_no_spark)
+            // Make sure correct data types are carried through
+            .map{ meta, cram, crai -> [ meta + [data_type: "cram"], cram, crai ] }
+
+        ch_table_bqsr_tab    = Channel.empty()
+
+        BAM_BASERECALIBRATOR(
+            ch_cram_for_bam_baserecalibrator,
+            dict,
+            fasta,
+            fasta_fai,
+            intervals_and_num_intervals,
+            known_sites_indels,
+            known_sites_indels_tbi
+            )
+
+        ch_table_bqsr_tab = BAM_BASERECALIBRATOR.out.table_bqsr
+
+        // versions = versions.mix(BAM_BASERECALIBRATOR.out.versions)
+
+        // ch_table_bqsr contains table from baserecalibrator
+        ch_table_bqsr = Channel.empty().mix(ch_table_bqsr_tab)
+
+        // reports = reports.mix(ch_table_bqsr.collect{ meta, table -> table })
+        cram_applybqsr = ch_cram_for_bam_baserecalibrator.join(ch_table_bqsr, failOnDuplicate: true, failOnMismatch: true)
+
+        // STEP 4: RECALIBRATING
+
+        cram_variant_calling = Channel.empty()
+
+        BAM_APPLYBQSR(
+            cram_applybqsr,
+            dict,
+            fasta,
+            fasta_fai,
+            intervals_and_num_intervals
+        )
+
+        cram_variant_calling = BAM_APPLYBQSR.out.cram
+
+        // Gather used softwares versions
+        // versions = versions.mix(BAM_APPLYBQSR.out.versions)
+
+        // CRAM_QC_RECAL(
+        //     cram_variant_calling,
+        //     fasta,
+        //     intervals_for_preprocessing
+        // )
+
+        // // Gather QC
+        // reports = reports.mix(CRAM_QC_RECAL.out.reports.collect{ meta, report -> report })
+
+        // // Gather software versions
+        // // versions = versions.mix(CRAM_QC_RECAL.out.versions)
+
+        // // convert CRAM files to BAM for downstream processes
+        // CRAM_TO_BAM_RECAL(cram_variant_calling, fasta, fasta_fai)
+        // versions = versions.mix(CRAM_TO_BAM_RECAL.out.versions)
+
+        CRAM_TO_BAM_FINAL(cram_variant_calling, fasta, fasta_fai)
+        // versions = versions.mix(CRAM_TO_BAM_FINAL.out.versions)
+
+        alignment_bams_final = Channel.empty()
+            .mix(CRAM_TO_BAM_FINAL.out.alignment_index)
+            .map{ meta, bam, bai -> [ meta.sample, Utils.remove_lanes_from_meta(meta), bam, bai ] }
+    }
+
+
+	emit:
+	alignment_bams_final
+	reports
+	versions
+
+}
+
+//
+// QC on BAM
+//
+
+include { CONPAIR } from '../../modules/local/conpair/main.nf'
+include { PICARD_COLLECTWGSMETRICS } from '../../modules/nf-core/picard/collectwgsmetrics/main'
+include { PARABRICKS_BAMMETRICS } from '../../modules/local/bammetrics/main'
+include { PICARD_COLLECTMULTIPLEMETRICS } from '../../modules/nf-core/picard/collectmultiplemetrics/main'
+include { GPU_COLLECTMULTIPLEMETRICS } from '../../modules/local/gpu_collectmultiplemetrics/main'
+include { GATK4_ESTIMATELIBRARYCOMPLEXITY } from '../../modules/nf-core/gatk4/estimatelibrarycomplexity/main'
+include { SAMTOOLS_SUBSAMPLE } from '../../modules/local/subsample_reads/main'
+workflow BAM_QC {
+    take:
+    inputs
+    bam // channel: [mandatory] [ meta.sample, meta, bam, bai ]
+    dict
+	tools_used
+
+    main:
+    def fasta = WorkflowNfcasereports.create_file_channel(params.fasta)
+    def fai = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
+    // def intervals = WorkflowNfcasereports.create_file_channel(params.intervals)
+
+    versions = Channel.empty()
+    reports = Channel.empty()
+
+	// TODO: define subsample_interval as a parameter in default config
+	// on NYU: "/gpfs/data/imielinskilab/DB/references/hg19/human_g1k_v37_decoy.fasta.subsampled_0.33.interval_list"
+	intervals_file = params.subsample_interval ?: []
+
+	use_gpu = params.use_gpu
+
+    if (tools_used.contains("all") || tools_used.contains("collect_wgs_metrics")) {
+        collect_wgs_metrics_inputs = inputs
+            .filter { it.qc_coverage_metrics.isEmpty() }
+            .map { it -> [it.meta.sample] }
+            .unique()
+        collect_wgs_metrics_bam = collect_wgs_metrics_inputs
+            .join(bam)
+            .map { _id, meta, bamPath, bai -> [ meta, bamPath, bai ] }
+		ucollect_wgs_metrics_bam = collect_wgs_metrics_bam.unique { it -> it[0].sample }
+		if (use_gpu) {
+			process_wgsmetrics = PARABRICKS_BAMMETRICS(
+				ucollect_wgs_metrics_bam,
+				fasta.map{ it -> [ [ id:'fasta' ], it ] },
+				fai.map{ it -> [ [ id:'fai' ], it ] },
+				intervals_file
+			)
+		} else {
+			process_wgsmetrics = PICARD_COLLECTWGSMETRICS(
+				ucollect_wgs_metrics_bam,
+				fasta.map{ it -> [ [ id:'fasta' ], it ] },
+				fai.map{ it -> [ [ id:'fai' ], it ] },
+				intervals_file
+			)
+		}
+
+		reports = reports.mix(process_wgsmetrics.metrics)
+		versions = versions.mix(process_wgsmetrics.versions)
+    }
+
+
+	is_aligner_excludes_multiple_metrics = params.aligner != "fq2bam"
+	do_gpu_multiple_metrics = use_gpu && is_aligner_excludes_multiple_metrics // fq2bam already includes this.
+	
+	// do_gpu_multiple_metrics = use_gpu
+
+    if (tools_used.contains("all") || tools_used.contains("collect_multiple_metrics")) {
+        collect_multiple_metrics_inputs = inputs
+            .filter { it.qc_alignment_summary.isEmpty() || it.qc_insert_size.isEmpty() }
+            .map { it -> [it.meta.sample] }
+            .unique()
+        collect_multiple_metrics_bam = collect_multiple_metrics_inputs
+            .join(bam)
+            .map { _id, meta, bamPath, bai -> [ meta, bamPath, bai ] }
+
+		process_mm_qc = [metrics: Channel.empty(), versions: Channel.empty()]
+		// FIXME: GPU multiple metrics failing to pick up GPU
+		if (do_gpu_multiple_metrics) {
+			process_mm_qc = GPU_COLLECTMULTIPLEMETRICS(
+				collect_multiple_metrics_bam,
+				fasta.map{ it -> [ [ id:'fasta' ], it ] },
+				fai.map{ it -> [ [ id:'fai' ], it ] }
+			)
+		} else if (is_aligner_excludes_multiple_metrics) {
+			process_mm_qc = PICARD_COLLECTMULTIPLEMETRICS(
+				collect_multiple_metrics_bam,
+				fasta.map{ it -> [ [ id:'fasta' ], it ] },
+				fai.map{ it -> [ [ id:'fai' ], it ] }
+			)
+			
+		}
+		reports = reports.mix(process_mm_qc.metrics)
+        versions = versions.mix(process_mm_qc.versions)
+    }
+
+	is_run_qc_duplicates = params.is_run_qc_duplicates ?: false // if parameter doesn't exist, set to false
+	do_qc_duplicates = (tools_used.contains("all") || tools_used.contains("estimate_library_complexity")) && is_run_qc_duplicates && ! params.aligner == "fq2bam"
+    if (do_qc_duplicates) {
+        estimate_library_complexity_inputs = inputs
+            .filter { it.qc_dup_rate.isEmpty() }
+            .map { it -> [it.meta.sample] }
+        estimate_library_complexity_bam = estimate_library_complexity_inputs
+            .join(bam)
+            .map { _id, meta, bamPath, bai -> [ meta, bamPath, bai ] }
+        // Subsample BAMs for faster estimation of library complexity
+        // SAMTOOLS_SUBSAMPLE(
+        //     estimate_library_complexity_bam,
+        //     fasta.map{ it -> [ [ id:'fasta' ], it ] },
+        //     []
+        // )
+        // bams_subsampled = SAMTOOLS_SUBSAMPLE.out.bam_subsampled
+
+        // bam_only = bams_subsampled.map{ meta, bam, bai -> [ meta, bam ] }
+		bam_only = estimate_library_complexity_bam.map{ meta, bamPath, _bai -> [ meta, bamPath ] }
+        GATK4_ESTIMATELIBRARYCOMPLEXITY(
+            bam_only,
+            fasta,
+            fai,
+            dict
+        )
+        reports = reports.mix(GATK4_ESTIMATELIBRARYCOMPLEXITY.out.metrics)
+        versions = versions.mix(GATK4_ESTIMATELIBRARYCOMPLEXITY.out.versions)
+    }
+
+    inputs_unlaned = inputs.map { it ->
+        it + [meta: Utils.remove_lanes_from_meta(it.meta)]
+    }
+
+
+    inputs_unlaned_split = inputs_unlaned
+        .branch { it -> 
+            tumor: it.meta.status.toString() == "1"
+            normal: it.meta.status.toString() == "0"
+        }
+
+    normal_ids = inputs_unlaned_split.normal.map { it.meta.patient }.unique().collect().ifEmpty(["NO_NORMALS_PRESENT___MD7cicQBtB"])
+    tumor_ids = inputs_unlaned_split.tumor.map { it.meta.patient }.unique().collect()
+
+    mixed_ids = tumor_ids
+        .concat(normal_ids)
+        .collect(flat: false)
+    
+    tumor_paired_ids = mixed_ids
+        .map{ tumor, normal ->
+            tumor.findAll { normal.contains(it) }
+        }
+        .flatten()
+
+    ids_without_conpair = inputs_unlaned.filter { it ->
+        it.conpair_contamination.isEmpty() || it.conpair_concordance.isEmpty()
+    }.map { it -> 
+        [ it.meta.patient ]
+    }.unique().dump(tag: "ids_without_conpair", pretty: true)
+
+    tumor_paired_ids = tumor_paired_ids.join(ids_without_conpair)
+    
+    
+    bam_key_patient = bam.map { _meta_sample, meta, bamPath, bai ->
+        [ meta.patient, meta, bamPath, bai ]
+    } // Note patient keys will be duplicated
+
+    conpair_inputs_to_combine = tumor_paired_ids // A Should be unique.. no dups.
+        .cross(bam_key_patient) // B can have dups, according to nextflow docs. This will inner join but allow for dups. Essentially a filter by merge step
+        .map { patient, bamList ->
+            def meta_bam = bamList[1]
+            def bam_file = bamList[2]
+            def bai_file = bamList[3]
+            [ patient, meta_bam, bam_file, bai_file ]
+        }
+        .dump(tag: "conpair_inputs_to_combine", pretty: true)
+        .branch { it ->
+            tumor: it[1].status.toString() == "1"
+            normal: it[1].status.toString() == "0"
+        }
+    
+    conpair_inputs = conpair_inputs_to_combine.tumor
+        .combine(conpair_inputs_to_combine.normal, by: 0)
+        .map { _patient_tumor, meta_tumor, bam_tumor, bai_tumor, _meta_normal, bam_normal, bai_normal ->
+            def meta_tumor_out = meta_tumor + [id: meta_tumor.patient]
+            meta_tumor_out = meta_tumor_out - meta_tumor_out.subMap('read_group')
+            [ meta_tumor_out, bam_tumor, bai_tumor, bam_normal, bai_normal ]
+        }.dump(tag: "conpair_inputs", pretty: true)
+
+    
+    CONPAIR(conpair_inputs, fasta, fai, dict)
+
+
+
+    emit:
+    reports
+
+    versions // channel: [ versions.yml ]
+}
+
+
+
+
+include { BAM_MSISENSORPRO } from './bam_msisensorpro/main'
 workflow MSISENSORPRO_STEP {
     take: 
     inputs_unlaned
@@ -83,7 +654,7 @@ workflow MSISENSORPRO_STEP {
     versions
 }
 
-include { BAM_AMBER} from '../bam_amber/main'
+include { BAM_AMBER} from './bam_amber/main'
 workflow AMBER_STEP {
     take:
     inputs_unlaned
@@ -179,8 +750,8 @@ workflow AMBER_STEP {
 }
 
 
-include { BAM_FRAGCOUNTER as NORMAL_FRAGCOUNTER } from '../bam_fragCounter/main'
-include { BAM_FRAGCOUNTER as TUMOR_FRAGCOUNTER } from '../bam_fragCounter/main'
+include { BAM_FRAGCOUNTER as NORMAL_FRAGCOUNTER } from './bam_fragCounter/main'
+include { BAM_FRAGCOUNTER as TUMOR_FRAGCOUNTER } from './bam_fragCounter/main'
 workflow FRAGCOUNTER_STEP {
     take:
     inputs_unlaned
@@ -239,8 +810,8 @@ workflow FRAGCOUNTER_STEP {
 
 }
 
-include { COV_DRYCLEAN as TUMOR_DRYCLEAN } from '../cov_dryclean/main'
-include { COV_DRYCLEAN as NORMAL_DRYCLEAN } from '../cov_dryclean/main'
+include { COV_DRYCLEAN as TUMOR_DRYCLEAN } from './cov_dryclean/main'
+include { COV_DRYCLEAN as NORMAL_DRYCLEAN } from './cov_dryclean/main'
 workflow DRYCLEAN_STEP {
     take:
     inputs_unlaned
@@ -307,7 +878,7 @@ workflow DRYCLEAN_STEP {
     
 }
 
-include { COV_CBS } from '../cov_cbs/main'
+include { COV_CBS } from './cov_cbs/main'
 workflow CBS_STEP {
     take:
     inputs_unlaned
@@ -385,9 +956,404 @@ workflow CBS_STEP {
 
 }
 
-include { BAM_SAGE } from '../bam_sage/main'
-include { BAM_SAGE_TUMOR_ONLY_FILTER } from '../bam_sage/main'
-include { RESCUE_CH_HEME_STEP } from '../rescue_ch_step/main'
+
+//GRIDSS
+include { BAM_SVCALLING_GRIDSS; BAM_SVCALLING_GRIDSS_SOMATIC } from '../../subworkflows/local/bam_svcalling_gridss/main.nf'
+// include { BAM_SVCALLING_GRIDSS_SOMATIC } from '../../subworkflows/local/bam_svcalling_gridss/main.nf'
+
+include { 
+    GRIDSS_PREPROCESS as GRIDSS_PREPROCESS_TUMOR;
+    GRIDSS_PREPROCESS as GRIDSS_PREPROCESS_NORMAL;
+    GRIDSS_ASSEMBLE_SCATTER;
+    GRIDSS_ASSEMBLE_GATHER;
+    GRIDSS_CALL
+} from '../../modules/local/gridss/gridss/main.nf'
+// include { GRIDSS_PREPROCESS as GRIDSS_PREPROCESS_NORMAL   } from '../../modules/local/gridss/gridss/main.nf'
+// include { GRIDSS_ASSEMBLE_SCATTER   } from '../../modules/local/gridss/gridss/main.nf'
+// include { GRIDSS_ASSEMBLE_GATHER   } from '../../modules/local/gridss/gridss/main.nf'
+// include { GRIDSS_CALL   } from '../../modules/local/gridss/gridss/main.nf'
+
+workflow SV_CALLING_STEP {
+    take:
+    inputs_unlaned
+    alignment_bams_final
+    bwa_index
+    tools_used
+
+    main:
+    fasta                               = WorkflowNfcasereports.create_file_channel(params.fasta)
+    fasta_fai                           = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
+    blacklist_gridss                    = WorkflowNfcasereports.create_file_channel(params.blacklist_gridss)
+
+
+    // versions               = Channel.empty()
+    // vcf                    = Channel.empty()
+    // vcf_index              = Channel.empty()
+    // assembly_bam           = Channel.empty()
+    vcf_from_gridss_gridss = Channel.empty()
+    vcf_raw_from_gridss_gridss = Channel.empty()
+
+
+    parallelize_gridss = params.parallelize_gridss ?: true
+
+    inputs_unlaned_split = inputs_unlaned
+        .branch { it -> 
+            tumor: it.meta.status.toString() == "1"
+            normal: it.meta.status.toString() == "0"
+        }
+
+    def normal_ids = inputs_unlaned_split.normal.map { it.meta.patient }.unique().collect().ifEmpty(["NO_NORMALS_PRESENT___MD7cicQBtB"]).view { "Normal IDs: $it" }
+    def tumor_ids = inputs_unlaned_split.tumor.map { it.meta.patient }.unique().collect().view { "Tumor IDs: $it" }
+
+    def total_jobnodes = params.get("gridss_total_job_nodes", 12)
+
+    // gridss_existing_outputs = inputs_unlaned.map {
+    //         it -> [it.meta, it.vcf, it.vcf_tbi] }
+    //         .filter { !it[1].isEmpty() && !it[2].isEmpty() }
+    
+    gridss_existing_outputs = inputs_unlaned_split.tumor.map {
+            it -> [it.meta, it.vcf, it.vcf_tbi] }
+            .dump(tag: "gridss_existing_outputs", pretty: true)
+            .filter { !it[1].isEmpty() && !it[2].isEmpty() }
+    
+    vcf_from_gridss_gridss = gridss_existing_outputs
+        
+    gridss_raw_existing_outputs = inputs_unlaned_split.tumor.map {
+        it -> [it.meta, it.vcf_raw, it.vcf_raw_tbi] }
+        .filter { !it[1].isEmpty() && !it[2].isEmpty() }
+    
+    vcf_raw_from_gridss_gridss = gridss_raw_existing_outputs
+
+
+    // SV Calling
+    // ##############################
+    if (tools_used.contains("all") || tools_used.contains("gridss") || params.is_run_junction_filter) {
+
+        
+
+        // Filter out bams for which SV calling has already been done
+        // FIXME: vcf to vcf_raw
+        bam_sv_inputs = inputs_unlaned.filter { it.vcf_raw.isEmpty() }.map { it -> [it.meta.sample] }.unique()
+        bam_sv_calling = alignment_bams_final // meta.sample, meta, bam, bai
+            .combine(bam_sv_inputs, by: 0) // 
+            .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
+            .dump ( tag: "BAM SV calling input", pretty: true )
+
+        bam_sv_calling_status = bam_sv_calling.branch{
+            normal: it[0].status.toString() == "0"
+            tumor:  it[0].status.toString() == "1"
+        }
+        
+        if (parallelize_gridss) {
+
+            gridss_preprocess_tumor = GRIDSS_PREPROCESS_TUMOR(bam_sv_calling_status.tumor, fasta, fasta_fai, bwa_index, blacklist_gridss)
+            gridss_preprocess_normal = GRIDSS_PREPROCESS_NORMAL(bam_sv_calling_status.normal.unique { it -> it[0].sample }, fasta, fasta_fai, bwa_index, blacklist_gridss)
+            
+            gridss_preprocess_tumor_for_merge = gridss_preprocess_tumor.gridss_preprocess_dir
+                .map { meta, gridss_preprocess_dir ->
+                    [ meta.patient, gridss_preprocess_dir ]
+                }
+
+            sample_meta_map = bam_sv_calling_status.normal
+                .map { it -> [ it[0].sample, it[0] ] }
+                .unique()
+
+            gridss_preprocess_normal_for_merge = gridss_preprocess_normal.gridss_preprocess_dir
+                .map { meta, gridss_preprocess_dir ->
+                    [ meta.sample, gridss_preprocess_dir ]
+                }
+                .cross(sample_meta_map)
+                .map { preproc_out, sample_meta ->
+                    def meta_complete = sample_meta[1]
+                    def gridss_preprocess_dir = preproc_out[1]
+                    [ meta_complete.patient, gridss_preprocess_dir ]
+                }
+
+            mixed_ids = tumor_ids
+                .concat(normal_ids)
+                .collect(flat: false)
+
+            tumor_only_ids = mixed_ids
+                .map{ tumor, normal ->
+                    tumor.findAll { !normal.contains(it) }
+                }
+                .flatten()
+                .view { "Tumor IDs without normal: $it" }
+            
+            tumor_paired_ids = mixed_ids
+                .map{ tumor, normal ->
+                    tumor.findAll { normal.contains(it) }
+                }
+                .flatten()
+                .view { "Tumor IDs with normal: $it" }
+
+            assembly_preinput_tumor_paired = bam_sv_calling_status.tumor
+                .map{ it ->
+                    [it[0].patient, it[0], it[1], it[2]]
+                }
+                .join(tumor_paired_ids)
+                .join(gridss_preprocess_tumor_for_merge) // patient, meta, bam, bai, gridss_preprocess_dir
+                // .view { "Assembly preinput tumor paired: $it" }
+
+            assembly_preinput_normal = bam_sv_calling_status.normal
+                .map{ it ->
+                    [it[0].patient, it[0], it[1], it[2]]
+                }
+                .join(gridss_preprocess_normal_for_merge) // patient, meta, bam, bai, gridss_preprocess_dir
+                // .view { "Assembly preinput normal: $it" }
+
+            assembly_paired_input = assembly_preinput_tumor_paired
+                .cross(assembly_preinput_normal) { v -> v[0] }
+                .flatMap { tumor, normal ->
+                    def meta_id = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
+                    ( 0..< total_jobnodes ).collect { i ->
+                        [
+                            patient: tumor[0],
+                            meta: tumor[1] + [id: meta_id, tumor_id: tumor[1].sample, normal_id: normal[1].sample], 
+                            tumor_bam: tumor[2], 
+                            tumor_bai: tumor[3], 
+                            tumor_gridss_preprocess: tumor[4],
+                            normal_bam: normal[2],
+                            normal_bai: normal[3],
+                            normal_gridss_preprocess: normal[4],
+                            jobnodes: total_jobnodes,
+                            jobindex: i
+                        ]
+                    }
+                }
+                .map { 
+                    it.values()
+                }
+                
+
+            assembly_tumoronly_input = bam_sv_calling_status.tumor
+                .map{ it ->
+                    [it[0].patient, it[0], it[1], it[2]]
+                }
+                .dump(tag: "bam_sv_calling_status.tumor.map", pretty: true)
+                .join(tumor_only_ids)
+                .join(gridss_preprocess_tumor_for_merge)
+                .flatMap { tumor ->
+                    ( 0..<total_jobnodes ).collect { i ->
+                        [
+                            patient: tumor[1].patient, 
+                            meta: tumor[1] + [id: tumor[1].sample, tumor_id: tumor[1].sample, normal_id: ""], 
+                            tumor_bam: tumor[2], 
+                            tumor_bai: tumor[3], 
+                            tumor_gridss_preprocess: tumor[4],
+                            normal_bam: [],
+                            normal_bai: [],
+                            normal_gridss_preprocess: [],
+                            jobnodes: total_jobnodes,
+                            jobindex: i
+                        ]
+                    }
+                }
+                .map { 
+                    it.values()
+                }
+            
+            assembly_mixed_input = assembly_paired_input
+                .mix(assembly_tumoronly_input)
+                .map{ it.toList()[1..-1] }
+                // .view{ "assembly_mixed_input $it" }
+            
+            GRIDSS_ASSEMBLE_SCATTER(assembly_mixed_input, fasta, fasta_fai, bwa_index, blacklist_gridss)
+
+            collected_assembly_dirs = GRIDSS_ASSEMBLE_SCATTER.out.gridss_workdir
+                .map { meta, gridss_scatter_assembly_paths_per_jobnode ->
+                    [meta.patient, gridss_scatter_assembly_paths_per_jobnode]
+                }
+                .groupTuple(by: 0, size: total_jobnodes) // [meta.patient, list[workdirs0, workdirs1, ...]]
+                .map { patient, list_of_gridss_scatter_assembly_paths ->
+                    def gridss_scatter_assembly_paths = list_of_gridss_scatter_assembly_paths.flatten()
+                    def assembly_dir = gridss_scatter_assembly_paths.collect{ it.getParent().getName().toString() }.unique()[0]
+                    gridss_scatter_assembly_paths = gridss_scatter_assembly_paths.findAll { it =~ /.*chunk.*\.(bam|bai)$/ }
+                    [patient, assembly_dir, gridss_scatter_assembly_paths]
+                }
+                // .view { "collected_assembly_dirs: $it" }
+            
+            gatherassembly_mixed_input = assembly_mixed_input
+                .map{ meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, _jobnodes, _jobindex ->
+                    [
+                        meta.patient, 
+                        meta, 
+                        tumor_bam, 
+                        tumor_bai,
+                        tumor_gridss_preprocess,
+                        normal_bam, 
+                        normal_bai,
+                        normal_gridss_preprocess
+                    ]
+                }
+                .distinct()
+                .join(
+                    collected_assembly_dirs
+                )
+                .map{ _patient, meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths ->
+                    [
+                        meta, 
+                        tumor_bam, 
+                        tumor_bai,
+                        tumor_gridss_preprocess,
+                        normal_bam, 
+                        normal_bai,
+                        normal_gridss_preprocess,
+                        gridss_assembly_dir,
+                        gridss_scatter_assembly_paths
+                        
+                    ]
+                }
+                // .view { "GRIDSS_ASSEMBLE_GATHER input: $it" }
+            
+            GRIDSS_ASSEMBLE_GATHER(gatherassembly_mixed_input, fasta, fasta_fai, bwa_index, blacklist_gridss)
+
+            call_input = gatherassembly_mixed_input.map{ meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths ->
+                    [
+                        meta.patient, 
+                        meta, 
+                        tumor_bam, 
+                        tumor_bai,
+                        tumor_gridss_preprocess, 
+                        normal_bam, 
+                        normal_bai,
+                        normal_gridss_preprocess, 
+                        gridss_assembly_dir,
+                        gridss_scatter_assembly_paths
+                    ]
+                }
+                .distinct()
+                .join(
+                    GRIDSS_ASSEMBLE_GATHER.out.gridss_final_assembly
+                        .map { meta, gridss_final_assembly, gridss_gather_assembly_paths ->
+                            [meta.patient, gridss_final_assembly, gridss_gather_assembly_paths]
+                        }
+                )
+                .map{ _patient, meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths, gridss_final_assembly, gridss_gather_assembly_paths ->
+                    [
+                        meta, 
+                        tumor_bam, 
+                        tumor_bai, 
+                        tumor_gridss_preprocess, 
+                        normal_bam, 
+                        normal_bai,
+                        normal_gridss_preprocess,
+                        gridss_assembly_dir,
+                        gridss_scatter_assembly_paths + gridss_gather_assembly_paths,
+                        gridss_final_assembly
+                    ]
+                }
+                // .view { "GRIDSS_CALL input: $it" }
+            
+            GRIDSS_CALL(call_input, fasta, fasta_fai, bwa_index, blacklist_gridss)
+
+            vcf_from_gridss_gridss = GRIDSS_CALL.out.filtered_vcf
+                .mix(gridss_existing_outputs)
+            
+            raw_vcf = GRIDSS_CALL.out.vcf
+            raw_vcf = raw_vcf
+                .map { meta, vcf_list, tbi_list ->
+                    def i_v = vcf_list.findIndexOf { it.name.contains('gridss.vcf.gz') } 
+                    def i_t = tbi_list.findIndexOf { it.name.contains('gridss.vcf.gz.tbi') } 
+
+                    def vcfOut = vcf_list[i_v]
+                    def tbi = tbi_list[i_t]
+                    [ meta, vcfOut, tbi ]
+                }
+                .dump (tag: "raw vcf", pretty: true)
+            
+            vcf_raw_from_gridss_gridss = raw_vcf
+                .mix(gridss_raw_existing_outputs)
+        } else {
+
+            // gridss_existing_outputs = inputs_unlaned.map { it -> [it.meta, it.vcf, it.vcf_tbi] }.filter { !it[1].isEmpty() && !it[2].isEmpty() }
+            
+            if (params.tumor_only) {
+                // bam_sv_calling_status = bam_sv_calling.branch{
+                //     tumor:  it[0].status.toString() == "1"ring() == "1"
+                // }
+
+                // add empty arrays to stand-in for normals
+                bam_sv_calling_pair = bam_sv_calling_status.tumor.map{ meta, bam, bai -> [ meta + [tumor_id: meta.sample], [], [], bam, bai ] }
+            } else {
+                // getting the tumor and normal cram files separated
+                // bam_sv_calling_status = bam_sv_calling.branch{
+                //     normal: it[0].status.toString() == "0"
+                //     tumor:  it[0].status.toString() == "1"
+                // }
+
+                // All normal samples
+                bam_sv_calling_normal_for_crossing = bam_sv_calling_status.normal.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }.dump(tag: " Normal samples for crossing:", pretty: true)
+
+                // All tumor samples
+                bam_sv_calling_tumor_for_crossing = bam_sv_calling_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }.dump(tag: " Tumor samples for crossing", pretty: true)
+
+                // Crossing the normal and tumor samples to create tumor and normal pairs
+                bam_sv_calling_pair = bam_sv_calling_normal_for_crossing.cross(bam_sv_calling_tumor_for_crossing)
+                    .map { normal, tumor ->
+                        def meta = [:]
+
+                        meta.id         = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
+                        meta.normal_id  = normal[1].sample
+                        meta.patient    = normal[0]
+                        meta.sex        = normal[1].sex
+                        meta.tumor_id   = tumor[1].sample
+
+                        [ meta, normal[2], normal[3], tumor[2], tumor[3] ]
+                }
+            }
+
+            BAM_SVCALLING_GRIDSS(
+                bam_sv_calling_pair,
+                bwa_index
+            )
+            vcf_from_gridss_gridss = BAM_SVCALLING_GRIDSS.out.vcf
+                .mix(gridss_existing_outputs)
+
+            vcf_raw_from_gridss_gridss = BAM_SVCALLING_GRIDSS.out.vcf
+                .mix(gridss_raw_existing_outputs)
+
+        }
+
+        // vcf_from_gridss_gridss = Channel.empty()
+        //     .mix(BAM_SVCALLING_GRIDSS.out.vcf)
+        //     .mix(gridss_existing_outputs)
+        // versions = versions.mix(BAM_SVCALLING_GRIDSS.out.versions)
+
+        // if (params.tumor_only) {
+        //     vcf_from_sv_calling_for_merge = vcf_from_gridss_gridss
+        //         .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
+
+        //     JUNCTION_FILTER(vcf_from_gridss_gridss)
+
+        //     pon_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.pon_filtered_sv_rds)
+        //     final_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.final_filtered_sv_rds)
+        //     final_filtered_sv_rds_for_merge = final_filtered_sv_rds
+        //         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, rds
+        // } else {
+        //     //somatic filter for GRIDSS
+        //     BAM_SVCALLING_GRIDSS_SOMATIC(vcf_from_gridss_gridss)
+
+        //     versions = versions.mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.versions)
+        //     vcf_somatic_high_conf = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_high_confidence)
+        //     vcf_from_sv_calling_for_merge = vcf_somatic_high_conf
+        //         .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
+
+        //     unfiltered_som_sv = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_all)
+        //     unfiltered_som_sv_for_merge = unfiltered_som_sv
+        //         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
+        // }
+    }
+    
+    emit:
+    vcf_from_gridss_gridss
+    vcf_raw_from_gridss_gridss
+
+}
+
+include { BAM_SAGE } from './bam_sage/main'
+include { BAM_SAGE_TUMOR_ONLY_FILTER } from './bam_sage/main'
+include { RESCUE_CH_HEME_STEP } from './rescue_ch_step/main'
 workflow VARIANT_CALLING_STEP {
     take:
     inputs_unlaned
@@ -579,8 +1545,8 @@ workflow VARIANT_CALLING_STEP {
 }
 
 // SNPEFF
-include { VCF_SNPEFF as VCF_SNPEFF_SOMATIC } from '../vcf_snpeff/main'
-include { VCF_SNPEFF as VCF_SNPEFF_GERMLINE } from '../vcf_snpeff/main'
+include { VCF_SNPEFF as VCF_SNPEFF_SOMATIC } from './vcf_snpeff/main'
+include { VCF_SNPEFF as VCF_SNPEFF_GERMLINE } from './vcf_snpeff/main'
 workflow VARIANT_ANNOTATION_STEP {
     take:
     inputs_unlaned
@@ -662,7 +1628,7 @@ workflow VARIANT_ANNOTATION_STEP {
 }
 
 // COBALT
-include { BAM_COBALT } from '../bam_cobalt/main'
+include { BAM_COBALT } from './bam_cobalt/main'
 workflow COBALT_STEP {
     take:
     inputs_unlaned
@@ -734,7 +1700,7 @@ workflow COBALT_STEP {
 }
 
 // PURPLE
-include { BAM_COV_PURPLE } from '../bam_cov_purple/main'
+include { BAM_COV_PURPLE } from './bam_cov_purple/main'
 workflow PURPLE_STEP {
     take:
     inputs_unlaned
@@ -951,9 +1917,9 @@ workflow PURPLE_STEP {
 }
 
 // JaBbA
-include { COV_JUNC_TUMOR_ONLY_JABBA as JABBA_TUMOR_ONLY } from '../jabba/main'
-include { COV_JUNC_JABBA as JABBA } from '../jabba/main'
-include { RETIER_JUNCTIONS } from '../jabba/main'
+include { COV_JUNC_TUMOR_ONLY_JABBA as JABBA_TUMOR_ONLY } from './jabba/main'
+include { COV_JUNC_JABBA as JABBA } from './jabba/main'
+include { RETIER_JUNCTIONS } from './jabba/main'
 workflow JABBA_STEP {
     take:
     inputs_unlaned
@@ -1135,7 +2101,7 @@ workflow JABBA_STEP {
 
 
 // Allelic CN
-include { COV_GGRAPH_NON_INTEGER_BALANCE as NON_INTEGER_BALANCE } from '../allelic_cn/main'
+include { COV_GGRAPH_NON_INTEGER_BALANCE as NON_INTEGER_BALANCE } from './allelic_cn/main'
 workflow NON_INTEGER_BALANCE_STEP {
     take:
     inputs_unlaned
@@ -1197,7 +2163,7 @@ workflow NON_INTEGER_BALANCE_STEP {
 
 }
 
-include { COV_GGRAPH_LP_PHASED_BALANCE as LP_PHASED_BALANCE } from '../allelic_cn/main'
+include { COV_GGRAPH_LP_PHASED_BALANCE as LP_PHASED_BALANCE } from './allelic_cn/main'
 workflow LP_PHASED_BALANCE_STEP {
     take:
     inputs_unlaned
@@ -1240,7 +2206,7 @@ workflow LP_PHASED_BALANCE_STEP {
 }
 
 // Events
-include { GGRAPH_EVENTS as EVENTS } from '../events/main'
+include { GGRAPH_EVENTS as EVENTS } from './events/main'
 workflow EVENTS_STEP {
     take:
     inputs_unlaned
@@ -1278,7 +2244,7 @@ workflow EVENTS_STEP {
 
 
 // Fusions
-include { GGRAPH_FUSIONS as FUSIONS } from '../fusions/main'
+include { GGRAPH_FUSIONS as FUSIONS } from './fusions/main'
 workflow FUSIONS_STEP {
     take:
     inputs_unlaned
@@ -1330,7 +2296,7 @@ workflow FUSIONS_STEP {
 }
 
 // SNV MULTIPLICITY
-include { VCF_SNV_MULTIPLICITY } from '../vcf_snv_multiplicity/main'
+include { VCF_SNV_MULTIPLICITY } from './vcf_snv_multiplicity/main'
 workflow MULTIPLICITY_STEP {
     take:
     inputs_unlaned
@@ -1464,7 +2430,7 @@ workflow MULTIPLICITY_STEP {
 }
 
 // ONCOKB
-include { VCF_FUSIONS_CNA_ONCOKB_ANNOTATOR } from '../oncokb/main'
+include { VCF_FUSIONS_CNA_ONCOKB_ANNOTATOR } from './oncokb/main'
 workflow ONCOKB_STEP {
     take:
     inputs_unlaned
@@ -1540,7 +2506,7 @@ workflow ONCOKB_STEP {
 }
 
 
-include { JUNC_SNV_GGRAPH_HRDETECT } from '../hrdetect/main'
+include { JUNC_SNV_GGRAPH_HRDETECT } from './hrdetect/main'
 workflow HRDETECT_STEP {
     take:
     inputs_unlaned
@@ -1611,7 +2577,7 @@ workflow HRDETECT_STEP {
 }
 
 // OnenessTwoness
-include { HRD_ONENESS_TWONESS } from '../onenesstwoness/main'
+include { HRD_ONENESS_TWONESS } from './onenesstwoness/main'
 workflow ONENESS_TWONESS_STEP {
     take:
     inputs_unlaned
@@ -1655,4 +2621,161 @@ workflow ONENESS_TWONESS_STEP {
 
     emit:
     onenesstwoness_rds
+}
+
+
+// SigProfilerAssignment
+include { VCF_SIGPROFILERASSIGNMENT } from '../../subworkflows/local/vcf_sigprofilerassignment/main'
+// FFPE IMPACT Filter
+include { FFPE_IMPACT_FILTER } from '../../modules/local/ffpe_impact_filter/main'
+workflow SIGNATURES_STEP {
+	
+  // defining inputs
+  take:
+  inputs_unlaned
+  snv_somatic_annotations_for_merge // meta.patient, annotated somatic snv vcf
+  tools_used
+
+  // Creating empty channels for output
+  main:
+
+  sbs_signatures = Channel.empty()
+  indel_signatures = Channel.empty()
+  signatures_matrix = Channel.empty()
+  sbs_activities = Channel.empty()
+  indel_activities = Channel.empty()
+  sbs_posterior_prob = Channel.empty()
+  indel_posterior_prob = Channel.empty()
+  annotated_vcf_ffpe_impact_or_snpeff = Channel.empty()
+
+  is_filter_ffpe_impact = params.filter_ffpe_impact ?: false
+
+  signatures_inputs = Channel.empty()
+  signatures_inputs_somatic_vcf = Channel.empty()
+  sbs_signatures_existing_outputs = Channel.empty()
+  indel_signatures_existing_outputs = Channel.empty()
+  signatures_matrix_existing_outputs = Channel.empty()
+  
+  sbs_activities_existing_outputs = Channel.empty()
+  indel_activities_existing_outputs = Channel.empty()
+
+  sbs_posterior_prob_existing_outputs = Channel.empty()
+  indel_posterior_prob_existing_outputs = Channel.empty()
+
+//   ffpe_filtered_existing_vcf = Channel.empty()
+
+//   inputs_unlaned = inputs.map { it ->
+//     it + [meta: Utils.remove_lanes_from_meta(it.meta)]
+//   }
+
+  inputs_tumor_status = inputs_unlaned.branch{ tumor: it.meta.status.toString() == "1" }
+  
+
+//   versions = Channel.empty()
+
+
+  filtered_ffpe_impact_somatic_vcf_inputs = inputs_tumor_status.tumor
+   	  .filter { it -> it.ffpe_impact_filtered_vcf.isEmpty() }
+	  .map { it -> [ it.meta.patient, it.meta ] } // patient, meta
+	  .join(snv_somatic_annotations_for_merge) // patient, annotated_somatic_vcf
+	  .unique()
+  
+  filtered_ffpe_impact_existing_outputs = inputs_tumor_status.tumor
+   	  .filter { it -> ! it.ffpe_impact_filtered_vcf.isEmpty() }
+	  .map { it -> [ it.meta, it.ffpe_impact_filtered_vcf, it.ffpe_impact_filtered_vcf_tbi ] }
+	  .unique()
+
+  
+  inputs_tumors_meta_for_merge = inputs_tumor_status.tumor.map{ it -> [ it.meta.patient, it.meta + [id: it.meta.sample]] }.unique()
+  
+  annotated_vcf_ffpe_impact_or_snpeff_for_merge = snv_somatic_annotations_for_merge // meta.patient, annotated somatic snv vcf
+
+  annotated_vcf_ffpe_impact_or_snpeff = inputs_tumors_meta_for_merge
+	.join(annotated_vcf_ffpe_impact_or_snpeff_for_merge, failOnDuplicate: false, failOnMismatch: false)
+	.map { it -> [ it[1], it[2]] } // meta, annotated somatic snv vcf
+
+
+
+
+  if (tools_used.contains("all") || tools_used.contains("signatures")) {
+	// filtered_ffpe_impact_somatic_vcf_for_merge = Channel.empty()
+	// filtered_ffpe_impact_somatic_vcf_for_merge = inputs_tumor_status.tumor
+   	//   .filter { ! it.ffpe_impact_filtered_vcf.isEmpty() }
+	//   .map { it -> [ it.meta, it.ffpe_impact_filtered_vcf, it.ffpe_impact_filtered_vcf_tbi ] }
+	
+	signatures_inputs = inputs_tumor_status.tumor
+		.filter { it.sbs_signatures.isEmpty() || it.indel_signatures.isEmpty() || it.signatures_matrix.isEmpty()}
+		.map { it -> [it.meta.patient, it.meta + [id: it.meta.patient]] }
+
+	signatures_inputs_somatic_vcf = signatures_inputs
+		.join(snv_somatic_annotations_for_merge)
+		.map { it -> [ it[1], it[2] ] } // meta, annotated somatic snv
+
+	sbs_signatures_existing_outputs = inputs_tumor_status.tumor.map { it -> [it.meta, it.sbs_signatures] }.filter { !it[1].isEmpty() && it[0].status.toString() == "1" }
+	indel_signatures_existing_outputs = inputs_tumor_status.tumor.map { it -> [it.meta, it.indel_signatures] }.filter { !it[1].isEmpty() && it[0].status.toString() == "1" }
+	signatures_matrix_existing_outputs = inputs_tumor_status.tumor.map { it -> [it.meta, it.signatures_matrix] }.filter { !it[1].isEmpty() && it[0].status.toString() == "1" }
+
+	VCF_SIGPROFILERASSIGNMENT(signatures_inputs_somatic_vcf)
+
+	sbs_signatures = Channel.empty()
+		.mix(VCF_SIGPROFILERASSIGNMENT.out.sbs_signatures)
+		.mix(sbs_signatures_existing_outputs)
+	indel_signatures = Channel.empty()
+		.mix(VCF_SIGPROFILERASSIGNMENT.out.indel_signatures)
+		.mix(indel_signatures_existing_outputs)
+	signatures_matrix = Channel.empty()
+		.mix(VCF_SIGPROFILERASSIGNMENT.out.signatures_matrix)
+		.mix(signatures_matrix_existing_outputs)
+
+	sbs_activities = Channel.empty()
+		.mix(VCF_SIGPROFILERASSIGNMENT.out.sbs_activities)
+		.mix(sbs_activities_existing_outputs)
+
+	indel_activities = Channel.empty()
+  		.mix(VCF_SIGPROFILERASSIGNMENT.out.indel_activities)
+  		.mix(indel_activities_existing_outputs)
+
+	sbs_posterior_prob = Channel.empty()
+		.mix(VCF_SIGPROFILERASSIGNMENT.out.sbs_posterior_prob)
+		.mix(sbs_posterior_prob_existing_outputs)
+
+	indel_posterior_prob = Channel.empty()
+		.mix(VCF_SIGPROFILERASSIGNMENT.out.indel_posterior_prob)
+		.mix(indel_posterior_prob_existing_outputs)
+
+
+	sbs_posterior_prob_join = sbs_posterior_prob
+		.map { it -> [it[0].patient, it[1]] } // meta.patient, sbs_posterior_prob
+	
+	indel_posterior_prob_join = indel_posterior_prob
+		.map { it -> [it[0].patient, it[1] ] } // meta.patient, indel_posterior_prob
+
+
+	merged_inputs = filtered_ffpe_impact_somatic_vcf_inputs // patient, meta, annotated somatic_mut_vcf
+		.join(sbs_posterior_prob_join) // patient, sbs_posterior_prob
+		.join(indel_posterior_prob_join) // patient, indel_posterior_prob
+		.map { _patient, meta, annotated_vcf, sbs_posterior_prob_path, indel_posterior_prob_path -> 
+			[meta, annotated_vcf, sbs_posterior_prob_path, indel_posterior_prob_path ] 
+		} // meta, annotated somatic_mut_vcf, sbs_posterior_prob, indel_posterior_prob
+
+	if (is_filter_ffpe_impact) {
+		FFPE_IMPACT_FILTER(merged_inputs)
+		annotated_vcf_ffpe_impact_or_snpeff = FFPE_IMPACT_FILTER.out.ffpe_impact_filtered_vcf
+			.mix(filtered_ffpe_impact_existing_outputs) // meta, ffpe_impact_filtered_vcf, ffpe_impact_filtered_vcf_tbi
+	} 	
+
+  }
+
+  
+
+  emit:
+  sbs_signatures
+  indel_signatures
+  signatures_matrix
+  sbs_activities
+  indel_activities
+  sbs_posterior_prob
+  indel_posterior_prob
+  annotated_vcf_ffpe_impact_or_snpeff
+
 }

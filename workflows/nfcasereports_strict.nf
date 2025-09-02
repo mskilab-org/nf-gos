@@ -102,11 +102,7 @@ def flowcellLaneFromFastq(path) {
     return fcid
 }
 
-include { CHANNEL_ALIGN_CREATE_CSV } from '../subworkflows/local/channel_align_create_csv/main'
-include { CHANNEL_MARKDUPLICATES_CREATE_CSV } from '../subworkflows/local/channel_markduplicates_create_csv/main'
-include { CHANNEL_BASERECALIBRATOR_CREATE_CSV } from '../subworkflows/local/channel_baserecalibrator_create_csv/main'
-include { CHANNEL_APPLYBQSR_CREATE_CSV } from '../subworkflows/local/channel_applybqsr_create_csv/main'
-include { CHANNEL_SVCALLING_CREATE_CSV } from '../subworkflows/local/channel_svcalling_create_csv/main'
+include { validateParameters; paramsHelp } from 'plugin/nf-schema'
 
 // Download annotation cache if needed
 include { PREPARE_CACHE } from '../subworkflows/local/prepare_cache/main'
@@ -118,150 +114,49 @@ include { PREPARE_GENOME } from '../subworkflows/local/prepare_genome/main'
 include { PREPARE_INTERVALS } from '../subworkflows/local/prepare_intervals/main'
 
 // BAM Picard QC
-include { BAM_QC } from '../subworkflows/local/bam_qc/main'
-
-// Svaba
-include { BAM_SVCALLING_SVABA } from '../subworkflows/local/bam_svcalling_svaba/main'
-
-// MSISensor Pro
-include { MSISENSORPRO_STEP } from '../subworkflows/local/steps/main'
+// include { BAM_QC } from '../subworkflows/local/bam_qc/main'
 
 //GRIDSS
-include { BAM_SVCALLING_GRIDSS } from '../subworkflows/local/bam_svcalling_gridss/main'
-include { BAM_SVCALLING_GRIDSS_SOMATIC } from '../subworkflows/local/bam_svcalling_gridss/main'
+include { 
+    BAM_SVCALLING_GRIDSS; 
+    BAM_SVCALLING_GRIDSS_SOMATIC
+} from '../subworkflows/local/bam_svcalling_gridss/main'
 
 // SV Junction Filtering
-include { SV_JUNCTION_FILTER as JUNCTION_FILTER } from '../subworkflows/local/junction_filter/main'
+include { 
+    SV_JUNCTION_FILTER as JUNCTION_FILTER;
+    SV_JUNCTION_FILTER_BEDTOOLS as JUNCTION_FILTER_BEDTOOLS
+} from '../subworkflows/local/junction_filter/main'
 
-include { SV_JUNCTION_FILTER_BEDTOOLS as JUNCTION_FILTER_BEDTOOLS } from '../subworkflows/local/junction_filter/main'
+include { 
+    ALIGNMENT_STEP; 
+    BAM_QC;
+    MSISENSORPRO_STEP;
+    SV_CALLING_STEP;
+    FRAGCOUNTER_STEP;
+    DRYCLEAN_STEP;
+    AMBER_STEP;
+    COBALT_STEP;
+    PURPLE_STEP;
+    CBS_STEP;
+    VARIANT_CALLING_STEP;
+    VARIANT_ANNOTATION_STEP;
+    JABBA_STEP;
+    NON_INTEGER_BALANCE_STEP;
+    LP_PHASED_BALANCE_STEP;
+    EVENTS_STEP;
+    FUSIONS_STEP;
+    MULTIPLICITY_STEP;
+    ONCOKB_STEP;
+    SIGNATURES_STEP;
+    HRDETECT_STEP;
+    ONENESS_TWONESS_STEP
+} from '../subworkflows/local/steps.nf'
 
-// AMBER
-include { AMBER_STEP } from '../subworkflows/local/steps/main'
-
-// fragCounter
-include { FRAGCOUNTER_STEP } from '../subworkflows/local/steps/main'
-
-// dryclean
-include { COV_DRYCLEAN as TUMOR_DRYCLEAN } from '../subworkflows/local/cov_dryclean/main'
-include { COV_DRYCLEAN as NORMAL_DRYCLEAN } from '../subworkflows/local/cov_dryclean/main'
-
-// CBS
-include { COV_CBS as CBS } from '../subworkflows/local/cov_cbs/main'
-
-// SAGE
-include { BAM_SAGE } from '../subworkflows/local/bam_sage/main'
-include { BAM_SAGE_TUMOR_ONLY_FILTER } from '../subworkflows/local/bam_sage/main'
-include { RESCUE_CH_HEME_STEP } from '../subworkflows/local/rescue_ch_step/main'
-
-
-// SNPEFF
-include { VCF_SNPEFF as VCF_SNPEFF_SOMATIC } from '../subworkflows/local/vcf_snpeff/main'
-include { VCF_SNPEFF as VCF_SNPEFF_GERMLINE } from '../subworkflows/local/vcf_snpeff/main'
-
-// COBALT
-include { BAM_COBALT } from '../subworkflows/local/bam_cobalt/main'
-
-// PURPLE
-include { BAM_COV_PURPLE } from '../subworkflows/local/bam_cov_purple/main'
-
-// JaBbA
-include { COV_JUNC_TUMOR_ONLY_JABBA as JABBA_TUMOR_ONLY } from '../subworkflows/local/jabba/main'
-include { COV_JUNC_JABBA as JABBA } from '../subworkflows/local/jabba/main'
-// if (params.tumor_only) {
-//     include { COV_JUNC_TUMOR_ONLY_JABBA as JABBA } from '../subworkflows/local/jabba/main'
-// } else {
-//     include { COV_JUNC_JABBA as JABBA } from '../subworkflows/local/jabba/main'
-// }
-include { RETIER_JUNCTIONS } from '../subworkflows/local/jabba/main'
-
-// Events
-include { GGRAPH_EVENTS as EVENTS } from '../subworkflows/local/events/main'
-
-// Fusions
-include { GGRAPH_FUSIONS as FUSIONS } from '../subworkflows/local/fusions/main'
-
-// Allelic CN
-include { COV_GGRAPH_NON_INTEGER_BALANCE as NON_INTEGER_BALANCE } from '../subworkflows/local/allelic_cn/main'
-
-include { COV_GGRAPH_LP_PHASED_BALANCE as LP_PHASED_BALANCE } from '../subworkflows/local/allelic_cn/main'
-
-// HRDetect
-include { JUNC_SNV_GGRAPH_HRDETECT } from '../subworkflows/local/hrdetect/main'
-
-// OnenessTwoness
-include { HRD_ONENESS_TWONESS } from '../subworkflows/local/onenesstwoness/main'
-
-//STRELKA2
-include { BAM_SOMATIC_STRELKA } from '../subworkflows/local/bam_somatic_strelka/main'
-include { BAM_GERMLINE_STRELKA } from '../subworkflows/local/bam_germline_strelka/main'
-
-// SNV MULTIPLICITY
-include { VCF_SNV_MULTIPLICITY } from '../subworkflows/local/vcf_snv_multiplicity/main'
-
-// ONCOKB
-include { VCF_FUSIONS_CNA_ONCOKB_ANNOTATOR } from '../subworkflows/local/oncokb/main'
-
-// PAVE
-include { VCF_PAVE as VCF_PAVE_SOMATIC } from '../subworkflows/local/vcf_pave/main'
-include { VCF_PAVE as VCF_PAVE_GERMLINE } from '../subworkflows/local/vcf_pave/main'
-
-// // SigProfilerAssignment
-// include { VCF_SIGPROFILERASSIGNMENT } from '../subworkflows/local/vcf_sigprofilerassignment/main'
-
-// Alignment Step
-include { ALIGNMENT_STEP } from '../subworkflows/local/alignment_step/main'
-
-// SV Calling Step
-include { SV_CALLING_STEP } from '../subworkflows/local/sv_calling_step/main'
-
-// Dryclean Step
-include { DRYCLEAN_STEP } from '../subworkflows/local/steps/main'
-
-// Cobalt Step
-include { COBALT_STEP } from '../subworkflows/local/steps/main'
-
-// Purple Step
-include { PURPLE_STEP } from '../subworkflows/local/steps/main'
-
-// CBS Step
-include { CBS_STEP } from '../subworkflows/local/steps/main'
-
-// Variant Calling Step
-include { VARIANT_CALLING_STEP } from '../subworkflows/local/steps/main'
-
-// Variant Annotation Step
-include { VARIANT_ANNOTATION_STEP } from '../subworkflows/local/steps/main'
-
-// JaBbA Step
-include { JABBA_STEP } from '../subworkflows/local/steps/main'
-
-// Non-Integer Balance Step
-include { NON_INTEGER_BALANCE_STEP } from '../subworkflows/local/steps/main'
-
-// LP Phased Balance Step
-include { LP_PHASED_BALANCE_STEP } from '../subworkflows/local/steps/main'
-
-// Events Step
-include { EVENTS_STEP } from '../subworkflows/local/steps/main'
-
-// Fusions Step
-include { FUSIONS_STEP } from '../subworkflows/local/steps/main'
-
-// Multiplicity Step
-include { MULTIPLICITY_STEP } from '../subworkflows/local/steps/main'
-
-// OncoKB Step
-include { ONCOKB_STEP } from '../subworkflows/local/steps/main'
-
-// Signatures Step
-include { SIGNATURES_STEP } from '../subworkflows/local/signatures_step/main'
-
-// HRDetect Step
-include { HRDETECT_STEP } from '../subworkflows/local/steps/main'
-
-// OnenessTwoness Step
-include { ONENESS_TWONESS_STEP } from '../subworkflows/local/steps/main'
-
+include {
+    SV_CHIMERA_FILTER as SV_CHIMERA_FILTER_RAWVCF;
+    SV_CHIMERA_FILTER as SV_CHIMERA_FILTER_VCF
+} from '../modules/local/process.nf'
 
 
 workflow SETUP {
@@ -699,9 +594,25 @@ workflow TOOLS {
 
 }
 
+
 workflow NFGOS {
 
     main:
+    // Print help message if needed
+    if (params.help) {
+        def logo = NfcoreTemplate.logo(workflow, params.monochrome_logs)
+        def citation = '\n' + WorkflowMain.citation(workflow) + '\n'
+        def String command = "nextflow run ${workflow.manifest.name} --input samplesheet.csv --genome GRCh37 -profile docker"
+        log.info logo + paramsHelp(command) + citation + NfcoreTemplate.dashedLine(params.monochrome_logs)
+        System.exit(0)
+    }
+
+    // Validate input parameters
+    if (params.validate_params) {
+        validateParameters()
+    }
+    WorkflowMain.initialise(workflow, params, log)
+
     SETUP()
     inputs = SETUP.out.inputs
     inputs_unlaned = SETUP.out.inputs_unlaned
@@ -875,6 +786,14 @@ workflow NFGOS {
 
     vcf_from_gridss_gridss = SV_CALLING_STEP.out.vcf_from_gridss_gridss
     vcf_raw_from_gridss_gridss = SV_CALLING_STEP.out.vcf_raw_from_gridss_gridss
+
+    do_filter_ffpe_chimera = params.filter_ffpe_chimera ?: false
+    if (do_filter_ffpe_chimera) {
+        SV_CHIMERA_FILTER_VCF(vcf_from_gridss_gridss)
+        SV_CHIMERA_FILTER_RAWVCF(vcf_raw_from_gridss_gridss)
+        vcf_from_gridss_gridss = SV_CHIMERA_FILTER_VCF.out.vcftbi
+        vcf_raw_from_gridss_gridss = SV_CHIMERA_FILTER_RAWVCF.out.vcftbi
+    }
 
     /* FIXME: Junction Filtering step
         Placed here for now as the new JUNCTION_FILTER_BEDTOOLS needs to be implemented.
@@ -1145,7 +1064,8 @@ workflow NFGOS {
         vcf_from_sv_calling_for_merge,
         hets_sites_for_merge,
         annotated_vcf_ffpe_impact_or_snpeff_for_merge,
-        non_integer_balance_balanced_gg_for_merge,
+        // non_integer_balance_balanced_gg_for_merge,
+        jabba_rds_for_merge,
         tools_used
     )
     hrdetect_rds_for_merge = HRDETECT_STEP.out.hrdetect_rds

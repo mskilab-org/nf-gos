@@ -17,6 +17,9 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../../../modules/nf-core/custom/du
 // FASTQ Concatenation
 include { CAT_FASTQ } from '../../../modules/nf-core/cat/fastq/main'
 
+// FFPE Chimera Filter
+include { CHIMERA_FILTER } from '../../../modules/local/ffpe_bam_filter/main'
+
 // Map input reads to reference genome
 include { FASTQ_ALIGN_BWAMEM_MEM2 } from '../../../subworkflows/local/fastq_align_bwamem_mem2/main'
 include { FASTQ_PARABRICKS_FQ2BAM } from '../../../subworkflows/local/fastq_parabricks_fq2bam/main'
@@ -237,15 +240,25 @@ workflow ALIGNMENT_STEP {
             }
         .groupTuple()
 
+        
 		
 
         // bams are merged (when multiple lanes from the same sample) and indexed
         BAM_MERGE_INDEX_SAMTOOLS(bam_mapped)
 
-        // Gather used softwares versions
-        // versions = versions.mix(BAM_MERGE_INDEX_SAMTOOLS.out.versions)
+        
 
         alignment_bams_final = BAM_MERGE_INDEX_SAMTOOLS.out.bam_bai.map({ meta, bam, bai -> [ meta.sample, Utils.remove_lanes_from_meta(meta), bam, bai ] })
+
+        // Gather used softwares versions
+        // versions = versions.mix(BAM_MERGE_INDEX_SAMTOOLS.out.versions)
+        do_filter_ffpe_chimera = params.filter_ffpe_chimera ?: false
+        println "params.filter_ffpe_chimera: ${params.filter_ffpe_chimera}"
+        if (do_filter_ffpe_chimera) {
+            println "You have set params.filter_ffpe_chimera: ${params.filter_ffpe_chimera}, will do FFPE chimera filtering"
+            CHIMERA_FILTER(alignment_bams_final.map { _sample, meta, bam, bai -> [meta, bam, bai] })
+            alignment_bams_final = CHIMERA_FILTER.out.bambai.map { meta, bam, bai -> [ meta.sample, meta, bam, bai ]}
+        }
 		// alignment_bams_final.view{ log.info "alignment_bams_final: $it" }
     }
 

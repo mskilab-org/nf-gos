@@ -8,8 +8,8 @@ process ONCOKB_ANNOTATOR {
     maxErrors 100
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/unified:0.0.11':
-        'mskilab/unified:0.0.11' }"
+        'docker://mskilab/unified:0.0.12':
+        'mskilab/unified:0.0.12' }"
 
     input:
     tuple val(meta), path(vcf), path(fusions), path(cna)
