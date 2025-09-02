@@ -125,6 +125,18 @@ include { validateParameters; paramsHelp } from 'plugin/nf-schema'
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
+// include { NFCASEREPORTS } from './workflows/nfcasereports'
+include { NFGOS as NFCASEREPORTS } from './workflows/nfcasereports_strict.nf'
+// include { NFGOS } from './workflows/nfcasereports_strict.nf'
+
+//
+// WORKFLOW: Run main mskilab-org/nf-jabba analysis pipeline
+//
+// workflow MAIN {
+workflow MSKILABORG_NFCASEREPORTS {
+    NFCASEREPORTS ()
+}
+
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     RUN ALL WORKFLOWS
@@ -135,10 +147,13 @@ include { validateParameters; paramsHelp } from 'plugin/nf-schema'
 // WORKFLOW: Execute a single named workflow for the pipeline
 // See: https://github.com/nf-core/rnaseq/issues/619
 //
-
-include { NFGOS } from './workflows/nfcasereports_strict.nf'
 workflow {
-    NFGOS()
+    MSKILABORG_NFCASEREPORTS ()
+
+
+    workflow.onComplete = {
+        NfcoreTemplate.summary(workflow, params, log)
+    }
 }
 
 /*

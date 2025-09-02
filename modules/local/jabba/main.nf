@@ -311,7 +311,7 @@ process RETIER_WHITELIST_JUNCTIONS___OLD {
 }
 
 
-process RETIER_WHITELIST_JUNCTIONS {
+process RETIER_WHITELIST_JUNCTIONS___DEV_COPY {
     tag "$meta.id"
     label 'process_low'
 
@@ -475,3 +475,147 @@ process RETIER_WHITELIST_JUNCTIONS {
     END_VERSIONS
     """
 }
+
+
+process RETIER_WHITELIST_JUNCTIONS {
+    tag "$meta.id"
+    label 'process_low'
+
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'docker://mskilab/unified:0.0.13':
+        'mskilab/unified:0.0.13' }"
+
+    input:
+    tuple val(meta), path(junctions)
+    val(tfield)
+    path(whitelist_genes)
+
+    output:
+    tuple val(meta), path("*___tiered.rds"), emit: retiered_junctions, optional: true
+
+    script:
+    """
+    #!/usr/bin/env Rscript
+
+	options(error = function() {traceback(2); quit(save = "no", status = 1)})
+
+    library(gUtils)
+    library(dplyr)
+    library(VariantAnnotation)
+    library(gGnome)
+
+    # Load the whitelist genes
+    heme_gen = readRDS("${whitelist_genes}")
+
+    heme_gen = IRanges::resize(
+        heme_gen,
+        width = as.integer(width(heme_gen)) + 150000,
+        fix = "end",
+        ignore.strand = FALSE
+    )
+
+    # Define the path to the junctions file
+    jpath = "${junctions}"
+    jpath_tiered = glue::glue('{tools::file_path_sans_ext(jpath)}___tiered.rds')
+
+    # Read the VCF file
+	is_character = is.character(jpath)
+	is_len_one = NROW(jpath) == 1
+	is_na = is_len_one && (is.na(jpath) || jpath %in% c("NA", base::nullfile()))
+	is_possible_path = is_character && is_len_one && !is_na
+  	is_existent_path = is_possible_path && file.exists(jpath)
+  	is_rds = is_possible_path && grepl(".rds\$", jpath)
+	is_vcf = is_possible_path && grepl(".vcf(.bgz|.gz){0,}\$", jpath)
+
+	if (is_existent_path && is_rds) {
+		ra.all = readRDS(jpath)
+	} else if (is_existent_path && is_vcf) {
+		ra.all = gGnome:::read.juncs(jpath)
+	} else if (!is_existent_path) {
+		stop("jpath does not exist or is invalid path: ", jpath)
+	}
+
+	is_properly_formatted_grangeslist = (
+	    inherits(ra.all, "GRangesList")
+		&& (
+			all(S4Vectors::elementNROWS(ra.all) == 2)
+			|| (NROW(ra.all) == 0)
+		)
+	)
+
+	if (!is_properly_formatted_grangeslist) {
+		stop("Improperly formatted junctions")
+	}
+
+    # Important part is below
+    mcols_ra.all = mcols(ra.all)
+    default_tier = rep_len(2, NROW(mcols_ra.all))
+    default_tier[mcols_ra.all[["FILTER"]] != "PASS"] = 3
+    mcols_ra.all[["${tfield}"]] = default_tier
+
+    mcols(ra.all) = mcols_ra.all
+    ra.all = ra.all[order(mcols_ra.all[["${tfield}"]], decreasing = FALSE)]
+    mcols_ra.all = mcols(ra.all)
+    grpiv = gUtils::grl.pivot(ra.all)
+    bp1 = grpiv[[1]]
+    bp2 = grpiv[[2]]
+
+    bp1_genes = gUtils::gr.val(bp1, heme_gen, val = "gene_name", sep = "___SEP___")
+    bp2_genes = gUtils::gr.val(bp2, heme_gen, val = "gene_name", sep = "___SEP___")
+
+    bp1_genes\$genes = IRanges::CharacterList(strsplit(bp1_genes\$gene_name, "___SEP___"))
+    bp2_genes\$genes = IRanges::CharacterList(strsplit(bp2_genes\$gene_name, "___SEP___"))
+
+    is_bp1bp2_genes_different = any(bp1_genes\$genes != bp2_genes\$genes)
+    is_bp1_in_a_gene = elementNROWS(bp1_genes\$genes) > 0
+    is_bp2_in_a_gene = elementNROWS(bp2_genes\$genes) > 0
+
+    is_bp1bp2_different = (
+    is_bp1bp2_genes_different
+    | (is_bp1_in_a_gene & !is_bp2_in_a_gene)
+    | (!is_bp1_in_a_gene & is_bp2_in_a_gene)
+    )
+
+
+    ra.raw.reciprocals.lst = gGnome::get_reciprocal_pairs(
+        ra.all[is_bp1bp2_different]
+        ,
+        distance_pad = 1e4
+        ,
+        return_inputs = TRUE  
+    )
+
+    ra.raw.reciprocals = ra.raw.reciprocals.lst\$jun_recip_pairs
+    mcols_ra.raw.reciprocals = mcols(ra.raw.reciprocals)
+    nr_ra.raw.reciprocals = NROW(ra.raw.reciprocals)
+    mcols_ra.raw.reciprocals[["${tfield}"]] = rep_len(1, nr_ra.raw.reciprocals)
+    mcols(ra.raw.reciprocals) = mcols_ra.raw.reciprocals
+
+    ra.raw.reciprocals = gr.fix(ra.raw.reciprocals, ra.all)
+    ra.all = gr.fix(ra.all, ra.raw.reciprocals)
+    ra.out = c(ra.raw.reciprocals, ra.all)
+
+    if (nr_ra.raw.reciprocals > 0) {
+        cat("Whitelisted", nr_ra.raw.reciprocals, "reciprocal junctions via retiering '${tfield}' field to 1.\n")
+    }
+
+    ra.out = ra.out[!gGnome::fra.duplicated(ra.out, pad = 1000)]
+
+
+    saveRDS(ra.out, jpath_tiered)
+    """
+    stub:
+
+    prefix = task.ext.prefix ?: "${meta.id}"
+    def VERSION = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
+
+    """
+    touch ___tiered.rds
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        Retier Junctions: ${VERSION}
+    END_VERSIONS
+    """
+}
+

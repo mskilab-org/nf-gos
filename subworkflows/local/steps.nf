@@ -1958,10 +1958,10 @@ workflow JABBA_STEP {
 		// The variable below will get propagated to jabba if retiering is not done to ! params.tumor_only block
 		jabba_vcf_from_sv_calling_for_merge = vcf_from_sv_calling_for_merge
 
-        vcf_raw_from_gridss_gridss_for_merge = vcf_raw_from_gridss_gridss
-            .map {
-                [ it[0].patient ] + it[1..-1].toList() // patient, vcf_raw, vcf_tbi_raw
-            }
+        // vcf_raw_from_gridss_gridss_for_merge = vcf_raw_from_gridss_gridss
+        //     .map {
+        //         [ it[0].patient ] + it[1..-1].toList() // patient, vcf_raw, vcf_tbi_raw
+        //     }
 
 		// Variable exists in case retiering is done
 		untiered_junctions_for_merge = vcf_from_sv_calling_for_merge
@@ -1970,10 +1970,14 @@ workflow JABBA_STEP {
 			untiered_junctions_for_merge = final_filtered_sv_rds_for_merge
 		}
 		if (params.is_retier_whitelist_junctions) {
-			untiered_junctions_input = jabba_inputs
-				.join(untiered_junctions_for_merge)
-                .join(vcf_raw_from_gridss_gridss_for_merge)
-				.map { it -> [ it[1], it[2], it[3] ] } // meta, (vcf or rds), vcf_raw
+			// untiered_junctions_input = jabba_inputs
+			// 	.join(untiered_junctions_for_merge)
+            //     .join(vcf_raw_from_gridss_gridss_for_merge)
+			// 	.map { it -> [ it[1], it[2], it[3] ] } // meta, (vcf or rds), vcf_raw
+
+            untiered_junctions_input = jabba_inputs
+				.join(untiered_junctions_for_merge) 
+				.map { it -> [ it[1], it[2] ] } // meta, (vcf or rds)
 
 			RETIER_JUNCTIONS(untiered_junctions_input)
 			retiered_junctions_output_for_merge = Channel.empty()
