@@ -64,12 +64,17 @@ TCXX49,XX,0,TCXX49_N,lane_1,/path/to/fastq_1.fq.gz,/path/to/fastq_2.gz
 Each row represents a pair of fastq files (paired end) for a single sample (in
 this case a normal sample, status: 0).
 
-After the input file is ready, you can run the pipeline using our `gOSh` CLI.
+After the input file is ready, you can run the pipeline using our [`gOSh`](https://github.com/mskilab-org/gosh) CLI. For `gOSh` installation instructions, see https://github.com/mskilab-org/gosh. 
 
+**The recommended way to run nf-gos is through the gOSh CLI.**
+
+
+With a samplesheet.csv in the run directory, nf-gOS is ready to be run through the `gOSh` wrapper.
 ```bash
-pip install bin/gosh # install gosh
 gosh run pipeline
 ```
+
+The first time the pipeline is executed in a run directory, a wizard will prompt the user through several essential configuration parameters (like reference assembly to use, and pipeline presets).
 
 You can also run the pipeline directly using the following command:
 
@@ -200,7 +205,7 @@ To debug any step or process that failed, first check your current `execution_tr
 
 ## Credits
 
-`nf-casereports` was written by [`Shihab Dider`](https://github.com/shihabdider) and [`Tanubrata Dey`](https://github.com/tanubrata) and at the Perlmutter Cancer Center and the New York Genome Center.
+`nf-gos` was written by [`Shihab Dider`](https://github.com/shihabdider) and [`Tanubrata Dey`](https://github.com/tanubrata) and at the Perlmutter Cancer Center and the New York Genome Center.
 
 We thank the following people for their extensive guidance in the development of this pipeline:
 - [Marcin Imielinski](https://github.com/imielinski)
