@@ -1,5 +1,6 @@
 library(optparse)
 options(error = function() {traceback(2); quit("no", 1)})
+options(scipen = 9999)
 
 if (!exists('opt')) ## if opt already exists allow over-ride of command line arg processing for debugging purposes
 {
@@ -24,7 +25,14 @@ jun = gGnome:::read.juncs(opt$input_vcf)
 
 
 ramatch = fread(opt$ramatch_file, header = FALSE)
-ix_in_germline = unique(as.integer(ramatch$V1))
+junmatch = unique(ramatch[[1]])
+nr_junmatch = NROW(junmatch)
+any_junmatch = nr_junmatch > 0
+ix_in_germline = integer(0)
+if (any_junmatch) {
+    ix_in_germline = as.integer(stringr::str_split_fixed(junmatch, "___", 3)[,1])
+}
+# ix_in_germline = unique(as.integer(ramatch$V1))
 
 nr = NROW(ix_in_germline)
 any_ix_in_germline = nr > 0

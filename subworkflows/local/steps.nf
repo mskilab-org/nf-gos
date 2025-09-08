@@ -265,7 +265,6 @@ workflow ALIGNMENT_STEP {
             CHIMERA_FILTER(alignment_bams_final.map { _sample, meta, bam, bai -> [meta, bam, bai] })
             alignment_bams_final = CHIMERA_FILTER.out.bambai.map { meta, bam, bai -> [ meta.sample, meta, bam, bai ]}
         }
-		// alignment_bams_final.view{ log.info "alignment_bams_final: $it" }
     }
 
     // BAM Postprocessing
@@ -1386,18 +1385,14 @@ workflow VARIANT_CALLING_STEP {
         .map { it -> [it.meta, it.snv_somatic_vcf_tumoronly_filtered, it.snv_somatic_vcf_tumoronly_filtered_tbi] }
         .filter { !it[1].isEmpty() && !it[2].isEmpty()}
         .unique()
+        .dump(tag: "filtered_somatic_vcf_tumoronly_outputs from inputs_unlaned", pretty: true)
     filtered_somatic_vcf_tumor_only = filtered_somatic_vcf_tumoronly_outputs
 
     rescue_ch_existing_outputs = inputs_unlaned
         .map { it -> [it.meta, it.snv_somatic_vcf_rescue_ch_heme, it.snv_somatic_vcf_rescue_ch_heme_tbi] }
         .filter { !it[1].isEmpty() && !it[2].isEmpty()}
         .unique()
-    
-    rescue_ch_inputs = inputs_unlaned
-        .map { it -> [it.meta, it.snv_somatic_vcf_rescue_ch_heme, it.snv_somatic_vcf_rescue_ch_heme_tbi] }
-        .filter { it[1].isEmpty() || it[1].isEmpty() }
-        .map { it -> [it.meta.patient] }
-        .unique()
+        .dump(tag: "rescue_ch_existing_outputs from inputs_unlaned", pretty: true)
 
     // Set is_heme based on is_retier_whitelist_junctions
     // params.is_heme = params.is_retier_whitelist_junctions
@@ -1482,9 +1477,10 @@ workflow VARIANT_CALLING_STEP {
                 [it[0].patient] + it.toList()
             }
             .join(
-                filtered_somatic_vcf_tumoronly_outputs
-                    .filter { it -> it[1].isEmpty() }
-                    .map { it -> [it[0].patient] }
+                // filtered_somatic_vcf_tumoronly_outputs
+                inputs_unlaned
+                    .filter { it -> it.snv_somatic_vcf_tumoronly_filtered.isEmpty() }
+                    .map { it -> [ it.meta.patient ] }
                     .unique()
             )
             .map { it[1..-1] }
@@ -1509,7 +1505,6 @@ workflow VARIANT_CALLING_STEP {
                 .mix(BAM_SAGE_TUMOR_ONLY_FILTER.out.sage_filtered_vcf)
                 .mix(
                     filtered_somatic_vcf_tumoronly_outputs
-                    .filter { it -> !it[1].isEmpty() }
                 )
 
             filtered_somatic_vcf = filtered_somatic_vcf_tumor_only
@@ -1521,7 +1516,13 @@ workflow VARIANT_CALLING_STEP {
                         filtered_somatic_vcf_tumor_only
                             .map { [it[0].patient, it[1], it[2]]  } // meta.patient, vcf, tbi
                     )
-                    .join(rescue_ch_inputs)
+                    .join(
+                        inputs_unlaned
+                            .map { it -> [it.meta, it.snv_somatic_vcf_rescue_ch_heme, it.snv_somatic_vcf_rescue_ch_heme_tbi] }
+                            .filter { it[1].isEmpty() || it[2].isEmpty() }
+                            .map { it -> [ it[0].patient ] }
+                            .unique()
+                    )
                     .map { it[1..-1] } // meta, sage vcf, sage tbi, tumoronly vcf, tumoronly tbi
 
                 RESCUE_CH_HEME_STEP(
@@ -2357,7 +2358,7 @@ workflow MULTIPLICITY_STEP {
             .join(snv_multiplicity_inputs_hets_sites)
             .join(snv_multiplicity_inputs_dryclean_tumor_cov)
             .map{
-                patient, meta, somatic_ann, ggraph, hets, dryclean_cov  ->
+                _patient, meta, somatic_ann, ggraph, hets, dryclean_cov  ->
                 [ meta, somatic_ann, [], ggraph, hets, dryclean_cov ]
             }
     } else {
@@ -2393,7 +2394,7 @@ workflow MULTIPLICITY_STEP {
             .join(snv_multiplicity_inputs_hets_sites)
             .join(snv_multiplicity_inputs_dryclean_tumor_cov)
             .map{
-                patient, meta, somatic_ann, germline_ann, ggraph, hets, dryclean_cov ->
+                _patient, meta, somatic_ann, germline_ann, ggraph, hets, dryclean_cov ->
                 [ meta, somatic_ann, germline_ann, ggraph, hets, dryclean_cov ]
             }
     }
@@ -2697,6 +2698,7 @@ workflow SIGNATURES_STEP {
   annotated_vcf_ffpe_impact_or_snpeff = inputs_tumors_meta_for_merge
 	.join(annotated_vcf_ffpe_impact_or_snpeff_for_merge, failOnDuplicate: false, failOnMismatch: false)
 	.map { it -> [ it[1], it[2]] } // meta, annotated somatic snv vcf
+    .dump(tag: "annotated_vcf_ffpe_impact_or_snpeff in SIGNATURES STEP", pretty: true)
 
 
 

@@ -482,8 +482,8 @@ process RETIER_WHITELIST_JUNCTIONS {
     label 'process_low'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/unified:0.0.13':
-        'mskilab/unified:0.0.13' }"
+        'docker://mskilab/unified:0.0.15':
+        'mskilab/unified:0.0.15' }"
 
     input:
     tuple val(meta), path(junctions)

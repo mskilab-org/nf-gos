@@ -4,8 +4,8 @@ process JUNCTION_FILTER_BEDTOOLS {
     label 'process_medium'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/unified:0.0.13': 
-        'mskilab/unified:0.0.13' }"
+        'docker://mskilab/unified:0.0.14': 
+        'mskilab/unified:0.0.14' }"
 
     input:
     tuple val(meta), path(sv_vcf), path(sv_vcf_tbi)
@@ -33,7 +33,7 @@ process JUNCTION_FILTER_BEDTOOLS {
 
     export LIBDIR=\${NEXTFLOW_BIN_DIR}/R
     
-    if [ "${low_memory}"" = "true" ]; then
+    if [ "${low_memory}" = "true" ]; then
         export LOW_MEMORY=true
     else
         export LOW_MEMORY=false
