@@ -1,4 +1,4 @@
-process GRIDSS_SOMATIC {
+process GRIDSS_SOMATIC_FILTER {
     tag "$meta.id"
     label 'process_medium'
 

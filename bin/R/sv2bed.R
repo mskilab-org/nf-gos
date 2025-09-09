@@ -1,4 +1,5 @@
 library(optparse)
+options(scipen = 9999)
 options(error = function() {traceback(2); quit("no", 1)})
 
 if (!exists('opt')) ## if opt already exists allow over-ride of command line arg processing for debugging purposes

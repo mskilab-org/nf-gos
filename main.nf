@@ -59,6 +59,7 @@ params.blacklist_gridss = WorkflowMain.getGenomeAttribute(params, 'blacklist_gri
 params.pon_gridss = WorkflowMain.getGenomeAttribute(params, 'pon_gridss')
 params.gnomAD_sv_db = WorkflowMain.getGenomeAttribute(params, 'gnomAD_sv_db')
 params.junction_pon_gridss = WorkflowMain.getGenomeAttribute(params, 'junction_pon_gridss')
+params.junction_pon_dir = WorkflowMain.getGenomeAttribute(params, 'junction_pon_dir')
 params.junction_pon_svaba = WorkflowMain.getGenomeAttribute(params, 'junction_pon_svaba')
 params.gcmapdir_frag = WorkflowMain.getGenomeAttribute(params, 'gcmapdir_frag')
 params.build_dryclean = WorkflowMain.getGenomeAttribute(params, 'build_dryclean')
@@ -125,18 +126,6 @@ include { validateParameters; paramsHelp } from 'plugin/nf-schema'
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-// include { NFCASEREPORTS } from './workflows/nfcasereports'
-include { NFGOS as NFCASEREPORTS } from './workflows/nfcasereports_strict.nf'
-// include { NFGOS } from './workflows/nfcasereports_strict.nf'
-
-//
-// WORKFLOW: Run main mskilab-org/nf-jabba analysis pipeline
-//
-// workflow MAIN {
-workflow MSKILABORG_NFCASEREPORTS {
-    NFCASEREPORTS ()
-}
-
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     RUN ALL WORKFLOWS
@@ -147,9 +136,12 @@ workflow MSKILABORG_NFCASEREPORTS {
 // WORKFLOW: Execute a single named workflow for the pipeline
 // See: https://github.com/nf-core/rnaseq/issues/619
 //
-workflow {
-    MSKILABORG_NFCASEREPORTS ()
 
+include { NFGOS } from './workflows/main_workflow.nf'
+// include { SKILIFT } from './workflows/main_workflow.nf'
+workflow {
+    NFGOS()
+    // SKILIFT()
 
     workflow.onComplete = {
         NfcoreTemplate.summary(workflow, params, log)

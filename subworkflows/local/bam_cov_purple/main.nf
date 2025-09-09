@@ -6,18 +6,6 @@ include { PURPLE } from '../../../modules/local/purple/main'
 include { EXTRACT_PURITYPLOIDY } from '../../../modules/local/purple/main'
 
 //PURPLE
-gc_profile = WorkflowNfcasereports.create_file_channel(params.gc_profile)
-genome_fasta = WorkflowNfcasereports.create_file_channel(params.fasta)
-genome_fai = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
-genome_ver     = WorkflowNfcasereports.create_value_channel(params.genome_ver_amber)
-highly_diploid_percentage = WorkflowNfcasereports.create_value_channel(params.purple_highly_diploid_percentage)
-min_purity   = WorkflowNfcasereports.create_value_channel(params.purple_min_purity)
-ploidy_penalty_factor = WorkflowNfcasereports.create_value_channel(params.purple_ploidy_penalty_factor)
-genome_dict = WorkflowNfcasereports.create_file_channel(params.dict)
-sage_known_hotspots_somatic = WorkflowNfcasereports.create_file_channel(params.somatic_hotspots)
-sage_known_hotspots_germline = WorkflowNfcasereports.create_file_channel(params.germline_hotspots)
-driver_gene_panel = WorkflowNfcasereports.create_file_channel(params.driver_gene_panel)
-ensembl_data_resources = WorkflowNfcasereports.create_file_channel(params.ensembl_data_resources)
 
 workflow BAM_COV_PURPLE {
     // defining inputs
@@ -26,6 +14,19 @@ workflow BAM_COV_PURPLE {
 
     //Creating empty channels for output
     main:
+    gc_profile = WorkflowNfcasereports.create_file_channel(params.gc_profile)
+    genome_fasta = WorkflowNfcasereports.create_file_channel(params.fasta)
+    genome_fai = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
+    genome_ver     = WorkflowNfcasereports.create_value_channel(params.genome_ver_amber)
+    highly_diploid_percentage = WorkflowNfcasereports.create_value_channel(params.purple_highly_diploid_percentage)
+    min_purity   = WorkflowNfcasereports.create_value_channel(params.purple_min_purity)
+    ploidy_penalty_factor = WorkflowNfcasereports.create_value_channel(params.purple_ploidy_penalty_factor)
+    genome_dict = WorkflowNfcasereports.create_file_channel(params.dict)
+    sage_known_hotspots_somatic = WorkflowNfcasereports.create_file_channel(params.somatic_hotspots)
+    sage_known_hotspots_germline = WorkflowNfcasereports.create_file_channel(params.germline_hotspots)
+    driver_gene_panel = WorkflowNfcasereports.create_file_channel(params.driver_gene_panel)
+    ensembl_data_resources = WorkflowNfcasereports.create_file_channel(params.ensembl_data_resources)
+
     versions        = Channel.empty()
     ploidy          = Channel.empty()
 
