@@ -2,14 +2,7 @@
 // GPU ACCELERATED MAPPING
 //
 
-include { PARABRICKS_FQ2BAM            } from '../../../modules/local/fq2bam/main'
-
-fasta                               = WorkflowNfcasereports.create_file_channel(params.fasta)
-fasta_fai                           = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
-intervals                          = WorkflowNfcasereports.create_file_channel(params.intervals)
-mark_duplicates                     = params.fq2bam_mark_duplicates
-low_memory                          = params.fq2bam_low_memory
-optical_duplicate_pixel_distance    = params.optical_duplicate_pixel_distance
+include { PARABRICKS_FQ2BAM } from '../../../modules/local/fq2bam/main'
 
 workflow FASTQ_PARABRICKS_FQ2BAM {
     take:
@@ -18,6 +11,12 @@ workflow FASTQ_PARABRICKS_FQ2BAM {
     known_sites_tbi
 
     main:
+    fasta = WorkflowNfcasereports.create_file_channel(params.fasta)
+    fasta_fai = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
+    intervals = WorkflowNfcasereports.create_file_channel(params.intervals)
+    mark_duplicates = params.fq2bam_mark_duplicates
+    low_memory = params.fq2bam_low_memory
+    optical_duplicate_pixel_distance = params.optical_duplicate_pixel_distance
 
     bam = Channel.empty()
     bai = Channel.empty()
@@ -57,16 +56,16 @@ workflow FASTQ_PARABRICKS_FQ2BAM {
     bqsr_table = bqsr_table.mix(PARABRICKS_FQ2BAM.out.bqsr_table)
     duplicate_metrics = duplicate_metrics.mix(PARABRICKS_FQ2BAM.out.duplicate_metrics)
 
-    bam_to_cross = bam.map { meta, bam ->
-        [meta.sample, meta, bam] // meta here has no patient
+    bam_to_cross = bam.map { meta, bam_out ->
+        [meta.sample, meta, bam_out] // meta here has no patient
     }
 
     bam = bam_to_cross
         .cross(patient_sample_map)
         .map { baminfo, patient_map -> 
             def meta_complete = patient_map[1]
-            def bam = baminfo[2]
-            [ meta_complete, bam ]
+            def bam_out = baminfo[2]
+            [ meta_complete, bam_out ]
         }
     
 

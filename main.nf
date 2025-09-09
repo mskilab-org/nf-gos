@@ -138,8 +138,10 @@ include { validateParameters; paramsHelp } from 'plugin/nf-schema'
 //
 
 include { NFGOS } from './workflows/main_workflow.nf'
+// include { SKILIFT } from './workflows/main_workflow.nf'
 workflow {
     NFGOS()
+    // SKILIFT()
 
     workflow.onComplete = {
         NfcoreTemplate.summary(workflow, params, log)

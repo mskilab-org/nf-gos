@@ -17,7 +17,7 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../../modules/nf-core/custom/dumps
 include { CAT_FASTQ } from '../../modules/nf-core/cat/fastq/main'
 
 // FFPE Chimera Filter
-include { CHIMERA_FILTER } from '../../modules/local/ffpe_bam_filter/main'
+include { CHIMERA_FILTER as BAM_CHIMERA_FILTER } from '../../modules/local/ffpe_bam_filter/main'
 
 // Map input reads to reference genome
 include { FASTQ_ALIGN_BWAMEM_MEM2 } from '../../subworkflows/local/fastq_align_bwamem_mem2/main'
@@ -262,8 +262,8 @@ workflow ALIGNMENT_STEP {
         println "params.filter_ffpe_chimera: ${params.filter_ffpe_chimera}"
         if (do_filter_ffpe_chimera) {
             println "You have set params.filter_ffpe_chimera: ${params.filter_ffpe_chimera}, will do FFPE chimera filtering"
-            CHIMERA_FILTER(alignment_bams_final.map { _sample, meta, bam, bai -> [meta, bam, bai] })
-            alignment_bams_final = CHIMERA_FILTER.out.bambai.map { meta, bam, bai -> [ meta.sample, meta, bam, bai ]}
+            BAM_CHIMERA_FILTER(alignment_bams_final.map { _sample, meta, bam, bai -> [meta, bam, bai] })
+            alignment_bams_final = BAM_CHIMERA_FILTER.out.bambai.map { meta, bam, bai -> [ meta.sample, meta, bam, bai ]}
         }
     }
 
@@ -957,7 +957,7 @@ workflow CBS_STEP {
 
 
 //GRIDSS
-include { BAM_SVCALLING_GRIDSS; BAM_SVCALLING_GRIDSS_SOMATIC } from '../../subworkflows/local/bam_svcalling_gridss/main.nf'
+include { BAM_SVCALLING_GRIDSS } from '../../subworkflows/local/bam_svcalling_gridss/main.nf'
 // include { BAM_SVCALLING_GRIDSS_SOMATIC } from '../../subworkflows/local/bam_svcalling_gridss/main.nf'
 
 include { 
@@ -1023,16 +1023,16 @@ workflow SV_CALLING_STEP {
     
     vcf_raw_from_gridss_gridss = gridss_raw_existing_outputs
 
+    bam_sv_inputs = inputs_unlaned.filter { it.vcf_raw.isEmpty() }.map { it -> [it.meta.sample] }.unique()
+
 
     // SV Calling
     // ##############################
     if (tools_used.contains("all") || tools_used.contains("gridss") || params.is_run_junction_filter) {
 
-        
-
         // Filter out bams for which SV calling has already been done
         // FIXME: vcf to vcf_raw
-        bam_sv_inputs = inputs_unlaned.filter { it.vcf_raw.isEmpty() }.map { it -> [it.meta.sample] }.unique()
+        
         bam_sv_calling = alignment_bams_final // meta.sample, meta, bam, bai
             .combine(bam_sv_inputs, by: 0) // 
             .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
@@ -1313,35 +1313,6 @@ workflow SV_CALLING_STEP {
                 .mix(gridss_raw_existing_outputs)
 
         }
-
-        // vcf_from_gridss_gridss = Channel.empty()
-        //     .mix(BAM_SVCALLING_GRIDSS.out.vcf)
-        //     .mix(gridss_existing_outputs)
-        // versions = versions.mix(BAM_SVCALLING_GRIDSS.out.versions)
-
-        // if (params.tumor_only) {
-        //     vcf_from_sv_calling_for_merge = vcf_from_gridss_gridss
-        //         .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
-
-        //     JUNCTION_FILTER(vcf_from_gridss_gridss)
-
-        //     pon_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.pon_filtered_sv_rds)
-        //     final_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.final_filtered_sv_rds)
-        //     final_filtered_sv_rds_for_merge = final_filtered_sv_rds
-        //         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, rds
-        // } else {
-        //     //somatic filter for GRIDSS
-        //     BAM_SVCALLING_GRIDSS_SOMATIC(vcf_from_gridss_gridss)
-
-        //     versions = versions.mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.versions)
-        //     vcf_somatic_high_conf = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_high_confidence)
-        //     vcf_from_sv_calling_for_merge = vcf_somatic_high_conf
-        //         .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
-
-        //     unfiltered_som_sv = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_all)
-        //     unfiltered_som_sv_for_merge = unfiltered_som_sv
-        //         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
-        // }
     }
     
     emit:
@@ -1546,8 +1517,10 @@ workflow VARIANT_CALLING_STEP {
 }
 
 // SNPEFF
-include { VCF_SNPEFF as VCF_SNPEFF_SOMATIC } from './vcf_snpeff/main'
-include { VCF_SNPEFF as VCF_SNPEFF_GERMLINE } from './vcf_snpeff/main'
+include { 
+    VCF_SNPEFF as VCF_SNPEFF_SOMATIC; 
+    VCF_SNPEFF as VCF_SNPEFF_GERMLINE 
+} from './vcf_snpeff/main'
 workflow VARIANT_ANNOTATION_STEP {
     take:
     inputs_unlaned
@@ -1757,20 +1730,55 @@ workflow PURPLE_STEP {
 
     // need a channel with patient and meta for merging with rest
     purple_inputs_for_merge = inputs_unlaned
-        .filter { it -> it.ploidy.isEmpty() }
-        .map { it -> [it.meta.patient, it.meta - it.meta.subMap('tumor_id')] }
+        .filter { it -> 
+            (it.ploidy instanceof List && it.ploidy.isEmpty())
+            || (it.purity instanceof List && it.purity.isEmpty())
+        }
+        .map { it -> [it.meta.patient, it.meta - it.meta.subMap(['tumor_id', 'normal_id'])] }
         .unique()
 
-    meta_purple = purple_inputs_for_merge
+    // meta_purple = purple_inputs_for_merge
+    //     .branch{
+    //         normal: it[1].status.toString() == "0"
+    //         tumor:  it[1].status.toString() == "1"
+    //     }
+    //     .tumor
+    //     .map { patient, meta ->
+    //         [ patient, meta + [tumor_id: meta.sample, id: meta.sample] ]
+    //     }
+    
+    meta_purple_branched = purple_inputs_for_merge
         .branch{
             normal: it[1].status.toString() == "0"
             tumor:  it[1].status.toString() == "1"
         }
-        .tumor
-        .map {
-        patient, meta ->
-        [patient, meta + [tumor_id: meta.sample, id: meta.sample] ]
-    }
+    
+     meta_purple = meta_purple_branched.tumor
+            .map { patient, meta ->
+                [ patient ] + [ meta + [tumor_id: meta.sample] ] // [ patient, [meta] ]
+            }
+            .join(
+                meta_purple_branched.normal
+                    .map { patient, meta ->
+                        [ patient ] + [ meta + [normal_id: meta.sample] ] // [ patient, [meta] ]
+                    }
+                ,
+                remainder: true
+            )
+            .map { it -> // [ patient, [meta_tumor], [meta_normal] ]
+                def (patient, tumor, normal) = (it + [null, null])[0..2]
+                def meta_tumor = tumor ?: [null]
+                def meta_normal = normal ?: [null]
+                def meta_out = meta_tumor
+                meta_out = meta_out + [id: meta_tumor.sample ]
+                if (normal) {
+                    meta_out = meta_out + [ normal_id: meta_normal.normal_id ]
+                } else {
+                    meta_out = meta_out - meta_out.subMap("normal_id") // Ensure removal of normal_id if no normal
+                }
+                [ patient , meta_out ]
+            }
+            .dump(tag: "meta_purple merged", pretty: true)
 
     purple_inputs_snv_germline = Channel.empty()
     if (!params.tumor_only) {
@@ -1805,7 +1813,7 @@ workflow PURPLE_STEP {
     purple_inputs = meta_purple
         .join(purple_inputs_amber_dir)
         .join(purple_inputs_cobalt_dir)
-        .map { patient, meta, amber_dir, cobalt_dir ->
+        .map { _patient, meta, amber_dir, cobalt_dir ->
             [meta, amber_dir, cobalt_dir, [], [], [], [], [], []]
         }
 
@@ -1816,7 +1824,7 @@ workflow PURPLE_STEP {
             .join(purple_inputs_cobalt_dir)
             .join(purple_inputs_sv)
             .join(purple_inputs_snv)
-            .map { patient, meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi ->
+            .map { _patient, meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi ->
                 [meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, [], []]
             }
         }
@@ -1829,7 +1837,7 @@ workflow PURPLE_STEP {
                 .join(purple_inputs_sv)
                 .join(purple_inputs_snv)
                 .join(purple_inputs_snv_germline)
-                .map { patient, meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf, germ_snv_tbi ->
+                .map { _patient, meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf, germ_snv_tbi ->
                     [meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf, germ_snv_tbi]
                 }
         }

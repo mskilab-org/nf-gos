@@ -119,13 +119,13 @@ include { PREPARE_INTERVALS } from '../subworkflows/local/prepare_intervals/main
 //GRIDSS
 include { 
     BAM_SVCALLING_GRIDSS; 
-    BAM_SVCALLING_GRIDSS_SOMATIC
-} from '../subworkflows/local/bam_svcalling_gridss/main'
+    GRIDSS_SOMATIC_FILTER_STEP
+} from '../subworkflows/local/bam_svcalling_gridss/main.nf'
 
 // SV Junction Filtering
 include { 
     // SV_JUNCTION_FILTER as JUNCTION_FILTER;
-    SV_JUNCTION_FILTER_BEDTOOLS as JUNCTION_FILTER
+    SV_JUNCTION_FILTER_BEDTOOLS as JUNCTION_FILTER_STEP
 } from '../subworkflows/local/junction_filter/main'
 
 include { 
@@ -321,6 +321,8 @@ workflow SETUP {
             bai: it.bam ? it.bam + '.bai': [],
             vcf_tbi: it.vcf ? it.vcf + '.tbi' : [],
             vcf_raw_tbi: it.vcf_raw ? it.vcf_raw + '.tbi' : [],
+            structural_variants_chimera_filtered_tbi: it.structural_variants_chimera_filtered ? it.structural_variants_chimera_filtered + '.tbi' : [],
+            structural_variants_raw_chimera_filtered_tbi: it.structural_variants_raw_chimera_filtered ? it.structural_variants_raw_chimera_filtered + '.tbi' : [],
             snv_somatic_vcf_tumoronly_filtered_tbi: it.snv_somatic_vcf_tumoronly_filtered ? it.snv_somatic_vcf_tumoronly_filtered + ".tbi" : [],
             snv_somatic_vcf_rescue_ch_heme_tbi: it.snv_somatic_vcf_rescue_ch_heme ? it.snv_somatic_vcf_rescue_ch_heme + '.tbi' : [],
             snv_somatic_tbi: it.snv_somatic_vcf ? it.snv_somatic_vcf + '.tbi' : [],
@@ -349,7 +351,7 @@ workflow SETUP {
             [ patient_sample, ch_items.size() ]
         }
         .combine(ch_with_patient_sample, by: 0) // for each entry add numLanes
-        .map { patient_sample, num_lanes, ch_items ->
+        .map { _patient_sample, num_lanes, ch_items ->
 
             if (ch_items.meta.lane && ch_items.fastq_2) {
                 ch_items.meta =  ch_items.meta + [id: "${ch_items.meta.sample}-${ch_items.meta.lane}".toString()]
@@ -808,7 +810,7 @@ workflow NFGOS {
         vcf_from_gridss_gridss.dump(tag: "vcf_from_gridss_gridss", pretty: true)
 
         // JUNCTION_FILTER(vcf_from_gridss_gridss)
-        JUNCTION_FILTER__OUT = JUNCTION_FILTER(vcf_raw_from_gridss_gridss)
+        JUNCTION_FILTER__OUT = JUNCTION_FILTER_STEP(vcf_raw_from_gridss_gridss)
 
         pon_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER__OUT.pon_filtered_sv_rds)
         final_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER__OUT.final_filtered_sv_rds)
@@ -829,14 +831,14 @@ workflow NFGOS {
 
     } else {
         //somatic filter for GRIDSS
-        BAM_SVCALLING_GRIDSS_SOMATIC(vcf_raw_from_gridss_gridss)
+        GRIDSS_SOMATIC_FILTER_STEP(vcf_raw_from_gridss_gridss)
 
-        versions = versions.mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.versions)
-        vcf_somatic_high_conf = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_high_confidence)
+        versions = versions.mix(GRIDSS_SOMATIC_FILTER_STEP.out.versions)
+        vcf_somatic_high_conf = Channel.empty().mix(GRIDSS_SOMATIC_FILTER_STEP.out.somatic_high_confidence)
         vcf_from_sv_calling_for_merge = vcf_somatic_high_conf
             .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
 
-        unfiltered_som_sv = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_all)
+        unfiltered_som_sv = Channel.empty().mix(GRIDSS_SOMATIC_FILTER_STEP.out.somatic_all)
         unfiltered_som_sv_for_merge = unfiltered_som_sv
             .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
     }
