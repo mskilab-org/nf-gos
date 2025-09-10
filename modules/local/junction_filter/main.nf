@@ -4,8 +4,8 @@ process JUNCTION_FILTER_BEDTOOLS {
     label 'process_medium'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/unified:0.0.14': 
-        'mskilab/unified:0.0.14' }"
+        'docker://mskilab/unified:0.0.16': 
+        'mskilab/unified:0.0.16' }"
 
     input:
     tuple val(meta), path(sv_vcf), path(sv_vcf_tbi)

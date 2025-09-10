@@ -107,10 +107,21 @@ if [ -e $VCF ] && [ ! $(wc -c <${VCF}) == 0 ]; then
 
     if [ ! -e ./annotated.maf ]
     then
+        is_grch37=$( ( [ $(tolower $ASSEMBLY) == "hg19" ] || [ $(tolower $ASSEMBLY) == "grch37" ] ) && echo true || false )
+        is_grch38=$( ( [ $(tolower $ASSEMBLY) == "hg38" ] || [ $(tolower $ASSEMBLY) == "grch38" ] ) && echo true || false )
+        if $is_grch37; then
+            ref_path=${VEP_DIR}/homo_sapiens/112_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz
+        elif $is_grch38; then
+            ref_path=${VEP_DIR}/homo_sapiens/113_GRCh38/Homo_sapiens.GRCh38.dna.toplevel.fa.gz
+        else
+            echo "VEP Reference FASTA not found/supported!"
+            exit 1
+        fi
+
         perl ${HOME}/git/vcf2maf/vcf2maf.pl \
             --inhibit-vep \
             --vep-data=${VEP_DIR} \
-            --ref-fasta ${VEP_DIR}/homo_sapiens/112_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz \
+            --ref-fasta ${ref_path} `# --ref-fasta ${VEP_DIR}/homo_sapiens/112_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz` \
             --vep-path /opt/conda/envs/pact/bin \
             --input-vcf ${VCF} \
             --vep-forks=1 \

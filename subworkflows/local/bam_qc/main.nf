@@ -126,67 +126,69 @@ workflow BAM_QC {
         versions = versions.mix(GATK4_ESTIMATELIBRARYCOMPLEXITY.out.versions)
     }
 
-    inputs_unlaned = inputs.map { it ->
-        it + [meta: Utils.remove_lanes_from_meta(it.meta)]
+    if (tools_used.contains("all") || tools_used.contains("conpair")) {
+        inputs_unlaned = inputs.map { it ->
+            it + [meta: Utils.remove_lanes_from_meta(it.meta)]
+        }
+
+
+        inputs_unlaned_split = inputs_unlaned
+            .branch { it -> 
+                tumor: it.meta.status.toString() == "1"
+                normal: it.meta.status.toString() == "0"
+            }
+
+        normal_ids = inputs_unlaned_split.normal.map { it.meta.patient }.unique().collect().ifEmpty(["NO_NORMALS_PRESENT___MD7cicQBtB"])
+        tumor_ids = inputs_unlaned_split.tumor.map { it.meta.patient }.unique().collect()
+
+        mixed_ids = tumor_ids
+            .concat(normal_ids)
+            .collect(flat: false)
+        
+        tumor_paired_ids = mixed_ids
+            .map{ tumor, normal ->
+                tumor.findAll { normal.contains(it) }
+            }
+            .flatten()
+
+        ids_without_conpair = inputs_unlaned.filter { it ->
+            it.conpair_contamination.isEmpty() || it.conpair_concordance.isEmpty()
+        }.map { it -> 
+            [ it.meta.patient ]
+        }.unique().dump(tag: "ids_without_conpair", pretty: true)
+
+        tumor_paired_ids = tumor_paired_ids.join(ids_without_conpair)
+        
+        
+        bam_key_patient = bam.map { _meta_sample, meta, bamPath, bai ->
+            [ meta.patient, meta, bamPath, bai ]
+        } // Note patient keys will be duplicated
+
+        conpair_inputs_to_combine = tumor_paired_ids // A Should be unique.. no dups.
+            .cross(bam_key_patient) // B can have dups, according to nextflow docs. This will inner join but allow for dups. Essentially a filter by merge step
+            .map { patient, bamList ->
+                def meta_bam = bamList[1]
+                def bam_file = bamList[2]
+                def bai_file = bamList[3]
+                [ patient, meta_bam, bam_file, bai_file ]
+            }
+            .dump(tag: "conpair_inputs_to_combine", pretty: true)
+            .branch { it ->
+                tumor: it[1].status.toString() == "1"
+                normal: it[1].status.toString() == "0"
+            }
+        
+        conpair_inputs = conpair_inputs_to_combine.tumor
+            .combine(conpair_inputs_to_combine.normal, by: 0)
+            .map { _patient_tumor, meta_tumor, bam_tumor, bai_tumor, _meta_normal, bam_normal, bai_normal ->
+                def meta_tumor_out = meta_tumor + [id: meta_tumor.patient]
+                meta_tumor_out = meta_tumor_out - meta_tumor_out.subMap('read_group')
+                [ meta_tumor_out, bam_tumor, bai_tumor, bam_normal, bai_normal ]
+            }.dump(tag: "conpair_inputs", pretty: true)
+
+        
+        CONPAIR(conpair_inputs, fasta, fai, dict)
     }
-
-
-    inputs_unlaned_split = inputs_unlaned
-        .branch { it -> 
-            tumor: it.meta.status.toString() == "1"
-            normal: it.meta.status.toString() == "0"
-        }
-
-    normal_ids = inputs_unlaned_split.normal.map { it.meta.patient }.unique().collect().ifEmpty(["NO_NORMALS_PRESENT___MD7cicQBtB"])
-    tumor_ids = inputs_unlaned_split.tumor.map { it.meta.patient }.unique().collect()
-
-    mixed_ids = tumor_ids
-        .concat(normal_ids)
-        .collect(flat: false)
-    
-    tumor_paired_ids = mixed_ids
-        .map{ tumor, normal ->
-            tumor.findAll { normal.contains(it) }
-        }
-        .flatten()
-
-    ids_without_conpair = inputs_unlaned.filter { it ->
-        it.conpair_contamination.isEmpty() || it.conpair_concordance.isEmpty()
-    }.map { it -> 
-        [ it.meta.patient ]
-    }.unique().dump(tag: "ids_without_conpair", pretty: true)
-
-    tumor_paired_ids = tumor_paired_ids.join(ids_without_conpair)
-    
-    
-    bam_key_patient = bam.map { _meta_sample, meta, bamPath, bai ->
-        [ meta.patient, meta, bamPath, bai ]
-    } // Note patient keys will be duplicated
-
-    conpair_inputs_to_combine = tumor_paired_ids // A Should be unique.. no dups.
-        .cross(bam_key_patient) // B can have dups, according to nextflow docs. This will inner join but allow for dups. Essentially a filter by merge step
-        .map { patient, bamList ->
-            def meta_bam = bamList[1]
-            def bam_file = bamList[2]
-            def bai_file = bamList[3]
-            [ patient, meta_bam, bam_file, bai_file ]
-        }
-        .dump(tag: "conpair_inputs_to_combine", pretty: true)
-        .branch { it ->
-            tumor: it[1].status.toString() == "1"
-            normal: it[1].status.toString() == "0"
-        }
-    
-    conpair_inputs = conpair_inputs_to_combine.tumor
-        .combine(conpair_inputs_to_combine.normal, by: 0)
-        .map { _patient_tumor, meta_tumor, bam_tumor, bai_tumor, _meta_normal, bam_normal, bai_normal ->
-            def meta_tumor_out = meta_tumor + [id: meta_tumor.patient]
-            meta_tumor_out = meta_tumor_out - meta_tumor_out.subMap('read_group')
-            [ meta_tumor_out, bam_tumor, bai_tumor, bam_normal, bai_normal ]
-        }.dump(tag: "conpair_inputs", pretty: true)
-
-    
-    CONPAIR(conpair_inputs, fasta, fai, dict)
 
 
 
