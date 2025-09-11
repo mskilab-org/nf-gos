@@ -1167,7 +1167,9 @@ workflow SV_CALLING_STEP {
                 .map { patient, list_of_gridss_scatter_assembly_paths ->
                     def gridss_scatter_assembly_paths = list_of_gridss_scatter_assembly_paths.flatten()
                     def assembly_dir = gridss_scatter_assembly_paths.collect{ it.getParent().getName().toString() }.unique()[0]
-                    gridss_scatter_assembly_paths = gridss_scatter_assembly_paths.findAll { it =~ /.*chunk.*\.(bam|bai)$/ }
+                    if (total_jobnodes > 1) {
+                        gridss_scatter_assembly_paths = gridss_scatter_assembly_paths.findAll { it =~ /.*chunk.*\.(bam|bai)$/ }
+                    } 
                     [patient, assembly_dir, gridss_scatter_assembly_paths]
                 }
                 // .view { "collected_assembly_dirs: $it" }
