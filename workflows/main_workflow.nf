@@ -315,22 +315,22 @@ workflow SETUP {
         file("${projectDir}/gos-assets/nf-gos/assets/schema_input.json").toFile()
     )
 
-    rowsAsMaps = rowsAsMaps.collect { it ->
-        it + [
-            crai: it.cram ? it.cram + '.crai' : [],
-            bai: it.bam ? it.bam + '.bai': [],
-            vcf_tbi: it.vcf ? it.vcf + '.tbi' : [],
-            vcf_raw_tbi: it.vcf_raw ? it.vcf_raw + '.tbi' : [],
-            structural_variants_chimera_filtered_tbi: it.structural_variants_chimera_filtered ? it.structural_variants_chimera_filtered + '.tbi' : [],
-            structural_variants_raw_chimera_filtered_tbi: it.structural_variants_raw_chimera_filtered ? it.structural_variants_raw_chimera_filtered + '.tbi' : [],
-            snv_somatic_vcf_tumoronly_filtered_tbi: it.snv_somatic_vcf_tumoronly_filtered ? it.snv_somatic_vcf_tumoronly_filtered + ".tbi" : [],
-            snv_somatic_vcf_rescue_ch_heme_tbi: it.snv_somatic_vcf_rescue_ch_heme ? it.snv_somatic_vcf_rescue_ch_heme + '.tbi' : [],
-            snv_somatic_tbi: it.snv_somatic_vcf ? it.snv_somatic_vcf + '.tbi' : [],
-            snv_germline_tbi: it.snv_germline_vcf ? it.snv_germline_vcf + '.tbi' : [],
-            ffpe_impact_vcf_tbi: it.ffpe_impact_vcf ? it.ffpe_impact_vcf + '.tbi' : [],
-            ffpe_impact_filtered_vcf_tbi: it.ffpe_impact_filtered_vcf ? it.ffpe_impact_filtered_vcf + '.tbi' : []
-        ]
-    }
+    // rowsAsMaps = rowsAsMaps.collect { it ->
+    //     it + [
+    //         crai: it.cram ? it.cram + '.crai' : [],
+    //         bai: it.bam ? it.bam + '.bai': [],
+    //         vcf_tbi: it.vcf ? it.vcf + '.tbi' : [],
+    //         vcf_raw_tbi: it.vcf_raw ? it.vcf_raw + '.tbi' : [],
+    //         structural_variants_chimera_filtered_tbi: it.structural_variants_chimera_filtered ? it.structural_variants_chimera_filtered + '.tbi' : [],
+    //         structural_variants_raw_chimera_filtered_tbi: it.structural_variants_raw_chimera_filtered ? it.structural_variants_raw_chimera_filtered + '.tbi' : [],
+    //         snv_somatic_vcf_tumoronly_filtered_tbi: it.snv_somatic_vcf_tumoronly_filtered ? it.snv_somatic_vcf_tumoronly_filtered + ".tbi" : [],
+    //         snv_somatic_vcf_rescue_ch_heme_tbi: it.snv_somatic_vcf_rescue_ch_heme ? it.snv_somatic_vcf_rescue_ch_heme + '.tbi' : [],
+    //         snv_somatic_tbi: it.snv_somatic_vcf ? it.snv_somatic_vcf + '.tbi' : [],
+    //         snv_germline_tbi: it.snv_germline_vcf ? it.snv_germline_vcf + '.tbi' : [],
+    //         ffpe_impact_vcf_tbi: it.ffpe_impact_vcf ? it.ffpe_impact_vcf + '.tbi' : [],
+    //         ffpe_impact_filtered_vcf_tbi: it.ffpe_impact_filtered_vcf ? it.ffpe_impact_filtered_vcf + '.tbi' : []
+    //     ]
+    // }
     
     println "Settings Globals.rowsAsMaps to:"
     rowsAsMaps.eachWithIndex { m, i -> log.info "Row ${i}: ${m}" }

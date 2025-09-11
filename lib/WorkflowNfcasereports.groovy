@@ -197,6 +197,11 @@ class WorkflowNfcasereports {
         def metaKeys     = propEntries.findAll { it.value?.meta instanceof List && it.value.meta }*.key
         def nonMetaKeys  = propEntries.findAll { !(it.value?.meta instanceof List && it.value.meta) }*.key
 
+        // Collect fields that have x-index specifications (following JSON Schema extension conventions)
+        def indexFields = propEntries.findAll { it.value?.'x-index' }.collectEntries { 
+            [(it.key): it.value.'x-index']
+        }
+
         // If there are meta columns, nf-schema puts a combined meta Map at index 0
         def expectsMetaMap = metaKeys && tuples && tuples[0] instanceof List && tuples[0][0] instanceof Map
 
@@ -216,8 +221,51 @@ class WorkflowNfcasereports {
                 [(k): val]
             }
 
-            // Attach meta (nested)
-            return [meta: meta] + paired
+            // Automatically add index fields based on schema x-index property
+            def indexPairs = indexFields.collectEntries { fieldName, indexType ->
+                def fieldValue = paired[fieldName]
+                def indexFieldName = "${fieldName}_${indexType}"
+                def indexValue = fieldValue && !(fieldValue instanceof List && fieldValue.isEmpty()) ? 
+                    "${fieldValue}.${indexType}" : []
+                [(indexFieldName): indexValue]
+            }
+
+            // Attach meta (nested) and index fields
+            return [meta: meta] + paired + indexPairs
         }
     }
+    // public static List<Map> samplesheetTuplesToMaps(ArrayList tuples, File schemaFile, boolean coerceEmptyToNull = false) {
+    //     def schema = new JsonSlurper().parse(schemaFile)
+    //     assert schema?.items?.properties instanceof Map : "Schema must define items.properties"
+
+    //     // Preserve schema-declared order
+    //     def propEntries = schema.items.properties.entrySet().asList()
+
+    //     // Identify meta vs non-meta fields by presence of "meta" tag
+    //     def metaKeys     = propEntries.findAll { it.value?.meta instanceof List && it.value.meta }*.key
+    //     def nonMetaKeys  = propEntries.findAll { !(it.value?.meta instanceof List && it.value.meta) }*.key
+
+    //     // If there are meta columns, nf-schema puts a combined meta Map at index 0
+    //     def expectsMetaMap = metaKeys && tuples && tuples[0] instanceof List && tuples[0][0] instanceof Map
+
+    //     tuples.collect { row ->
+    //         assert row instanceof List : "Each row must be a List/tuple"
+
+    //         Map meta = [:]
+    //         List vals = row
+    //         if (expectsMetaMap) {
+    //             meta = (row[0] as Map) ?: [:]
+    //             vals = row.drop(1)
+    //         }
+
+    //         // Map non-meta keys to positional values
+    //         def paired = [nonMetaKeys, vals].transpose().collectEntries { k, v ->
+    //             def val = (coerceEmptyToNull && (v instanceof List) && v.isEmpty()) ? null : v
+    //             [(k): val]
+    //         }
+
+    //         // Attach meta (nested)
+    //         return [meta: meta] + paired
+    //     }
+    // }
 }
