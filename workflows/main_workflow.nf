@@ -124,8 +124,8 @@ include {
 
 // SV Junction Filtering
 include { 
-    // SV_JUNCTION_FILTER as JUNCTION_FILTER;
-    SV_JUNCTION_FILTER_BEDTOOLS as JUNCTION_FILTER_STEP
+    SV_JUNCTION_FILTER as JUNCTION_FILTER_STEP
+    // SV_JUNCTION_FILTER_BEDTOOLS as JUNCTION_FILTER_STEP
 } from '../subworkflows/local/junction_filter/main'
 
 include { 
@@ -653,7 +653,7 @@ workflow NFGOS {
     ch_multiqc_custom_methods_description = params.multiqc_methods_description ? file(params.multiqc_methods_description, checkIfExists: true) : file("$projectDir/gos-assets/nf-gos/assets/methods_description_template.yml", checkIfExists: true)
 
     // Set is_heme based on is_retier_whitelist_junctions
-    params.is_heme = params.is_retier_whitelist_junctions
+    // params.is_heme = params.is_retier_whitelist_junctions
 
     // To gather all QC reports for MultiQC
     reports  = Channel.empty()
