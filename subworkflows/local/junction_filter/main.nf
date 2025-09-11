@@ -11,7 +11,6 @@ workflow SV_JUNCTION_FILTER {
 
     main:
     def junction_pon_gridss                 = WorkflowNfcasereports.create_file_channel(params.junction_pon_gridss)
-    def junction_pon_gridss_dir = WorkflowNfcasereports.create_file_channel(params.junction_pon_gridss_dir)
     def gnomAD_sv_db                        = WorkflowNfcasereports.create_file_channel(params.gnomAD_sv_db)
     def padding                             = WorkflowNfcasereports.create_value_channel(params.pad_junc_filter)
 
@@ -21,9 +20,9 @@ workflow SV_JUNCTION_FILTER {
 
     JUNCTION_FILTER(input, junction_pon_gridss, gnomAD_sv_db, padding)
 
-    final_filtered_sv_rds   = JUNCTION_FILTER.out.final_filtered_sv_rds
-    pon_filtered_sv_rds     = JUNCTION_FILTER.out.pon_filtered_sv_rds
-    versions                = JUNCTION_FILTER.out.versions
+    final_filtered_sv_rds = JUNCTION_FILTER.out.final_filtered_sv_rds
+    pon_filtered_sv_rds = JUNCTION_FILTER.out.pon_filtered_sv_rds
+    versions = JUNCTION_FILTER.out.versions
 
     emit:
     final_filtered_sv_rds
