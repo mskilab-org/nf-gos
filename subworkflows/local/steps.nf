@@ -1964,7 +1964,12 @@ workflow JABBA_STEP {
     jabba_gg = jabba_gg_existing_outputs
 
 
-    jabba_inputs = inputs_unlaned.filter { (it.jabba_gg.isEmpty() || it.jabba_rds.isEmpty()) && it.meta.status.toString() == "1"}.map { it -> [it.meta.patient, it.meta] }.unique()
+    jabba_inputs = inputs_unlaned
+        .filter { (it.jabba_gg.isEmpty() || it.jabba_rds.isEmpty()) && it.meta.status.toString() == "1" }
+        .map { it -> [it.meta.patient, it.meta] }
+        .unique()
+        .dump(tag: "jabba_inputs from inputs_unlaned", pretty: true)
+
     if (tools_used.contains("all") || tools_used.contains("jabba")) {
         
 
@@ -1974,6 +1979,7 @@ workflow JABBA_STEP {
 
 		// The variable below will get propagated to jabba if retiering is not done to ! params.tumor_only block
 		jabba_vcf_from_sv_calling_for_merge = vcf_from_sv_calling_for_merge
+            .dump(tag: "jabba_vcf_from_sv_calling_for_merge", pretty: true)
 
         // vcf_raw_from_gridss_gridss_for_merge = vcf_raw_from_gridss_gridss
         //     .map {
@@ -2011,40 +2017,49 @@ workflow JABBA_STEP {
         jabba_inputs_sv = jabba_vcf_from_sv_calling_for_merge
             .join(jabba_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, (vcf or rds if retiered)
+            .dump(tag: "jabba_inputs_sv", pretty: true)
 
         if (params.tumor_only) {
             jabba_inputs_junction_filtered_sv = final_filtered_sv_rds_for_merge
                 .join(jabba_inputs)
-                .map { it -> [ it[0], it[1] ] } // meta.patient, pon and gnomaD filtered sv (for tumor only)
+                .map { it -> [ it[0], it[1] ] } // meta.patient, pon and gnomaD filtered sv (for tumor only)\
+                .dump(tag: "jabba_inputs_junction_filtered_sv", pretty: true)
         } else {
             jabba_inputs_unfiltered_sv = unfiltered_som_sv_for_merge
                 .join(jabba_inputs)
                 .map { it -> [ it[0], it[1] ] } // meta.patient, unfiltered_som_sv
+                .dump(tag: "jabba_inputs_unfiltered_sv", pretty: true)
         }
 
         jabba_inputs_hets = hets_sites_for_merge
             .join(jabba_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, hets
+            .dump(tag: "jabba_inputs_hets", pretty: true)
 
         jabba_inputs_cov = dryclean_tumor_cov_for_merge
             .join(jabba_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, cov
+            .dump(tag: "jabba_inputs_cov", pretty: true)
 
         jabba_inputs_purity = purity_for_merge
             .join(jabba_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, purity
+            .dump(tag: "jabba_inputs_purity", pretty: true)
 
         jabba_inputs_ploidy = ploidy_for_merge
             .join(jabba_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, ploidy
+            .dump(tag: "jabba_inputs_ploidy", pretty: true)
 
         jabba_inputs_cbs_seg = cbs_seg_for_merge
             .join(jabba_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, cbs_seg
+            .dump(tag: "jabba_inputs_cbs_seg", pretty: true)
 
         jabba_inputs_cbs_nseg = cbs_nseg_for_merge
             .join(jabba_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, cbs_nseg
+            .dump(tag: "jabba_inputs_cbs_nseg", pretty: true)
 
         
 
@@ -2094,6 +2109,7 @@ workflow JABBA_STEP {
                         nseg
                     ]
                 }
+                .dump(tag: "jabba_input not tumor only", pretty: true)
         }
 
         jabbaOut = Channel.empty()

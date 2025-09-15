@@ -844,6 +844,10 @@ workflow NFGOS {
             .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
     } else {
         vcf_from_sv_calling_for_merge = vcf_from_gridss_gridss
+            .map { it -> 
+                [ it[0].patient, it[1], it[2] ]  // meta.patient, vcf, tbi
+            }
+            .dump(tag: "sv output for paired run starting from 'vcf' column", pretty: true)
         unfiltered_som_sv_for_merge = inputs_unlaned.map{ it ->
             [ it.meta.patient, [] ]
         }
@@ -861,6 +865,7 @@ workflow NFGOS {
 
     hets_sites_for_merge = AMBER_STEP.out.sites_from_het_pileups_wgs
         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, hets
+        .dump(tag: "hets_sites_for_merge", pretty: true)
     
     COBALT_STEP(
         inputs_unlaned,
@@ -913,8 +918,10 @@ workflow NFGOS {
 
     cbs_seg_for_merge = CBS_STEP.out.cbs_seg_rds
         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, cbs_seg
+        .dump(tag: "cbs_seg_for_merge", pretty: true)
     cbs_nseg_for_merge = CBS_STEP.out.cbs_nseg_rds
         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, cbs_nseg
+        .dump(tag: "cbs_nseg_for_merge", pretty: true)
 
     VARIANT_CALLING_STEP(
         inputs_unlaned,
@@ -957,10 +964,12 @@ workflow NFGOS {
         tools_used
     )
     
-    purity_for_merge = PURPLE_STEP.out.purity
+    purity_for_merge = PURPLE_STEP.out.purity // [ meta, purity ]
         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, purity
+        .dump(tag: "PURPLE_STEP.out purity", pretty: true)
     ploidy_for_merge = PURPLE_STEP.out.ploidy
         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, ploidy
+        .dump(tag: "PURPLE_STEP.out ploidy", pretty: true)
 
     JABBA_STEP(
         inputs_unlaned,

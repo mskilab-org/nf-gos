@@ -199,6 +199,7 @@ workflow COV_JUNC_JABBA {
             "nseg_cbs": samples[8]
         ]
     }
+    .dump(tag: "COV_JUNC_JABBA inputs_map", pretty: true)
 
     // Run COERCE_SEQNAMES to force inputs to have the same sequence name format
     junction = inputs_map.map { sample ->
@@ -222,10 +223,15 @@ workflow COV_JUNC_JABBA {
     j_supp = inputs_map.map { sample ->
         [sample.meta, sample.j_supp]
     }
+    j_supp_empty = j_supp
+        .filter { it -> it[1].isEmpty() }
+    j_supp_nonempty = j_supp
+        .filter { it -> !it[1].isEmpty() }
 
     if (!params.tumor_only) {
-        COERCE_SEQNAMES_UNFIL_SOM_SV(j_supp)
+        COERCE_SEQNAMES_UNFIL_SOM_SV(j_supp_nonempty)
         chr_coerced_j_supp = COERCE_SEQNAMES_UNFIL_SOM_SV.out.file
+            .mix(j_supp_empty)
         chr_coerced_j_supp = chr_coerced_j_supp.map { meta, j_supp ->
             [meta.patient, j_supp]
         }
