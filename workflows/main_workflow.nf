@@ -803,6 +803,7 @@ workflow NFGOS {
     */
     final_filtered_sv_rds_for_merge = Channel.empty()
     unfiltered_som_sv_for_merge = Channel.empty()
+    def is_any_vcf_raw_provided = Globals.rowsAsMaps.any { ! ( it.vcf_raw == null || it.vcf_raw == [] || it.vcf_raw == '' ) }
     if (params.tumor_only) {
         vcf_from_sv_calling_for_merge = vcf_from_gridss_gridss
             .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
@@ -829,7 +830,7 @@ workflow NFGOS {
                     .unique()
             )
 
-    } else {
+    } else if (params.gridss_somatic_filter && is_any_vcf_raw_provided) {
         //somatic filter for GRIDSS
         GRIDSS_SOMATIC_FILTER_STEP(vcf_raw_from_gridss_gridss)
 
@@ -841,6 +842,11 @@ workflow NFGOS {
         unfiltered_som_sv = Channel.empty().mix(GRIDSS_SOMATIC_FILTER_STEP.out.somatic_all)
         unfiltered_som_sv_for_merge = unfiltered_som_sv
             .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
+    } else {
+        vcf_from_sv_calling_for_merge = vcf_from_gridss_gridss
+        unfiltered_som_sv_for_merge = inputs_unlaned.map{ it ->
+            [ it.meta.patient, [] ]
+        }
     }
 
 
