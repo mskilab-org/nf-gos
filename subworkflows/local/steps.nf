@@ -78,9 +78,15 @@ workflow ALIGNMENT_STEP {
 	
 	
 	// input_fastq_qc = input_fastq.map { it -> [it[0], [it[1], it[2]]] }
+    // inputs.map{ it -> 
+    //     println "bam_bai value: ${it.bam_bai}"
+    //     println "bam_bai class: ${it.bam_bai?.getClass()}"
+    //     println "bam_bai empty?: ${it.bam_bai?.isEmpty()}"
+    //     [it.bam, it.bam_bai]
+    // }.dump(tag: "wtf inputs", pretty: true)
 
 	alignment_bams_final = inputs
-		.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.bam, it.bai] }
+		.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.bam, it.bam_bai] }
 		.filter { it -> ! it[1].isEmpty() }
 		.map { it -> [it[0].sample, it[0], it[1], it[2]] }
         .unique()
@@ -1340,12 +1346,12 @@ workflow VARIANT_CALLING_STEP {
     dict = params.dict ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect() : Channel.empty()
 
     snv_somatic_existing_outputs = inputs_unlaned
-        .map { it -> [it.meta, it.snv_somatic_vcf, it.snv_somatic_tbi] }
+        .map { it -> [it.meta, it.snv_somatic_vcf, it.snv_somatic_vcf_tbi] }
         .filter { !it[1].isEmpty() && !it[2].isEmpty()}
         .unique()
     
     snv_germline_existing_outputs = inputs_unlaned
-        .map { it -> [it.meta, it.snv_germline_vcf, it.snv_germline_tbi] }
+        .map { it -> [it.meta, it.snv_germline_vcf, it.snv_germline_vcf_tbi] }
         .filter { !it[1].isEmpty() && !it[2].isEmpty()}
         .unique()
 

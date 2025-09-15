@@ -224,11 +224,18 @@ class WorkflowNfcasereports {
             // Automatically add index fields based on schema x-index property
             def indexPairs = indexFields.collectEntries { fieldName, indexType ->
                 def fieldValue = paired[fieldName]
-                def indexFieldName = "${fieldName}_${indexType}"
+                def indexFieldName = fieldName + "_" + indexType
                 def indexValue = fieldValue && !(fieldValue instanceof List && fieldValue.isEmpty()) ? 
-                    "${fieldValue}.${indexType}" : []
+                    fieldValue + "." + indexType : []
                 [(indexFieldName): indexValue]
             }
+
+            // Right before the return statement, add:
+            println "DEBUG paired keys: ${paired.keySet()}"
+            println "DEBUG indexPairs: ${indexPairs}"
+            println "DEBUG final map keys: ${([meta: meta] + paired + indexPairs).keySet()}"
+            println "DEBUG bam value: ${paired.bam}"
+            println "DEBUG bam_bai in indexPairs: ${indexPairs.bam_bai}"
 
             // Attach meta (nested) and index fields
             return [meta: meta] + paired + indexPairs
