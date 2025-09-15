@@ -30,7 +30,7 @@ process CBS {
     def VERSION     = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
     """
-    export RSCRIPT_PATH=\$(echo "${baseDir}/bin/cbsFH_ZC.R")
+    export RSCRIPT_PATH=\$(echo "\${NEXTFLOW_PROJECT_DIR}/bin/cbsFH_ZC.R")
     Rscript \$RSCRIPT_PATH \\
         -t ${tumor_dryclean_cov} \
         -n ${normal_cov} \

@@ -17,7 +17,7 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../../modules/nf-core/custom/dumps
 include { CAT_FASTQ } from '../../modules/nf-core/cat/fastq/main'
 
 // FFPE Chimera Filter
-include { CHIMERA_FILTER } from '../../modules/local/ffpe_bam_filter/main'
+include { CHIMERA_FILTER as BAM_CHIMERA_FILTER } from '../../modules/local/ffpe_bam_filter/main'
 
 // Map input reads to reference genome
 include { FASTQ_ALIGN_BWAMEM_MEM2 } from '../../subworkflows/local/fastq_align_bwamem_mem2/main'
@@ -78,9 +78,15 @@ workflow ALIGNMENT_STEP {
 	
 	
 	// input_fastq_qc = input_fastq.map { it -> [it[0], [it[1], it[2]]] }
+    // inputs.map{ it -> 
+    //     println "bam_bai value: ${it.bam_bai}"
+    //     println "bam_bai class: ${it.bam_bai?.getClass()}"
+    //     println "bam_bai empty?: ${it.bam_bai?.isEmpty()}"
+    //     [it.bam, it.bam_bai]
+    // }.dump(tag: "wtf inputs", pretty: true)
 
 	alignment_bams_final = inputs
-		.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.bam, it.bai] }
+		.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.bam, it.bam_bai] }
 		.filter { it -> ! it[1].isEmpty() }
 		.map { it -> [it[0].sample, it[0], it[1], it[2]] }
         .unique()
@@ -262,10 +268,9 @@ workflow ALIGNMENT_STEP {
         println "params.filter_ffpe_chimera: ${params.filter_ffpe_chimera}"
         if (do_filter_ffpe_chimera) {
             println "You have set params.filter_ffpe_chimera: ${params.filter_ffpe_chimera}, will do FFPE chimera filtering"
-            CHIMERA_FILTER(alignment_bams_final.map { _sample, meta, bam, bai -> [meta, bam, bai] })
-            alignment_bams_final = CHIMERA_FILTER.out.bambai.map { meta, bam, bai -> [ meta.sample, meta, bam, bai ]}
+            BAM_CHIMERA_FILTER(alignment_bams_final.map { _sample, meta, bam, bai -> [meta, bam, bai] })
+            alignment_bams_final = BAM_CHIMERA_FILTER.out.bambai.map { meta, bam, bai -> [ meta.sample, meta, bam, bai ]}
         }
-		// alignment_bams_final.view{ log.info "alignment_bams_final: $it" }
     }
 
     // BAM Postprocessing
@@ -958,7 +963,7 @@ workflow CBS_STEP {
 
 
 //GRIDSS
-include { BAM_SVCALLING_GRIDSS; BAM_SVCALLING_GRIDSS_SOMATIC } from '../../subworkflows/local/bam_svcalling_gridss/main.nf'
+include { BAM_SVCALLING_GRIDSS } from '../../subworkflows/local/bam_svcalling_gridss/main.nf'
 // include { BAM_SVCALLING_GRIDSS_SOMATIC } from '../../subworkflows/local/bam_svcalling_gridss/main.nf'
 
 include { 
@@ -1024,16 +1029,16 @@ workflow SV_CALLING_STEP {
     
     vcf_raw_from_gridss_gridss = gridss_raw_existing_outputs
 
+    bam_sv_inputs = inputs_unlaned.filter { it.vcf_raw.isEmpty() }.map { it -> [it.meta.sample] }.unique()
+
 
     // SV Calling
     // ##############################
     if (tools_used.contains("all") || tools_used.contains("gridss") || params.is_run_junction_filter) {
 
-        
-
         // Filter out bams for which SV calling has already been done
         // FIXME: vcf to vcf_raw
-        bam_sv_inputs = inputs_unlaned.filter { it.vcf_raw.isEmpty() }.map { it -> [it.meta.sample] }.unique()
+        
         bam_sv_calling = alignment_bams_final // meta.sample, meta, bam, bai
             .combine(bam_sv_inputs, by: 0) // 
             .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
@@ -1168,7 +1173,9 @@ workflow SV_CALLING_STEP {
                 .map { patient, list_of_gridss_scatter_assembly_paths ->
                     def gridss_scatter_assembly_paths = list_of_gridss_scatter_assembly_paths.flatten()
                     def assembly_dir = gridss_scatter_assembly_paths.collect{ it.getParent().getName().toString() }.unique()[0]
-                    gridss_scatter_assembly_paths = gridss_scatter_assembly_paths.findAll { it =~ /.*chunk.*\.(bam|bai)$/ }
+                    if (total_jobnodes > 1) {
+                        gridss_scatter_assembly_paths = gridss_scatter_assembly_paths.findAll { it =~ /.*chunk.*\.(bam|bai)$/ }
+                    } 
                     [patient, assembly_dir, gridss_scatter_assembly_paths]
                 }
                 // .view { "collected_assembly_dirs: $it" }
@@ -1314,35 +1321,6 @@ workflow SV_CALLING_STEP {
                 .mix(gridss_raw_existing_outputs)
 
         }
-
-        // vcf_from_gridss_gridss = Channel.empty()
-        //     .mix(BAM_SVCALLING_GRIDSS.out.vcf)
-        //     .mix(gridss_existing_outputs)
-        // versions = versions.mix(BAM_SVCALLING_GRIDSS.out.versions)
-
-        // if (params.tumor_only) {
-        //     vcf_from_sv_calling_for_merge = vcf_from_gridss_gridss
-        //         .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
-
-        //     JUNCTION_FILTER(vcf_from_gridss_gridss)
-
-        //     pon_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.pon_filtered_sv_rds)
-        //     final_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.final_filtered_sv_rds)
-        //     final_filtered_sv_rds_for_merge = final_filtered_sv_rds
-        //         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, rds
-        // } else {
-        //     //somatic filter for GRIDSS
-        //     BAM_SVCALLING_GRIDSS_SOMATIC(vcf_from_gridss_gridss)
-
-        //     versions = versions.mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.versions)
-        //     vcf_somatic_high_conf = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_high_confidence)
-        //     vcf_from_sv_calling_for_merge = vcf_somatic_high_conf
-        //         .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
-
-        //     unfiltered_som_sv = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_all)
-        //     unfiltered_som_sv_for_merge = unfiltered_som_sv
-        //         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
-        // }
     }
     
     emit:
@@ -1368,12 +1346,12 @@ workflow VARIANT_CALLING_STEP {
     dict = params.dict ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect() : Channel.empty()
 
     snv_somatic_existing_outputs = inputs_unlaned
-        .map { it -> [it.meta, it.snv_somatic_vcf, it.snv_somatic_tbi] }
+        .map { it -> [it.meta, it.snv_somatic_vcf, it.snv_somatic_vcf_tbi] }
         .filter { !it[1].isEmpty() && !it[2].isEmpty()}
         .unique()
     
     snv_germline_existing_outputs = inputs_unlaned
-        .map { it -> [it.meta, it.snv_germline_vcf, it.snv_germline_tbi] }
+        .map { it -> [it.meta, it.snv_germline_vcf, it.snv_germline_vcf_tbi] }
         .filter { !it[1].isEmpty() && !it[2].isEmpty()}
         .unique()
 
@@ -1386,18 +1364,14 @@ workflow VARIANT_CALLING_STEP {
         .map { it -> [it.meta, it.snv_somatic_vcf_tumoronly_filtered, it.snv_somatic_vcf_tumoronly_filtered_tbi] }
         .filter { !it[1].isEmpty() && !it[2].isEmpty()}
         .unique()
+        .dump(tag: "filtered_somatic_vcf_tumoronly_outputs from inputs_unlaned", pretty: true)
     filtered_somatic_vcf_tumor_only = filtered_somatic_vcf_tumoronly_outputs
 
     rescue_ch_existing_outputs = inputs_unlaned
         .map { it -> [it.meta, it.snv_somatic_vcf_rescue_ch_heme, it.snv_somatic_vcf_rescue_ch_heme_tbi] }
         .filter { !it[1].isEmpty() && !it[2].isEmpty()}
         .unique()
-    
-    rescue_ch_inputs = inputs_unlaned
-        .map { it -> [it.meta, it.snv_somatic_vcf_rescue_ch_heme, it.snv_somatic_vcf_rescue_ch_heme_tbi] }
-        .filter { it[1].isEmpty() || it[1].isEmpty() }
-        .map { it -> [it.meta.patient] }
-        .unique()
+        .dump(tag: "rescue_ch_existing_outputs from inputs_unlaned", pretty: true)
 
     // Set is_heme based on is_retier_whitelist_junctions
     // params.is_heme = params.is_retier_whitelist_junctions
@@ -1482,9 +1456,10 @@ workflow VARIANT_CALLING_STEP {
                 [it[0].patient] + it.toList()
             }
             .join(
-                filtered_somatic_vcf_tumoronly_outputs
-                    .filter { it -> it[1].isEmpty() }
-                    .map { it -> [it[0].patient] }
+                // filtered_somatic_vcf_tumoronly_outputs
+                inputs_unlaned
+                    .filter { it -> it.snv_somatic_vcf_tumoronly_filtered.isEmpty() }
+                    .map { it -> [ it.meta.patient ] }
                     .unique()
             )
             .map { it[1..-1] }
@@ -1509,7 +1484,6 @@ workflow VARIANT_CALLING_STEP {
                 .mix(BAM_SAGE_TUMOR_ONLY_FILTER.out.sage_filtered_vcf)
                 .mix(
                     filtered_somatic_vcf_tumoronly_outputs
-                    .filter { it -> !it[1].isEmpty() }
                 )
 
             filtered_somatic_vcf = filtered_somatic_vcf_tumor_only
@@ -1521,7 +1495,13 @@ workflow VARIANT_CALLING_STEP {
                         filtered_somatic_vcf_tumor_only
                             .map { [it[0].patient, it[1], it[2]]  } // meta.patient, vcf, tbi
                     )
-                    .join(rescue_ch_inputs)
+                    .join(
+                        inputs_unlaned
+                            .map { it -> [it.meta, it.snv_somatic_vcf_rescue_ch_heme, it.snv_somatic_vcf_rescue_ch_heme_tbi] }
+                            .filter { it[1].isEmpty() || it[2].isEmpty() }
+                            .map { it -> [ it[0].patient ] }
+                            .unique()
+                    )
                     .map { it[1..-1] } // meta, sage vcf, sage tbi, tumoronly vcf, tumoronly tbi
 
                 RESCUE_CH_HEME_STEP(
@@ -1545,8 +1525,10 @@ workflow VARIANT_CALLING_STEP {
 }
 
 // SNPEFF
-include { VCF_SNPEFF as VCF_SNPEFF_SOMATIC } from './vcf_snpeff/main'
-include { VCF_SNPEFF as VCF_SNPEFF_GERMLINE } from './vcf_snpeff/main'
+include { 
+    VCF_SNPEFF as VCF_SNPEFF_SOMATIC; 
+    VCF_SNPEFF as VCF_SNPEFF_GERMLINE 
+} from './vcf_snpeff/main'
 workflow VARIANT_ANNOTATION_STEP {
     take:
     inputs_unlaned
@@ -1756,20 +1738,55 @@ workflow PURPLE_STEP {
 
     // need a channel with patient and meta for merging with rest
     purple_inputs_for_merge = inputs_unlaned
-        .filter { it -> it.ploidy.isEmpty() }
-        .map { it -> [it.meta.patient, it.meta - it.meta.subMap('tumor_id')] }
+        .filter { it -> 
+            (it.ploidy instanceof List && it.ploidy.isEmpty())
+            || (it.purity instanceof List && it.purity.isEmpty())
+        }
+        .map { it -> [it.meta.patient, it.meta - it.meta.subMap(['tumor_id', 'normal_id'])] }
         .unique()
 
-    meta_purple = purple_inputs_for_merge
+    // meta_purple = purple_inputs_for_merge
+    //     .branch{
+    //         normal: it[1].status.toString() == "0"
+    //         tumor:  it[1].status.toString() == "1"
+    //     }
+    //     .tumor
+    //     .map { patient, meta ->
+    //         [ patient, meta + [tumor_id: meta.sample, id: meta.sample] ]
+    //     }
+    
+    meta_purple_branched = purple_inputs_for_merge
         .branch{
             normal: it[1].status.toString() == "0"
             tumor:  it[1].status.toString() == "1"
         }
-        .tumor
-        .map {
-        patient, meta ->
-        [patient, meta + [tumor_id: meta.sample, id: meta.sample] ]
-    }
+    
+     meta_purple = meta_purple_branched.tumor
+            .map { patient, meta ->
+                [ patient ] + [ meta + [tumor_id: meta.sample] ] // [ patient, [meta] ]
+            }
+            .join(
+                meta_purple_branched.normal
+                    .map { patient, meta ->
+                        [ patient ] + [ meta + [normal_id: meta.sample] ] // [ patient, [meta] ]
+                    }
+                ,
+                remainder: true
+            )
+            .map { it -> // [ patient, [meta_tumor], [meta_normal] ]
+                def (patient, tumor, normal) = (it + [null, null])[0..2]
+                def meta_tumor = tumor ?: [null]
+                def meta_normal = normal ?: [null]
+                def meta_out = meta_tumor
+                meta_out = meta_out + [id: meta_tumor.sample ]
+                if (normal) {
+                    meta_out = meta_out + [ normal_id: meta_normal.normal_id ]
+                } else {
+                    meta_out = meta_out - meta_out.subMap("normal_id") // Ensure removal of normal_id if no normal
+                }
+                [ patient , meta_out ]
+            }
+            .dump(tag: "meta_purple merged", pretty: true)
 
     purple_inputs_snv_germline = Channel.empty()
     if (!params.tumor_only) {
@@ -1804,7 +1821,7 @@ workflow PURPLE_STEP {
     purple_inputs = meta_purple
         .join(purple_inputs_amber_dir)
         .join(purple_inputs_cobalt_dir)
-        .map { patient, meta, amber_dir, cobalt_dir ->
+        .map { _patient, meta, amber_dir, cobalt_dir ->
             [meta, amber_dir, cobalt_dir, [], [], [], [], [], []]
         }
 
@@ -1815,7 +1832,7 @@ workflow PURPLE_STEP {
             .join(purple_inputs_cobalt_dir)
             .join(purple_inputs_sv)
             .join(purple_inputs_snv)
-            .map { patient, meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi ->
+            .map { _patient, meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi ->
                 [meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, [], []]
             }
         }
@@ -1828,7 +1845,7 @@ workflow PURPLE_STEP {
                 .join(purple_inputs_sv)
                 .join(purple_inputs_snv)
                 .join(purple_inputs_snv_germline)
-                .map { patient, meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf, germ_snv_tbi ->
+                .map { _patient, meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf, germ_snv_tbi ->
                     [meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf, germ_snv_tbi]
                 }
         }
@@ -1947,7 +1964,12 @@ workflow JABBA_STEP {
     jabba_gg = jabba_gg_existing_outputs
 
 
-    jabba_inputs = inputs_unlaned.filter { (it.jabba_gg.isEmpty() || it.jabba_rds.isEmpty()) && it.meta.status.toString() == "1"}.map { it -> [it.meta.patient, it.meta] }.unique()
+    jabba_inputs = inputs_unlaned
+        .filter { (it.jabba_gg.isEmpty() || it.jabba_rds.isEmpty()) && it.meta.status.toString() == "1" }
+        .map { it -> [it.meta.patient, it.meta] }
+        .unique()
+        .dump(tag: "jabba_inputs from inputs_unlaned", pretty: true)
+
     if (tools_used.contains("all") || tools_used.contains("jabba")) {
         
 
@@ -1957,11 +1979,12 @@ workflow JABBA_STEP {
 
 		// The variable below will get propagated to jabba if retiering is not done to ! params.tumor_only block
 		jabba_vcf_from_sv_calling_for_merge = vcf_from_sv_calling_for_merge
+            .dump(tag: "jabba_vcf_from_sv_calling_for_merge", pretty: true)
 
-        vcf_raw_from_gridss_gridss_for_merge = vcf_raw_from_gridss_gridss
-            .map {
-                [ it[0].patient ] + it[1..-1].toList() // patient, vcf_raw, vcf_tbi_raw
-            }
+        // vcf_raw_from_gridss_gridss_for_merge = vcf_raw_from_gridss_gridss
+        //     .map {
+        //         [ it[0].patient ] + it[1..-1].toList() // patient, vcf_raw, vcf_tbi_raw
+        //     }
 
 		// Variable exists in case retiering is done
 		untiered_junctions_for_merge = vcf_from_sv_calling_for_merge
@@ -1970,10 +1993,14 @@ workflow JABBA_STEP {
 			untiered_junctions_for_merge = final_filtered_sv_rds_for_merge
 		}
 		if (params.is_retier_whitelist_junctions) {
-			untiered_junctions_input = jabba_inputs
-				.join(untiered_junctions_for_merge)
-                .join(vcf_raw_from_gridss_gridss_for_merge)
-				.map { it -> [ it[1], it[2], it[3] ] } // meta, (vcf or rds), vcf_raw
+			// untiered_junctions_input = jabba_inputs
+			// 	.join(untiered_junctions_for_merge)
+            //     .join(vcf_raw_from_gridss_gridss_for_merge)
+			// 	.map { it -> [ it[1], it[2], it[3] ] } // meta, (vcf or rds), vcf_raw
+
+            untiered_junctions_input = jabba_inputs
+				.join(untiered_junctions_for_merge) 
+				.map { it -> [ it[1], it[2] ] } // meta, (vcf or rds)
 
 			RETIER_JUNCTIONS(untiered_junctions_input)
 			retiered_junctions_output_for_merge = Channel.empty()
@@ -1990,40 +2017,49 @@ workflow JABBA_STEP {
         jabba_inputs_sv = jabba_vcf_from_sv_calling_for_merge
             .join(jabba_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, (vcf or rds if retiered)
+            .dump(tag: "jabba_inputs_sv", pretty: true)
 
         if (params.tumor_only) {
             jabba_inputs_junction_filtered_sv = final_filtered_sv_rds_for_merge
                 .join(jabba_inputs)
-                .map { it -> [ it[0], it[1] ] } // meta.patient, pon and gnomaD filtered sv (for tumor only)
+                .map { it -> [ it[0], it[1] ] } // meta.patient, pon and gnomaD filtered sv (for tumor only)\
+                .dump(tag: "jabba_inputs_junction_filtered_sv", pretty: true)
         } else {
             jabba_inputs_unfiltered_sv = unfiltered_som_sv_for_merge
                 .join(jabba_inputs)
                 .map { it -> [ it[0], it[1] ] } // meta.patient, unfiltered_som_sv
+                .dump(tag: "jabba_inputs_unfiltered_sv", pretty: true)
         }
 
         jabba_inputs_hets = hets_sites_for_merge
             .join(jabba_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, hets
+            .dump(tag: "jabba_inputs_hets", pretty: true)
 
         jabba_inputs_cov = dryclean_tumor_cov_for_merge
             .join(jabba_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, cov
+            .dump(tag: "jabba_inputs_cov", pretty: true)
 
         jabba_inputs_purity = purity_for_merge
             .join(jabba_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, purity
+            .dump(tag: "jabba_inputs_purity", pretty: true)
 
         jabba_inputs_ploidy = ploidy_for_merge
             .join(jabba_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, ploidy
+            .dump(tag: "jabba_inputs_ploidy", pretty: true)
 
         jabba_inputs_cbs_seg = cbs_seg_for_merge
             .join(jabba_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, cbs_seg
+            .dump(tag: "jabba_inputs_cbs_seg", pretty: true)
 
         jabba_inputs_cbs_nseg = cbs_nseg_for_merge
             .join(jabba_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, cbs_nseg
+            .dump(tag: "jabba_inputs_cbs_nseg", pretty: true)
 
         
 
@@ -2073,6 +2109,7 @@ workflow JABBA_STEP {
                         nseg
                     ]
                 }
+                .dump(tag: "jabba_input not tumor only", pretty: true)
         }
 
         jabbaOut = Channel.empty()
@@ -2353,7 +2390,7 @@ workflow MULTIPLICITY_STEP {
             .join(snv_multiplicity_inputs_hets_sites)
             .join(snv_multiplicity_inputs_dryclean_tumor_cov)
             .map{
-                patient, meta, somatic_ann, ggraph, hets, dryclean_cov  ->
+                _patient, meta, somatic_ann, ggraph, hets, dryclean_cov  ->
                 [ meta, somatic_ann, [], ggraph, hets, dryclean_cov ]
             }
     } else {
@@ -2389,7 +2426,7 @@ workflow MULTIPLICITY_STEP {
             .join(snv_multiplicity_inputs_hets_sites)
             .join(snv_multiplicity_inputs_dryclean_tumor_cov)
             .map{
-                patient, meta, somatic_ann, germline_ann, ggraph, hets, dryclean_cov ->
+                _patient, meta, somatic_ann, germline_ann, ggraph, hets, dryclean_cov ->
                 [ meta, somatic_ann, germline_ann, ggraph, hets, dryclean_cov ]
             }
     }
@@ -2693,6 +2730,7 @@ workflow SIGNATURES_STEP {
   annotated_vcf_ffpe_impact_or_snpeff = inputs_tumors_meta_for_merge
 	.join(annotated_vcf_ffpe_impact_or_snpeff_for_merge, failOnDuplicate: false, failOnMismatch: false)
 	.map { it -> [ it[1], it[2]] } // meta, annotated somatic snv vcf
+    .dump(tag: "annotated_vcf_ffpe_impact_or_snpeff in SIGNATURES STEP", pretty: true)
 
 
 

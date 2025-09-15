@@ -19,6 +19,13 @@ class Globals {
                 ['qc_insert_size']
             ]
         ],
+        "conpair": [
+            inputs: ['bam'],
+            outputs: [
+                ['conpair_concordance'],
+                ['conpair_contamination']
+            ]
+        ],
         "estimate_library_complexity": [ inputs: ['bam'], outputs: ['qc_dup_rate'] ],
         // "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics', "estimate_library_complexity"] ],
         "postprocessing": [ inputs: ['bam'], outputs: [] ], // FIXME: Postprocessing will never be selected as a tool given the current set of inputs/outputs, empty output means tool will not be selected. postprocessing tool must be controlled by params.is_run_post_processing.
