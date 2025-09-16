@@ -8,6 +8,7 @@ class Globals {
 
   static Map tool_input_output_map = [
         "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
+        "itdseek": [ inputs: ['bam'], outputs: ['itdseek_vcf', 'itdseek_rds'] ],
         "collect_wgs_metrics": [
             inputs: ['bam'],
             outputs: ['qc_coverage_metrics']

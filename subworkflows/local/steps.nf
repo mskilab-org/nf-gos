@@ -659,6 +659,69 @@ workflow MSISENSORPRO_STEP {
     versions
 }
 
+include { 
+    ITDSEEK 
+} from '../../modules/local/process.nf'
+workflow ITDSEEK_STEP {
+    take:
+    inputs_unlaned
+    alignment_bams_final  // [meta, bam, bai]
+    tools_used
+
+    main:
+    // fasta = WorkflowNfcasereports.create_file_channel(params.fasta)
+    fasta = Channel.value(file(params.fasta))
+    fasta_fai = Channel.value(file(params.fasta_fai))
+    build = Channel.value(params.build_dryclean)
+    versions = Channel.empty()
+    // Existing
+    // ##############################
+    itdseek_existing = inputs_unlaned
+        .map { it -> [it.meta, it.itdseek_vcf, it.itdseek_rds] }
+        .filter { !it[1].isEmpty() && !it[2].isEmpty() }
+        .unique()
+        .branch{
+            normal: it[0].status.toString() == "0"
+            tumor:  it[0].status.toString() == "1"
+        }.tumor
+
+    // Emit
+    itdseek_emit = itdseek_existing
+
+    // Inputs
+    itdseek_inputs = inputs_unlaned
+            .map { it -> [it.meta, it.itdseek_vcf, it.itdseek_rds] }
+            .filter { it[1].isEmpty() || it[2].isEmpty() }
+            .unique()
+            .branch{
+                normal: it[0].status.toString() == "0"
+                tumor:  it[0].status.toString() == "1"
+            }.tumor
+            .map { it -> [it[0].sample] }.unique()
+            .dump(tag: "itdseek_inputs", pretty: true)
+
+    itdseek_inputs_w_bam = alignment_bams_final
+        .join(itdseek_inputs, by: 0)
+        .map{ it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
+        .dump(tag: "itdseek_inputs_w_bam", pretty: true)
+
+    def run_itdseek = (
+        ( tools_used.contains("all") || tools_used.contains("itdseek") )
+        && params.is_heme
+    )
+
+    if (run_itdseek) {
+        ITDSEEK(itdseek_inputs_w_bam, fasta, fasta_fai, build)
+
+        itdseek_emit = Channel.empty()
+            .mix(ITDSEEK.out.vcfrds)
+            .mix(itdseek_existing)
+    }
+
+    emit:
+    itdseek_emit
+}
+
 include { BAM_AMBER} from './bam_amber/main'
 workflow AMBER_STEP {
     take:
@@ -1025,6 +1088,7 @@ workflow SV_CALLING_STEP {
         
     gridss_raw_existing_outputs = inputs_unlaned_split.tumor.map {
         it -> [it.meta, it.vcf_raw, it.vcf_raw_tbi] }
+        .dump(tag: "gridss existing raw outputs", pretty: true)
         .filter { !it[1].isEmpty() && !it[2].isEmpty() }
     
     vcf_raw_from_gridss_gridss = gridss_raw_existing_outputs
@@ -1346,7 +1410,7 @@ workflow VARIANT_CALLING_STEP {
     dict = params.dict ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect() : Channel.empty()
 
     snv_somatic_existing_outputs = inputs_unlaned
-        .map { it -> [it.meta, it.snv_somatic_vcf, it.snv_somatic_vcf_tbi] }
+        .map { it -> [it.meta, it.snv_somatic_vcf_raw, it.snv_somatic_vcf_raw_tbi] }
         .filter { !it[1].isEmpty() && !it[2].isEmpty()}
         .unique()
     

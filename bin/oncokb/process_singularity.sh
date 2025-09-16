@@ -108,7 +108,7 @@ if [ -e $VCF ] && [ ! $(wc -c <${VCF}) == 0 ]; then
     if [ ! -e ./annotated.maf ]
     then
         is_grch37=$( ( [ $(tolower $ASSEMBLY) == "hg19" ] || [ $(tolower $ASSEMBLY) == "grch37" ] ) && echo true || false )
-        is_grch38=$( ( [ $(tolower $ASSEMBLY) == "hg38" ] || [ $(tolower $ASSEMBLY) == "grch38" ] ) && echo true || false )
+        is_grch38=$( ( [ $(tolower $ASSEMBLY) == "hg38" ] || [ $(tolower $ASSEMBLY) == "grch38" ] ) && echo true || echo false )
         if $is_grch37; then
             ref_path=${VEP_DIR}/homo_sapiens/112_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz
         elif $is_grch38; then
@@ -139,7 +139,7 @@ if [ -e $VCF ] && [ ! $(wc -c <${VCF}) == 0 ]; then
         -i ./annotated.maf \
         -o ./oncokb_annotated.maf \
         -b ${ONCOKB_TOKEN} \
-        -r GRCh37 \
+        -r ${ASSEMBLY} \
         -d || \
         { echo "OncoKB Annotation failed!" && exit 1; }
 

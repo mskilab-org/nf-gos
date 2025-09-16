@@ -131,6 +131,7 @@ include {
 include { 
     ALIGNMENT_STEP; 
     BAM_QC;
+    ITDSEEK_STEP;
     MSISENSORPRO_STEP;
     SV_CALLING_STEP;
     FRAGCOUNTER_STEP;
@@ -766,6 +767,9 @@ workflow NFGOS {
 
     dict_path = dict.map{ _meta, dictOut -> [dictOut] }
     BAM_QC(inputs, alignment_bams_final, dict_path, tools_used)
+
+
+    ITDSEEK_STEP(inputs_unlaned, alignment_bams_final, tools_used)
 
     // MSISensorPro
     // ##############################

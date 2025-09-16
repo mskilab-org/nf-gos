@@ -128,7 +128,7 @@ process JUNCTION_FILTER {
     val(padding)
 
     output:
-    tuple val(meta), path("somatic.filtered.gnoMAD.sv.rds"), emit: final_filtered_sv_rds, optional:false
+    tuple val(meta), path("somatic.filtered.gnomAD.sv.rds"), emit: final_filtered_sv_rds, optional:false
     tuple val(meta), path("somatic.filtered.sv.rds"), emit: pon_filtered_sv_rds, optional: false
     path "versions.yml", emit: versions, optional:false
 
