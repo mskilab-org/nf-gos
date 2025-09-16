@@ -62,19 +62,6 @@
         })
     })
 
-    # Filter the dryclean_cov file to ensure all ranges are 1000 bp long
-    filtered_dryclean_cov = paste0(opt$outdir, "filtered_dryclean_cov.rds")
-    gr_coverage <- readRDS(opt$tumor_dryclean)
-    range_widths <- width(gr_coverage)
-    if (any(range_widths != 1000)) {
-        message("Warning: Some ranges in the dryclean coverage file are not 1000 bp long. Filtering to keep only those that are 1000 bp long.")
-        gr_clean <- gr_coverage[range_widths == 1000]
-        saveRDS(gr_clean, filtered_dryclean_cov)
-        opt$tumor_dryclean <- filtered_dryclean_cov
-    } else {
-        message("All ranges in the dryclean coverage file are 1000 bp long. No filtering needed.")
-    }
-
     snvplicity.run <- multiplicity(somatic_snv = opt$somatic_snv,
                                       germline_snv = opt$germline_snv,
                                       het_pileups_wgs = opt$het_pileups_wgs,
