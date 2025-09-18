@@ -1242,9 +1242,8 @@ workflow SV_CALLING_STEP {
                     } 
                     [patient, assembly_dir, gridss_scatter_assembly_paths]
                 }
-                // .view { "collected_assembly_dirs: $it" }
             
-            gatherassembly_mixed_input = assembly_mixed_input
+             gather_or_precall_input = assembly_mixed_input
                 .map{ meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, _jobnodes, _jobindex ->
                     [
                         meta.patient, 
@@ -1272,49 +1271,116 @@ workflow SV_CALLING_STEP {
                         normal_gridss_preprocess,
                         gridss_assembly_dir,
                         gridss_scatter_assembly_paths
-                        
                     ]
                 }
-                // .view { "GRIDSS_ASSEMBLE_GATHER input: $it" }
             
-            GRIDSS_ASSEMBLE_GATHER(gatherassembly_mixed_input, fasta, fasta_fai, bwa_index, blacklist_gridss)
+            gather_or_precall_input_for_merge = gather_or_precall_input.map { it -> // meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths
+                    [ it[0].patient ] + it.toList() 
+                }
 
-            call_input = gatherassembly_mixed_input.map{ meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths ->
-                    [
-                        meta.patient, 
-                        meta, 
-                        tumor_bam, 
-                        tumor_bai,
-                        tumor_gridss_preprocess, 
-                        normal_bam, 
-                        normal_bai,
-                        normal_gridss_preprocess, 
-                        gridss_assembly_dir,
-                        gridss_scatter_assembly_paths
-                    ]
-                }
-                .distinct()
-                .join(
-                    GRIDSS_ASSEMBLE_GATHER.out.gridss_final_assembly
-                        .map { meta, gridss_final_assembly, gridss_gather_assembly_paths ->
-                            [meta.patient, gridss_final_assembly, gridss_gather_assembly_paths]
-                        }
-                )
-                .map{ _patient, meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths, gridss_final_assembly, gridss_gather_assembly_paths ->
-                    [
-                        meta, 
-                        tumor_bam, 
-                        tumor_bai, 
-                        tumor_gridss_preprocess, 
-                        normal_bam, 
-                        normal_bai,
-                        normal_gridss_preprocess,
-                        gridss_assembly_dir,
-                        gridss_scatter_assembly_paths + gridss_gather_assembly_paths,
-                        gridss_final_assembly
-                    ]
-                }
-                // .view { "GRIDSS_CALL input: $it" }
+            if (total_jobnodes > 1) {
+                
+                // gatherassembly_mixed_input = assembly_mixed_input
+                //     .map{ meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, _jobnodes, _jobindex ->
+                //         [
+                //             meta.patient, 
+                //             meta, 
+                //             tumor_bam, 
+                //             tumor_bai,
+                //             tumor_gridss_preprocess,
+                //             normal_bam, 
+                //             normal_bai,
+                //             normal_gridss_preprocess
+                //         ]
+                //     }
+                //     .distinct()
+                //     .join(
+                //         collected_assembly_dirs
+                //     )
+                //     .map{ _patient, meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths ->
+                //         [
+                //             meta, 
+                //             tumor_bam, 
+                //             tumor_bai,
+                //             tumor_gridss_preprocess,
+                //             normal_bam, 
+                //             normal_bai,
+                //             normal_gridss_preprocess,
+                //             gridss_assembly_dir,
+                //             gridss_scatter_assembly_paths
+                            
+                //         ]
+                //     }
+                
+                
+                // GRIDSS_ASSEMBLE_GATHER(gatherassembly_mixed_input, fasta, fasta_fai, bwa_index, blacklist_gridss)
+
+                GRIDSS_ASSEMBLE_GATHER(gather_or_precall_input, fasta, fasta_fai, bwa_index, blacklist_gridss)
+
+                // call_input = gatherassembly_mixed_input
+                    // .map{ meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths ->
+                    //     [
+                    //         meta.patient, 
+                    //         meta, 
+                    //         tumor_bam, 
+                    //         tumor_bai,
+                    //         tumor_gridss_preprocess, 
+                    //         normal_bam, 
+                    //         normal_bai,
+                    //         normal_gridss_preprocess, 
+                    //         gridss_assembly_dir,
+                    //         gridss_scatter_assembly_paths
+                    //     ]
+                    // }
+                call_input = gather_or_precall_input_for_merge
+                    .distinct()
+                    .join(
+                        GRIDSS_ASSEMBLE_GATHER.out.gridss_final_assembly
+                            .map { meta, gridss_final_assembly, gridss_gather_assembly_paths ->
+                                [meta.patient, gridss_final_assembly, gridss_gather_assembly_paths]
+                            }
+                    )
+                    .map{ _patient, meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths, gridss_final_assembly, gridss_gather_assembly_paths ->
+                        [
+                            meta, 
+                            tumor_bam, 
+                            tumor_bai, 
+                            tumor_gridss_preprocess, 
+                            normal_bam, 
+                            normal_bai,
+                            normal_gridss_preprocess,
+                            gridss_assembly_dir,
+                            gridss_scatter_assembly_paths + gridss_gather_assembly_paths,
+                            gridss_final_assembly
+                        ]
+                    }
+            } else if (total_jobnodes == 1) {
+
+                collected_assembly_bam = GRIDSS_ASSEMBLE_SCATTER.out.gridss_scatter_assembly_bam
+                    .map { meta, gridss_scatter_assembly_bam ->
+                        [meta.patient, gridss_scatter_assembly_bam ]
+                    }
+                    
+                call_input = gather_or_precall_input_for_merge
+                    .join(
+                        collected_assembly_bam
+                    )
+                    .map { _patient, meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths, gridss_scatter_assembly_bam ->
+                        [
+                            meta, 
+                            tumor_bam, 
+                            tumor_bai,
+                            tumor_gridss_preprocess,
+                            normal_bam, 
+                            normal_bai,
+                            normal_gridss_preprocess,
+                            gridss_assembly_dir,
+                            gridss_scatter_assembly_paths,
+                            gridss_scatter_assembly_bam
+                        ]
+                    }
+            }
+            
             
             GRIDSS_CALL(call_input, fasta, fasta_fai, bwa_index, blacklist_gridss)
 
