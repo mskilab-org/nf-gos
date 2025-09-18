@@ -148,7 +148,7 @@ process LP_PHASED_BALANCE {
     def VERSION = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
     """
-    export RSCRIPT_PATH=\$(echo "${baseDir}/bin/lp_phased_balance.R")
+    export RSCRIPT_PATH=\$(echo "\${NEXTFLOW_PROJECT_DIR}/bin/lp_phased_balance.R")
 
     # Remove 'chr' from chromosome names in sites.txt (for hg38)
     awk 'BEGIN{OFS=" "} {gsub(/^chr/,"",\$1); print}' sites.txt > sites.tmp && mv sites.tmp sites.txt
