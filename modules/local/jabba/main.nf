@@ -505,14 +505,16 @@ process RETIER_WHITELIST_JUNCTIONS {
     library(gGnome)
 
     # Load the whitelist genes
-    heme_gen = readRDS("${whitelist_genes}")
+    heme_gen_orig = readRDS("${whitelist_genes}")
 
-    heme_gen = IRanges::resize(
-        heme_gen,
-        width = as.integer(width(heme_gen)) + 150000,
-        fix = "end",
-        ignore.strand = FALSE
-    )
+    # heme_gen = IRanges::resize(
+    #     heme_gen_orig,
+    #    width = as.integer(width(heme_gen_orig)) + 150000,
+    #     fix = "end",
+    #     ignore.strand = FALSE
+    # )
+
+    heme_gen = heme_gen_orig + 150000
 
     # Define the path to the junctions file
     jpath = "${junctions}"
@@ -556,6 +558,29 @@ process RETIER_WHITELIST_JUNCTIONS {
     mcols(ra.all) = mcols_ra.all
     ra.all = ra.all[order(mcols_ra.all[["${tfield}"]], decreasing = FALSE)]
     mcols_ra.all = mcols(ra.all)
+
+    ## Reimplement previous logic:
+    ## If SV is FILTER == "PASS"
+    ## and overlaps with any whitelist genic territory
+    ## mark as tier 1
+    grlunl = grl.unlist(ra.all)
+    mcunl = mcols(grlunl)
+    filtervals = mcunl\$FILTER
+    is_in_whitelist = gUtils::`%^%`(grlunl, heme_gen)
+    is_filterpass = rep_len(FALSE, NROW(grlunl))
+    if (!is.null(filtervals)) 
+        is_filterpass = filtervals == "PASS"
+    grlix_to_retier = unique(mcunl[is_in_whitelist & is_filterpass,]\$grl.ix)
+    nr_grlix_to_retier = NROW(grlix_to_retier)
+
+    if (nr_grlix_to_retier > 0) {
+        mcols_ra.all = mcols(ra.all)
+        mcols_ra.all[grlix_to_retier,"${tfield}"] = 1
+        mcols(ra.all) = mcols_ra.all
+        ra.all = ra.all[order(mcols_ra.all[["${tfield}"]], decreasing = FALSE)]
+        mcols(ra.all) = mcols_ra.all
+    }
+
     grpiv = gUtils::grl.pivot(ra.all)
     bp1 = grpiv[[1]]
     bp2 = grpiv[[2]]
