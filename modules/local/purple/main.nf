@@ -116,8 +116,8 @@ process EXTRACT_PURITYPLOIDY {
     tuple val(meta), path(purple_purity)
 
     output:
-    tuple val(meta), env('purity_val'), emit: purity_val
-    tuple val(meta), env('ploidy_val'), emit: ploidy_val
+    tuple val(meta), env(purity_val), emit: purity_val
+    tuple val(meta), env(ploidy_val), emit: ploidy_val
 
     script:
     """
