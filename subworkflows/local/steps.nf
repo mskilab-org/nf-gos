@@ -1980,11 +1980,12 @@ workflow PURPLE_STEP {
                 }
         }
     }
-    
+
     if (tools_used.contains("all") || tools_used.contains("purple")) {
 
         BAM_COV_PURPLE(
-            purple_inputs
+            purple_inputs,
+            inputs_unlaned
         )
 
         versions = versions.mix(BAM_COV_PURPLE.out.versions)

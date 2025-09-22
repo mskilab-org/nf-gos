@@ -11,13 +11,14 @@ workflow BAM_COV_PURPLE {
     // defining inputs
     take:
     purple_inputs
+    inputs_unlaned
 
     //Creating empty channels for output
     main:
     gc_profile = WorkflowNfcasereports.create_file_channel(params.gc_profile)
     genome_fasta = WorkflowNfcasereports.create_file_channel(params.fasta)
     genome_fai = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
-    genome_ver     = WorkflowNfcasereports.create_value_channel(params.genome_ver_amber)
+    genome_ver = WorkflowNfcasereports.create_value_channel(params.genome_ver_amber)
     highly_diploid_percentage = WorkflowNfcasereports.create_value_channel(params.purple_highly_diploid_percentage)
     min_purity   = WorkflowNfcasereports.create_value_channel(params.purple_min_purity)
     ploidy_penalty_factor = WorkflowNfcasereports.create_value_channel(params.purple_ploidy_penalty_factor)
@@ -27,15 +28,26 @@ workflow BAM_COV_PURPLE {
     driver_gene_panel = WorkflowNfcasereports.create_file_channel(params.driver_gene_panel)
     ensembl_data_resources = WorkflowNfcasereports.create_file_channel(params.ensembl_data_resources)
 
-    versions        = Channel.empty()
-    ploidy          = Channel.empty()
+    versions = Channel.empty()
+    ploidy = Channel.empty()
+
+    minmaxvals = inputs_unlaned.filter{ it -> it.meta.status.toString() == "1" }.map { it -> [it.meta.patient, it.subMap("min_purity", "max_purity", "min_ploidy", "max_ploidy")] }.unique{ it -> it[0] }
+    purple_inputs_w_minmaxpurity = purple_inputs.map{it -> [ it[0].patient ] + it.toList() }.cross(minmaxvals).map { tuple_purple, tuple_minmaxvals ->
+        def minmaxes = tuple_minmaxvals[1]  // min_purity, max_purity, min_ploidy, max_ploidy
+        if (minmaxes.min_purity instanceof List && minmaxes.min_purity.isEmpty()) {
+            minmaxes = minmaxes + [min_purity: params.purple_min_purity]
+        }
+        def purple_out_tuple = tuple_purple.toList() + minmaxes.values()
+        purple_out_tuple[1..-1] // meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf or [], germ_snv_tbi or [], min_purity, max_purity, min_ploidy, max_ploidy
+    }
 
     PURPLE(
-        purple_inputs,
+        purple_inputs_w_minmaxpurity.map{ it -> it[0..-5] },
         genome_fasta,
         genome_ver,
         highly_diploid_percentage,
-        min_purity,
+        purple_inputs_w_minmaxpurity.map{ it -> it[-4] },
+        // min_purity,
         ploidy_penalty_factor,
         genome_fai,
         genome_dict,
