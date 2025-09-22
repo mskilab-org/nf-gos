@@ -32,7 +32,7 @@ process FFPE_IMPACT_FILTER {
     conda activate pact
 
 
-    export RSCRIPT_PATH=\$(echo "${baseDir}/bin/ffpe_impact_filter.R")
+    export RSCRIPT_PATH=\$(echo "\${NEXTFLOW_PROJECT_DIR}/bin/ffpe_impact_filter.R")
 
     Rscript \$RSCRIPT_PATH \\
         --id ${prefix} \\

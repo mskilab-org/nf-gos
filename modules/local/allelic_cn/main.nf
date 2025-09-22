@@ -60,7 +60,7 @@ process NON_INTEGER_BALANCE {
     unset R_HOME
     echo "USING LIBRARIES: \$(Rscript -e 'print(.libPaths())')"
 
-    export RSCRIPT_PATH=\$(echo "${baseDir}/bin/non_integer_balance.R")
+    export RSCRIPT_PATH=\$(echo "\${NEXTFLOW_PROJECT_DIR}/bin/non_integer_balance.R")
 
     Rscript \$RSCRIPT_PATH \\
         --id $id \\

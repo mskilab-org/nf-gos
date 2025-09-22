@@ -324,7 +324,7 @@ process RESCUE_CH_HEME {
     source /opt/conda/etc/profile.d/conda.sh
     conda activate pact
 
-    export RSCRIPT_PATH=\$(echo "${baseDir}/bin/rescue_ch.R")
+    export RSCRIPT_PATH=\$(echo "\${NEXTFLOW_PROJECT_DIR}/bin/rescue_ch.R")
 
     Rscript \$RSCRIPT_PATH \\
         --vcf ${sage_vcf} \\

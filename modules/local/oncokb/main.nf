@@ -31,7 +31,7 @@ process ONCOKB_ANNOTATOR {
     script:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
-    def libdir = "${baseDir}/oncokb"
+    def libdir = "\${NEXTFLOW_PROJECT_DIR}/oncokb"
     def verbose = "TRUE"
     def tumor_type = "unknown"
     def VERSION = '0.1'
