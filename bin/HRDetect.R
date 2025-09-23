@@ -180,11 +180,15 @@ if (file.exists(snv) && file.info(snv)$size) {
     message("Processing SNV VCF")
     if (grepl("gz$", snv))
     {
-        cmd = sprintf("{ vcftools --gzvcf %s --remove-indels --remove-filtered-all --recode --stdout | awk '{ if ($0 ~ /##contig=<ID=chr/) { gsub(/##contig=<ID=chr/, \"##contig=<ID=\"); print } else if ($0 !~ /^#/){ gsub(/^chr/, \"\"); print } else { print } }' | bedtools intersect -a stdin -b %s -header | vcf-sort -c | bcftools view -S ^./excls.txt | bcftools view -v snps | bcftools norm -Oz -m-any; } > %s", snv, normalizePath(regions.bed), snv.tmp)
+        ## cmd = sprintf("{ vcftools --gzvcf %s --remove-indels --remove-filtered-all --recode --stdout | awk '{ if ($0 ~ /##contig=<ID=chr/) { gsub(/##contig=<ID=chr/, \"##contig=<ID=\"); print } else if ($0 !~ /^#/){ gsub(/^chr/, \"\"); print } else { print } }' | bedtools intersect -a stdin -b %s -header | vcf-sort -c | bcftools view -S ^./excls.txt | bcftools view -v snps | bcftools norm -Oz -m-any; } > %s", snv, normalizePath(regions.bed), snv.tmp)
+        cmd = sprintf("{ vcftools --gzvcf %s --remove-indels --remove-filtered-all --recode --stdout | awk '{ if ($0 ~ /##contig=<ID=chr/) { gsub(/##contig=<ID=chr/, \"##contig=<ID=\"); print } else if ($0 !~ /^#/){ gsub(/^chr/, \"\"); print } else { print } }' | /nfs/sw/easybuild/software/BEDTools/2.31.0-GCC-12.3.0/bin/bedtools intersect -a stdin -b %s -header | vcf-sort -c | bcftools view -S ^./excls.txt | bcftools view -v snps | bcftools norm -Oz -m-any; } > %s", snv, normalizePath(regions.bed), snv.tmp)
+
     }
     else
     {
-        cmd = sprintf("{ vcftools --vcf %s --remove-indels --remove-filtered-all --recode --stdout | awk '{ if ($0 ~ /##contig=<ID=chr/) { gsub(/##contig=<ID=chr/, \"##contig=<ID=\"); print } else if ($0 !~ /^#/) { gsub(/^chr/, \"\"); print } else { print } }' | bedtools intersect -a stdin -b %s -header | vcf-sort -c | bcftools view -v snps | bcftools norm -Oz -m-any; } > %s", snv, normalizePath(regions.bed), snv.tmp)
+        ## cmd = sprintf("{ vcftools --vcf %s --remove-indels --remove-filtered-all --recode --stdout | awk '{ if ($0 ~ /##contig=<ID=chr/) { gsub(/##contig=<ID=chr/, \"##contig=<ID=\"); print } else if ($0 !~ /^#/) { gsub(/^chr/, \"\"); print } else { print } }' | bedtools intersect -a stdin -b %s -header | vcf-sort -c | bcftools view -v snps | bcftools norm -Oz -m-any; } > %s", snv, normalizePath(regions.bed), snv.tmp)
+        cmd = sprintf("{ vcftools --vcf %s --remove-indels --remove-filtered-all --recode --stdout | awk '{ if ($0 ~ /##contig=<ID=chr/) { gsub(/##contig=<ID=chr/, \"##contig=<ID=\"); print } else if ($0 !~ /^#/) { gsub(/^chr/, \"\"); print } else { print } }' | /nfs/sw/easybuild/software/BEDTools/2.31.0-GCC-12.3.0/bin/bedtools intersect -a stdin -b %s -header | vcf-sort -c | bcftools view -v snps | bcftools norm -Oz -m-any; } > %s", snv, normalizePath(regions.bed), snv.tmp)
+
     }
     print(cmd)
 
@@ -243,11 +247,11 @@ if (!is.null(indel) && file.exists(indel) && file.info(indel)$size) {
     if (grepl("gz$", indel))
     {
         ## cmd = sprintf("{ vcftools --gzvcf %s --keep-only-indels --remove-filtered-all --recode --stdout | awk '{ if ($0 ~ /##contig=<ID=chr/) { gsub(/##contig=<ID=chr/, \"##contig=<ID=\"); print } else if ($0 !~ /^#/) { gsub(/^chr/, \"\"); print } else { print } }' | bedtools intersect -a stdin -b ./good_rfile.bed -header | vcf-sort -c | bcftools view -S ^./excls.txt | bcftools view -v indels | bcftools norm -Ov -m-any | bcftools norm -f human_g1k_v37_decoy.fasta --check-ref s | bgzip -c; } > ./indel.vcf.bgz", indel)
-        cmd = sprintf("{ vcftools --gzvcf %s --keep-only-indels --remove-filtered-all --recode --stdout | awk '{ if ($0 ~ /##contig=<ID=chr/) { gsub(/##contig=<ID=chr/, \"##contig=<ID=\"); print } else if ($0 !~ /^#/) { gsub(/^chr/, \"\"); print } else { print } }' | bedtools intersect -a stdin -b %s -header | vcf-sort -c | bcftools view -v indels | bcftools norm -Ov -m-any | bcftools norm -f %s --check-ref s | bgzip -c; } > %s", indel, regions.bed, opt$ref, indel.tmp)
+        cmd = sprintf("{ vcftools --gzvcf %s --keep-only-indels --remove-filtered-all --recode --stdout | awk '{ if ($0 ~ /##contig=<ID=chr/) { gsub(/##contig=<ID=chr/, \"##contig=<ID=\"); print } else if ($0 !~ /^#/) { gsub(/^chr/, \"\"); print } else { print } }' | /nfs/sw/easybuild/software/BEDTools/2.31.0-GCC-12.3.0/bin/bedtools intersect -a stdin -b %s -header | vcf-sort -c | bcftools view -v indels | bcftools norm -Ov -m-any | bcftools norm -f %s --check-ref s | bgzip -c; } > %s", indel, regions.bed, opt$ref, indel.tmp)
     }
     else
     {
-        cmd = sprintf("{ vcftools --vcf %s --keep-only-indels --remove-filtered-all --recode --stdout | awk '{ if ($0 ~ /##contig=<ID=chr/) { gsub(/##contig=<ID=chr/, \"##contig=<ID=\"); print } else if ($0 !~ /^#/) { gsub(/^chr/, \"\"); print } else { print } }' | bedtools intersect -a stdin -b %s -header | vcf-sort -c | bcftools view -v indels | bcftools norm -Ov -m-any | bcftools norm -f %s --check-ref s | bgzip -c; } > %s", indel, regions.bed, opt$ref, indel.tmp)
+        cmd = sprintf("{ vcftools --vcf %s --keep-only-indels --remove-filtered-all --recode --stdout | awk '{ if ($0 ~ /##contig=<ID=chr/) { gsub(/##contig=<ID=chr/, \"##contig=<ID=\"); print } else if ($0 !~ /^#/) { gsub(/^chr/, \"\"); print } else { print } }' | /nfs/sw/easybuild/software/BEDTools/2.31.0-GCC-12.3.0/bin/bedtools intersect -a stdin -b %s -header | vcf-sort -c | bcftools view -v indels | bcftools norm -Ov -m-any | bcftools norm -f %s --check-ref s | bgzip -c; } > %s", indel, regions.bed, opt$ref, indel.tmp)
     }
     print(cmd)
 
@@ -284,6 +288,8 @@ if (!is.null(indel) && file.exists(indel) && file.info(indel)$size) {
         rowRanges(indel_fix)[del] = gr.resize(rr[del],
                                               width(rr[del]) + 1,
                                               pad = FALSE, fix = "end")
+        ## delref = unname(get_seq(TwoBitFile("~/DB/GATK/human_g1k_v37.fasta.2bit"),
+        ##                         rowRanges(indel_fix)[del]))
         delref = unname(get_seq(TwoBitFile("~/DB/GATK/human_g1k_v37.fasta.2bit"),
                                 rowRanges(indel_fix)[del]))
         delalt = unname(split(subseq(delref, 1, 1), seq_along(delref)))

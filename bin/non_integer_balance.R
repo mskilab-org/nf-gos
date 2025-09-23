@@ -36,6 +36,10 @@
         saveRDS(opt, paste(opt$outdir, 'cmd.args.rds', sep = '/'))
     }
 
+    oldpaths <- .libPaths()
+    new.path <- c(oldpaths, "/gpfs/commons/groups/imielinski_lab/lib/R-4.0.2")
+    .libPaths(new.path)
+    library(parallel)
     ## updated balance? yikes haha
     library(gUtils)
     library(skitools)
