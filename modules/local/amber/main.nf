@@ -40,6 +40,7 @@ process AMBER {
         -ref_genome_version ${genome_ver} \\
         -loci ${heterozygous_sites} \\
         -threads ${task.cpus} \\
+        -tumor_min_depth 2 \\
         -output_dir amber/
 
     cat <<-END_VERSIONS > versions.yml
