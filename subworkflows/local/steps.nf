@@ -1874,6 +1874,7 @@ workflow PURPLE_STEP {
         }
         .map { it -> [it.meta.patient, it.meta - it.meta.subMap(['tumor_id', 'normal_id'])] }
         .unique()
+        .dump(tag: "purple_inputs_for_merge", pretty: true)
 
     // meta_purple = purple_inputs_for_merge
     //     .branch{
@@ -1918,15 +1919,6 @@ workflow PURPLE_STEP {
             }
             .dump(tag: "meta_purple merged", pretty: true)
 
-    purple_inputs_snv_germline = Channel.empty()
-    if (!params.tumor_only) {
-        if (params.purple_use_smlvs) {
-            purple_inputs_snv_germline = purple_inputs_for_merge
-                .join(germline_vcf_for_merge)
-                .map { it -> [ it[0], it[2], it[3] ] } // patient, vcf, tbi
-        }
-    }
-
     purple_inputs_cobalt_dir = purple_inputs_for_merge
         .join(cobalt_dir_for_merge)
         .map { it -> [ it[0], it[2] ] } // patient, cobalt_dir
@@ -1935,12 +1927,14 @@ workflow PURPLE_STEP {
         .join(amber_dir_for_merge)
         .map { it -> [ it[0], it[2] ] } // patient, amber_dir
 
+    purple_inputs_sv = purple_inputs_for_merge.map { it -> [ it[0], [], [] ] }.unique{ it -> it[0] }
     if (params.purple_use_svs) {
         purple_inputs_sv = purple_inputs_for_merge
             .join(vcf_from_sv_calling_for_merge)
             .map { it -> [ it[0], it[2], it[3] ] } // patient, vcf, tbi
     }
 
+    purple_inputs_snv = purple_inputs_for_merge.map { it -> [ it[0], [], [] ] }.unique{ it -> it[0] }
     if (params.purple_use_smlvs) {
         println "Using Purple small variants"
         purple_inputs_snv = purple_inputs_for_merge
@@ -1948,38 +1942,24 @@ workflow PURPLE_STEP {
             .map { it -> [ it[0], it[2], it[3] ] } // patient, vcf, tbi
     }
 
-    purple_inputs = meta_purple
-        .join(purple_inputs_amber_dir)
-        .join(purple_inputs_cobalt_dir)
-        .map { _patient, meta, amber_dir, cobalt_dir ->
-            [meta, amber_dir, cobalt_dir, [], [], [], [], [], []]
-        }
+    purple_inputs_snv_germline = purple_inputs_for_merge.map { it -> [ it[0], [], [] ] }.unique{ it -> it[0] }
 
-    if (params.tumor_only) {
-        if (params.purple_use_svs && params.purple_use_smlvs) {
-            purple_inputs = meta_purple
-            .join(purple_inputs_amber_dir)
-            .join(purple_inputs_cobalt_dir)
-            .join(purple_inputs_sv)
-            .join(purple_inputs_snv)
-            .map { _patient, meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi ->
-                [meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, [], []]
-            }
-        }
-    } else {
-        if (params.purple_use_svs && params.purple_use_smlvs) {
-            println "Purple SVS and small variants are being used"
-            purple_inputs = meta_purple
-                .join(purple_inputs_amber_dir)
-                .join(purple_inputs_cobalt_dir)
-                .join(purple_inputs_sv)
-                .join(purple_inputs_snv)
-                .join(purple_inputs_snv_germline)
-                .map { _patient, meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf, germ_snv_tbi ->
-                    [meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf, germ_snv_tbi]
-                }
-        }
+    if (! params.tumor_only && params.purple_use_smlvs) {
+        purple_inputs_snv_germline = purple_inputs_for_merge
+            .join(germline_vcf_for_merge)
+            .map { it -> [ it[0], it[2], it[3] ] } // patient, vcf, tbi
     }
+
+    purple_inputs = meta_purple
+        .join(purple_inputs_amber_dir.dump(tag: "purple_inputs_amber_dir", pretty: true))
+        .join(purple_inputs_cobalt_dir.dump(tag: "purple_inputs_cobalt_dir", pretty: true))
+        .join(purple_inputs_sv.dump(tag: "purple_inputs_sv", pretty: true)) // appends empty [ [], [] ] if params.purple_use_svs is false
+        .join(purple_inputs_snv.dump(tag: "purple_inputs_snv (somatic)", pretty: true)) // appends empty [ [], [] ] if params.purple_use_smlvs is false
+        .join(purple_inputs_snv_germline.dump(tag: "purple_inputs_snv_germline", pretty: true)) // appends empty [ [], [] ] if tumor only (params.tumor_only is false)
+        .map { _patient, meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf, germ_snv_tbi ->
+            [meta, amber_dir, cobalt_dir, sv_vcf, sv_tbi, snv_vcf, snv_tbi, germ_snv_vcf, germ_snv_tbi]
+        }
+        .dump(tag: "purple_inputs", pretty: true)
 
     if (tools_used.contains("all") || tools_used.contains("purple")) {
 
