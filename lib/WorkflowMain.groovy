@@ -11,8 +11,8 @@ class WorkflowMain {
     //
     public static String citation(workflow) {
         return "If you use ${workflow.manifest.name} for your analysis please cite:\n\n" +
-            "* The nf-casereports pipeline\n" +
-            "  https://github.com/mskilab-org/nf-casereports/\n\n"
+            "* The nf-gos pipeline\n" +
+            "  https://github.com/mskilab-org/nf-gos/\n\n"
     }
 
 

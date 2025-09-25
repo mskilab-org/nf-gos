@@ -578,7 +578,7 @@ process RETIER_WHITELIST_JUNCTIONS {
         mcols_ra.all[grlix_to_retier,"${tfield}"] = 1
         mcols(ra.all) = mcols_ra.all
         ra.all = ra.all[order(mcols_ra.all[["${tfield}"]], decreasing = FALSE)]
-        mcols(ra.all) = mcols_ra.all
+        mcols_ra.all = mcols(ra.all)
     }
 
     grpiv = gUtils::grl.pivot(ra.all)

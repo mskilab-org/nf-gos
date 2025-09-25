@@ -1,5 +1,5 @@
 //
-// This file holds several functions specific to the workflow/nfcasereports.nf in the mskilab-org/nf-casereports pipeline
+// This file holds several functions specific to the workflow/nfcasereports.nf in the mskilab-org/nf-gos pipeline
 //
 
 import nextflow.Nextflow
