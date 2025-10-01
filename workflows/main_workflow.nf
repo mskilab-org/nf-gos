@@ -796,14 +796,14 @@ workflow NFGOS {
 
     do_filter_ffpe_chimera = params.filter_ffpe_chimera ?: false
     if (do_filter_ffpe_chimera) {
-        chimera_outputs = inputs_unlaned.filter {it -> it.meta.status.toString == "1" }.map { it -> 
+        chimera_outputs = inputs_unlaned.filter {it -> it.meta.status.toString() == "1" }.map { it -> 
             [it.meta, it.structural_variants_chimera_filtered, it.structural_variants_chimera_filtered_tbi]
         }
 
         chimera_existing_outputs = chimera_outputs.filter { !it[1].isEmpty() && !it[2].isEmpty() }
         chimera_inputs = chimera_outputs.filter { it[1].isEmpty() || it[2].isEmpty() }.map {it -> [ it[0].patient ] }.unique()
 
-        chimera_raw_outputs = inputs_unlaned.filter {it -> it.meta.status.toString == "1" }.map { it -> 
+        chimera_raw_outputs = inputs_unlaned.filter {it -> it.meta.status.toString() == "1" }.map { it -> 
             [it.meta, it.structural_variants_raw_chimera_filtered, it.structural_variants_raw_chimera_filtered_tbi]
         }
 
