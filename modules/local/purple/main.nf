@@ -130,11 +130,14 @@ process REVISE_PURITYPLOIDY {
 
     input:
     tuple val(meta), path(purple_purity)
+    val(use_purple_range)
+    tuple val(meta2), path(purity_range)
 
     output:
     tuple val(meta), path("*.revised.tsv"), emit: purple_purity_revised
 
     script:
+    def r_use_purple_range = use_purple_range ? 'TRUE' : 'FALSE'
     """
     #!/usr/bin/env Rscript
 
@@ -151,8 +154,17 @@ process REVISE_PURITYPLOIDY {
 
     fitcopy = copy(fit)
 
-    if (identical(fitcopy\$status, "NO_TUMOR")) {
+    do_use_purple_range_in_r = identical(${r_use_purple_range}, TRUE)
+    no_tumor_initially_identified = identical(fitcopy\$status, "NO_TUMOR")
+    do_set_diploid = no_tumor_initially_identified && !do_use_purple_range_in_r
+    do_set_first_pp_range = no_tumor_initially_identified && do_use_purple_range_in_r
+
+    if (do_set_diploid) {
         fitcopy[, c("purity", "ploidy", "status") := list(1.00, 2.00, "REVISED_DIPLOID")]
+    } else if (do_set_first_pp_range) {
+        pp = fread("${purity_range}")
+        first_pp = pp[1, ]
+        fitcopy[, c("purity", "ploidy", "status") := list(first_pp\$purity, first_pp\$ploidy, "REVISED_FROM_PP_RANGE")]
     }
     
 

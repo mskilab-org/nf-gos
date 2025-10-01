@@ -83,8 +83,29 @@ workflow BAM_COV_PURPLE {
     purple_purity_to_extract = purple_purity
     versions          = versions.mix(PURPLE.out.versions)
 
-    if (params.is_heme) {
-        REVISE_PURITYPLOIDY(purple_purity)
+
+    if (params.is_heme || params.purple_revise_purity_ploidy) {
+        input_purple_revision = (
+            purple_purity
+                .map { meta, purity_bestfit -> [ meta.patient, meta, purity_bestfit ] }
+                .unique { it -> it[0] }
+                .cross(
+                    purple_dir.map { meta, purple_paths_list ->
+                        def paths = purple_paths_list.flatten()
+                        def purity_range_path = paths.findAll { it =~ /.*\.purple.purity.range.tsv$/ }
+                        [ meta.patient, meta, purity_range_path ]
+                        .unique { it -> it[0] }
+                    }
+                )
+        )
+
+        def purple_revise_with_range = WorkflowNfcasereports.create_value_channel(params.purple_revise_with_range)
+        
+        REVISE_PURITYPLOIDY(
+            input_purple_revision.map{ it -> it[0][1..-1]}, 
+            purple_revise_with_range,
+            input_purple_revision.map{ it -> it[1][1..-1]}
+        )
         purple_purity_to_extract = Channel.empty().mix(REVISE_PURITYPLOIDY.out.purple_purity_revised)
         // Use revised purity/ploidy values for heme
     }
