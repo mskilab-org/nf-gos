@@ -264,13 +264,13 @@ workflow ALIGNMENT_STEP {
 
         // Gather used softwares versions
         // versions = versions.mix(BAM_MERGE_INDEX_SAMTOOLS.out.versions)
-        do_filter_ffpe_chimera = params.filter_ffpe_chimera ?: false
-        println "params.filter_ffpe_chimera: ${params.filter_ffpe_chimera}"
-        if (do_filter_ffpe_chimera) {
-            println "You have set params.filter_ffpe_chimera: ${params.filter_ffpe_chimera}, will do FFPE chimera filtering"
-            BAM_CHIMERA_FILTER(alignment_bams_final.map { _sample, meta, bam, bai -> [meta, bam, bai] })
-            alignment_bams_final = BAM_CHIMERA_FILTER.out.bambai.map { meta, bam, bai -> [ meta.sample, meta, bam, bai ]}
-        }
+        // do_filter_ffpe_chimera = params.filter_ffpe_chimera ?: false
+        // println "params.filter_ffpe_chimera: ${params.filter_ffpe_chimera}"
+        // if (do_filter_ffpe_chimera) {
+        //     println "You have set params.filter_ffpe_chimera: ${params.filter_ffpe_chimera}, will do FFPE chimera filtering"
+        //     BAM_CHIMERA_FILTER(alignment_bams_final.map { _sample, meta, bam, bai -> [meta, bam, bai] })
+        //     alignment_bams_final = BAM_CHIMERA_FILTER.out.bambai.map { meta, bam, bai -> [ meta.sample, meta, bam, bai ]}
+        // }
     }
 
     // BAM Postprocessing
@@ -366,6 +366,19 @@ workflow ALIGNMENT_STEP {
         alignment_bams_final = Channel.empty()
             .mix(CRAM_TO_BAM_FINAL.out.alignment_index)
             .map{ meta, bam, bai -> [ meta.sample, Utils.remove_lanes_from_meta(meta), bam, bai ] }
+    }
+
+    do_filter_ffpe_chimera = params.filter_ffpe_chimera ?: false
+    println "params.filter_ffpe_chimera: ${params.filter_ffpe_chimera}"
+    if (do_filter_ffpe_chimera) {
+        println "You have set params.filter_ffpe_chimera: ${params.filter_ffpe_chimera}, will do FFPE chimera filtering"
+        alignment_bams_final_branch = alignment_bams_final.branch { _sample, meta, _bam, _bai ->
+            tumor: meta.status.toString() == "1"
+            normal: meta.status.toString() == "0"
+        }
+        BAM_CHIMERA_FILTER(alignment_bams_final_branch.tumor.map { _sample, meta, bam, bai -> [meta, bam, bai] })
+        alignment_bams_final_tumor = BAM_CHIMERA_FILTER.out.bambai.map { meta, bam, bai -> [ meta.sample, meta, bam, bai ]}
+        alignment_bams_final = alignment_bams_final_tumor.mix(alignment_bams_final_branch.normal)
     }
 
 

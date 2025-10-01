@@ -796,10 +796,32 @@ workflow NFGOS {
 
     do_filter_ffpe_chimera = params.filter_ffpe_chimera ?: false
     if (do_filter_ffpe_chimera) {
-        SV_CHIMERA_FILTER_VCF(vcf_from_gridss_gridss)
-        SV_CHIMERA_FILTER_RAWVCF(vcf_raw_from_gridss_gridss)
-        vcf_from_gridss_gridss = SV_CHIMERA_FILTER_VCF.out.vcftbi
-        vcf_raw_from_gridss_gridss = SV_CHIMERA_FILTER_RAWVCF.out.vcftbi
+        chimera_outputs = inputs_unlaned.filter {it -> it.meta.status.toString == "0" }.tumor.map { it -> 
+            [it.meta, it.structural_variants_chimera_filtered, it.structural_variants_chimera_filtered_tbi]
+        }
+
+        chimera_existing_outputs = chimera_outputs.filter { !it[1].isEmpty() && !it[2].isEmpty() }
+        chimera_inputs = chimera_outputs.filter { it[1].isEmpty() || it[2].isEmpty() }.map {it -> [ it[0].patient ] }.unique()
+
+        chimera_raw_outputs = inputs_unlaned.filter {it -> it.meta.status.toString == "0" }.map { it -> 
+            [it.meta, it.structural_variants_raw_chimera_filtered, it.structural_variants_raw_chimera_filtered_tbi]
+        }
+
+        chimera_raw_existing_outputs = chimera_raw_outputs.filter { !it[1].isEmpty() && !it[2].isEmpty() }
+        chimera_raw_inputs = chimera_raw_outputs.filter { it[1].isEmpty() || it[2].isEmpty() }.map {it -> [ it[0].patient ] }.unique()
+
+        SV_CHIMERA_FILTER_VCF(
+            vcf_from_gridss_gridss.map { it -> [ it[0].patient, it[0], it[1], it[2] ] } // meta.patient, meta, vcf, tbi
+            .join(chimera_inputs)
+            .map { _patient, meta, vcf, tbi -> [ meta, vcf, tbi ] }
+        )
+        SV_CHIMERA_FILTER_RAWVCF(
+            vcf_raw_from_gridss_gridss.map { it -> [ it[0].patient, it[0], it[1], it[2] ] } // meta.patient, meta, vcf, tbi
+            .join(chimera_raw_inputs)
+            .map { _patient, meta, vcf, tbi -> [ meta, vcf, tbi ] }
+        )
+        vcf_from_gridss_gridss = SV_CHIMERA_FILTER_VCF.out.vcftbi.mix(chimera_existing_outputs)
+        vcf_raw_from_gridss_gridss = SV_CHIMERA_FILTER_RAWVCF.out.vcftbi.mix(chimera_raw_existing_outputs)
     }
 
     /* FIXME: Junction Filtering step
@@ -815,7 +837,20 @@ workflow NFGOS {
         vcf_from_gridss_gridss.dump(tag: "vcf_from_gridss_gridss", pretty: true)
 
         // JUNCTION_FILTER(vcf_from_gridss_gridss)
-        JUNCTION_FILTER__OUT = JUNCTION_FILTER_STEP(vcf_raw_from_gridss_gridss)
+        vcf_raw_to_filter = vcf_raw_from_gridss_gridss
+            .map{ meta, vcf, tbi -> [ meta.patient, meta, vcf, tbi ] }
+            .join(
+                inputs_unlaned
+                    .filter{ it -> 
+                        it.meta.status.toString() == "1" &&
+                        it.vcf.isEmpty()
+                    }
+                    .map{ it -> [ it.meta.patient ] }
+                    .unique()
+            )
+            .map { _patient, meta, vcf, tbi -> [ meta, vcf, tbi ] }
+        
+        JUNCTION_FILTER__OUT = JUNCTION_FILTER_STEP(vcf_raw_to_filter)
 
         pon_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER__OUT.pon_filtered_sv_rds)
         final_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER__OUT.final_filtered_sv_rds)
