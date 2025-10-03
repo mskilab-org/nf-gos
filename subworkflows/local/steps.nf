@@ -74,7 +74,9 @@ workflow ALIGNMENT_STEP {
 	reports = Channel.empty()
 	versions = Channel.empty()
 
-	input_fastq = inputs.filter { it -> it.bam.isEmpty() }.map { it -> [it.meta, it.fastq_1, it.fastq_2, it.meta.read_group] }
+	input_fastq = inputs.filter { it -> 
+        it.bam.isEmpty() && it.bam_chimera_filtered.isEmpty() 
+    }.map { it -> [it.meta, it.fastq_1, it.fastq_2, it.meta.read_group] }
 	
 	
 	// input_fastq_qc = input_fastq.map { it -> [it[0], [it[1], it[2]]] }
@@ -93,9 +95,6 @@ workflow ALIGNMENT_STEP {
         .dump(tag: "wtf alignment_bams", pretty: true)
     
     alignment_existing_outputs = inputs.map { it -> [Utils.remove_lanes_from_meta(it.meta), it.bam] }.filter { it -> !it[1].isEmpty() }.unique()
-
-	
-
 
 	if (tools_used.contains("all") || tools_used.contains("aligner")) {
         
@@ -376,9 +375,23 @@ workflow ALIGNMENT_STEP {
             tumor: meta.status.toString() == "1"
             normal: meta.status.toString() == "0"
         }
-        BAM_CHIMERA_FILTER(alignment_bams_final_branch.tumor.map { _sample, meta, bam, bai -> [meta, bam, bai] })
+
+        all_inputs_chimera_filter = inputs
+            .filter { it -> it.meta.status.toString() == "1" }
+            .map { it -> [Utils.remove_lanes_from_meta(it.meta), it.bam_chimera_filtered, it.bam_chimera_filtered_bai] }
+            .map { it -> [it[0].sample, it[0], it[1], it[2]] }
+            .unique{ it -> it[0] }
+        
+        samples_chimera_to_run = all_inputs_chimera_filter.filter { it ->  it[1].isEmpty() }.map{ it -> it[0] } // sample
+        outputs_existing_chimera = all_inputs_chimera_filter.filter { it ->  ! it[1].isEmpty() }
+                
+        BAM_CHIMERA_FILTER(
+            alignment_bams_final_branch.tumor
+            .join(samples_chimera_to_run)
+            .map { _sample, meta, bam, bai -> [meta, bam, bai] }
+        )
         alignment_bams_final_tumor = BAM_CHIMERA_FILTER.out.bambai.map { meta, bam, bai -> [ meta.sample, meta, bam, bai ]}
-        alignment_bams_final = alignment_bams_final_tumor.mix(alignment_bams_final_branch.normal)
+        alignment_bams_final = alignment_bams_final_tumor.mix(outputs_existing_chimera).mix(alignment_bams_final_branch.normal)
     }
 
 

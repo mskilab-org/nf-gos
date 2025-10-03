@@ -829,7 +829,7 @@ workflow NFGOS {
     */
     final_filtered_sv_rds_for_merge = Channel.empty()
     unfiltered_som_sv_for_merge = Channel.empty()
-    def is_any_vcf_raw_provided = Globals.rowsAsMaps.any { ! ( it.vcf_raw == null || it.vcf_raw == [] || it.vcf_raw == '' ) }
+    is_any_vcf_raw_provided = Globals.rowsAsMaps.any { ! ( it.vcf_raw == null || it.vcf_raw == [] || it.vcf_raw == '' ) }
     if (params.tumor_only) {
         vcf_from_sv_calling_for_merge = vcf_from_gridss_gridss
             .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
@@ -869,18 +869,37 @@ workflow NFGOS {
                     .unique()
             )
 
-    } else if (params.gridss_somatic_filter && is_any_vcf_raw_provided) {
+    } else if (params.gridss_somatic_filter) {
         //somatic filter for GRIDSS
-        GRIDSS_SOMATIC_FILTER_STEP(vcf_raw_from_gridss_gridss)
+
+        // output_gridss_somatic_filter = vcf_from_gridss_gridss.map { meta, vcf, tbi -> [ meta.patient , [ meta, vcf, tbi ] ] }
+        // vcf_raw_gridss_filter_input = vcf_raw_from_gridss_gridss.map { meta, vcf_raw, tbi_raw ->
+        //         [ meta.get("patient"), [ meta, vcf_raw, tbi_raw ] ]
+        //     }
+        //     .join(
+        //         output_gridss_somatic_filter,
+        //         remainder: true
+        //     )
+        //     .filter { patient, raw_list, vcf_list ->
+        //         vcf_list == null // vcf_list will be null if key is not matched
+        //     }
+        //     .map { patient, raw_list, vcf_list ->
+        //         raw_list
+        //     }
+        
+        GRIDSS_SOMATIC_FILTER_STEP(
+            vcf_raw_from_gridss_gridss
+        )
 
         versions = versions.mix(GRIDSS_SOMATIC_FILTER_STEP.out.versions)
         vcf_somatic_high_conf = Channel.empty().mix(GRIDSS_SOMATIC_FILTER_STEP.out.somatic_high_confidence)
-        vcf_from_sv_calling_for_merge = vcf_somatic_high_conf
-            .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
+        vcf_from_gridss_gridss = vcf_somatic_high_conf
+        vcf_from_sv_calling_for_merge = vcf_from_gridss_gridss.map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
+
+
 
         unfiltered_som_sv = Channel.empty().mix(GRIDSS_SOMATIC_FILTER_STEP.out.somatic_all)
-        unfiltered_som_sv_for_merge = unfiltered_som_sv
-            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
+        unfiltered_som_sv_for_merge = unfiltered_som_sv.map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
     } else {
         vcf_from_sv_calling_for_merge = vcf_from_gridss_gridss
             .map { it -> 

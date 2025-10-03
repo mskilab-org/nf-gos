@@ -99,7 +99,7 @@ workflow BAM_COV_PURPLE {
                 )
         )
 
-        def purple_revise_with_range = WorkflowNfcasereports.create_value_channel(params.purple_revise_with_range)
+        purple_revise_with_range = WorkflowNfcasereports.create_value_channel(params.purple_revise_with_range)
         
         REVISE_PURITYPLOIDY(
             input_purple_revision.map{ it -> it[0][1..-1]}, 
