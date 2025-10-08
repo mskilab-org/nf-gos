@@ -89,6 +89,7 @@ workflow BAM_COV_PURPLE {
             purple_purity
                 .map { meta, purity_bestfit -> [ meta.patient, meta, purity_bestfit ] }
                 .unique { it -> it[0] }
+                .dump(tag: "input_purple_revision pre cross", pretty: true)
                 .cross(
                     purple_dir.map { meta, purple_paths_list ->
                         def paths = purple_paths_list.flatten()
@@ -97,9 +98,10 @@ workflow BAM_COV_PURPLE {
                         .unique { it -> it[0] }
                     }
                 )
+                .dump(tag: "input_purple_revision post cross", pretty: true)
         )
 
-        purple_revise_with_range = WorkflowNfcasereports.create_value_channel(params.purple_revise_with_range)
+        purple_revise_with_range = Channel.value(params.purple_revise_with_range).dump(tag: "purple_revise_with_range channel", pretty: true)
         
         REVISE_PURITYPLOIDY(
             input_purple_revision.map{ it -> it[0][1..-1]}, 

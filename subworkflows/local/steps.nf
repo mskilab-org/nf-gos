@@ -1894,6 +1894,7 @@ workflow PURPLE_STEP {
 
     // need a channel with patient and meta for merging with rest
     purple_inputs_for_merge = inputs_unlaned
+        .filter { it -> it.meta.status.toString() == "1" }
         .filter { it -> 
             (it.ploidy instanceof List && it.ploidy.isEmpty())
             || (it.purity instanceof List && it.purity.isEmpty())
@@ -1955,9 +1956,44 @@ workflow PURPLE_STEP {
 
     purple_inputs_sv = purple_inputs_for_merge.map { it -> [ it[0], [], [] ] }.unique{ it -> it[0] }
     if (params.purple_use_svs) {
-        purple_inputs_sv = purple_inputs_for_merge
-            .join(vcf_from_sv_calling_for_merge)
-            .map { it -> [ it[0], it[2], it[3] ] } // patient, vcf, tbi
+        sample_purple_use_svs = inputs_unlaned
+            .filter { it -> it.meta.status.toString() == "1" }
+            .map { it -> 
+                def value = it.purple_use_svs
+                if ( 
+                    ! ( value instanceof Integer)
+                    && (
+                        value == null 
+                        || value == "" 
+                        || value == "NA"
+                        || value == "/dev/null"
+                        || (value instanceof List && value.isEmpty())
+                    )
+                ) {
+                    value = true
+                } else {
+                    value = value.toString() == "1"
+                    // error "purple_use_svs parameter in inputs is not boolean or empty/NA for sample ${it.meta.sample}. Please fix."  
+                }
+                println "purple_use_svs for sample ${it.meta.sample} set to ${value}"
+                [ it.meta.patient, [ value ] ]
+            }
+        purple_inputs_sv = purple_inputs_for_merge.map { it -> [ it[0], [ it[1] ] ] } // patient, [meta]
+            .join(vcf_from_sv_calling_for_merge.map { it -> [ it[0] ] + [ it[1..-1] ] })
+            .join(sample_purple_use_svs)
+            .map { it -> // patient, meta, vcftbi_list, use_svs_list
+                def (patient, _meta_list, vcftbi_list, use_svs_list) = (it + [null, null, null])[0..3]
+                def use_svs = use_svs_list ? use_svs_list[0] : true
+                if (use_svs) {
+                    [ patient, vcftbi_list[0], vcftbi_list[1] ] // patient, vcf, tbi
+                } else {
+                    [ patient, [], [] ] // patient, empty vcf, empty tbi
+                }
+            }
+            .dump(tag: "purple_inputs_sv", pretty: true)
+            // purple_inputs_sv = purple_inputs_for_merge // patient, meta
+            //     .join(vcf_from_sv_calling_for_merge)
+                // .map { it -> [ it[0], it[2], it[3] ] } // patient, vcf, tbi
     }
 
     purple_inputs_snv = purple_inputs_for_merge.map { it -> [ it[0], [], [] ] }.unique{ it -> it[0] }
@@ -2347,16 +2383,18 @@ workflow LP_PHASED_BALANCE_STEP {
 
     main:
     // Existing
-    lp_phased_balance_existing_outputs = inputs_unlaned.map { it -> [it.meta, it.lp_balanced_gg] }.filter { !it[1].isEmpty() }
+    lp_phased_balance_existing_outputs = inputs_unlaned.filter{it -> it.meta.status.toString() == "1" }.map { it -> [it.meta, it.lp_balanced_gg] }.filter { !it[1].isEmpty() }.unique{ it -> it[0].patient }
     lp_phased_balance_balanced_gg = lp_phased_balance_existing_outputs
 
     // Inputs
-    lp_phased_balance_inputs = inputs_unlaned.filter { it.lp_balanced_gg.isEmpty() }.map { it -> [it.meta.patient, it.meta + [id: it.meta.sample]] }
+    lp_phased_balance_inputs = inputs_unlaned.filter{it -> it.meta.status.toString() == "1" }.filter{ it.lp_balanced_gg.isEmpty() }.map { it -> [it.meta.patient, it.meta + [id: it.meta.sample]] }.unique{ it -> it[0] }.dump(tag: "lp_phased_balance_inputs in LP_PHASED_BALANCE_STEP", pretty: true)
 
     lp_phased_balance_inputs_ni_balanced_gg = non_integer_balance_balanced_gg_for_merge
+        .dump(tag: "non_integer_balance_balanced_gg_for_merge in LP_PHASED_BALANCE_STEP", pretty: true)
         .join(lp_phased_balance_inputs)
         .map { it -> [ it[0], it[1] ] } // meta.patient, non integer balanced ggraph
     lp_phased_balance_inputs_hets = hets_sites_for_merge
+        .dump(tag: "hets_sites_for_merge in LP_PHASED_BALANCE_STEP", pretty: true)
         .join(lp_phased_balance_inputs)
         .map { it -> [ it[0], it[1] ] } // meta.patient, hets
 
@@ -2364,6 +2402,7 @@ workflow LP_PHASED_BALANCE_STEP {
         .join(lp_phased_balance_inputs_ni_balanced_gg)
         .join(lp_phased_balance_inputs_hets)
         .map{ _patient, meta, balanced_gg, hets -> [ meta, balanced_gg, hets ] }
+        .dump(tag: "lp_phased_balance_inputs merged in LP_PHASED_BALANCE_STEP", pretty: true)
 
     if (tools_used.contains("all") || tools_used.contains("lp_phased_balance")) {
 

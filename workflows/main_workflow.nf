@@ -906,9 +906,10 @@ workflow NFGOS {
                 [ it[0].patient, it[1], it[2] ]  // meta.patient, vcf, tbi
             }
             .dump(tag: "sv output for paired run starting from 'vcf' column", pretty: true)
-        unfiltered_som_sv_for_merge = inputs_unlaned.map{ it ->
-            [ it.meta.patient, [] ]
-        }
+        // unfiltered_som_sv_for_merge = inputs_unlaned.map{ it ->
+        //     [ it.meta.patient, [] ]
+        // }
+        unfiltered_som_sv_for_merge = vcf_raw_from_gridss_gridss.map { it -> [ it[0].patient, it[1] ] }
     }
 
 
