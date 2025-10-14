@@ -694,10 +694,15 @@ workflow NFGOS {
 
     // Gather built indices or get them from the params
     // Built from the fasta file:
-    dict = params.dict ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect()
+    dict = (params.dict && !params.regenerate_reference_indices) 
+                                    ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect()
                                     : PREPARE_GENOME.out.dict
-    fasta_fai = WorkflowNfcasereports.create_file_channel(params.fasta_fai, PREPARE_GENOME.out.fasta_fai)
-    bwa = WorkflowNfcasereports.create_file_channel(params.bwa)
+    fasta_fai = (params.fasta_fai && !params.regenerate_reference_indices)
+                                    ? Channel.fromPath(params.fasta_fai).collect()
+                                    : PREPARE_GENOME.out.fasta_fai
+    bwa = (params.bwa && !params.regenerate_reference_indices)
+                                    ? Channel.fromPath(params.bwa).collect()
+                                    : PREPARE_GENOME.out.bwa
 
     // Gather index for mapping given the chosen aligner
     index_alignment = bwa
@@ -705,12 +710,12 @@ workflow NFGOS {
     // TODO: add a params for msisensorpro_scan
     msisensorpro_scan = PREPARE_GENOME.out.msisensorpro_scan
 
-    dbsnp_tbi =  WorkflowNfcasereports.create_index_channel(params.dbsnp, params.dbsnp_tbi, PREPARE_GENOME.out.dbsnp_tbi)
+    dbsnp_tbi =  WorkflowNfcasereports.create_index_channel(params.dbsnp, params.dbsnp_tbi, PREPARE_GENOME.out.dbsnp_tbi, params.regenerate_reference_indices)
     //do not change to Channel.value([]), the check for its existence then fails for Getpileupsumamries
-    germline_resource_tbi = params.germline_resource ? params.germline_resource_tbi ? Channel.fromPath(params.germline_resource_tbi).collect() : PREPARE_GENOME.out.germline_resource_tbi : []
-    known_indels_tbi = WorkflowNfcasereports.create_index_channel(params.known_indels, params.known_indels_tbi, PREPARE_GENOME.out.known_indels_tbi)
-    known_snps_tbi = WorkflowNfcasereports.create_index_channel(params.known_snps, params.known_snps_tbi, PREPARE_GENOME.out.known_snps_tbi)
-    pon_tbi = WorkflowNfcasereports.create_index_channel(params.pon, params.pon_tbi, PREPARE_GENOME.out.pon_tbi)
+    germline_resource_tbi = params.germline_resource ? (params.germline_resource_tbi && !params.regenerate_reference_indices) ? Channel.fromPath(params.germline_resource_tbi).collect() : PREPARE_GENOME.out.germline_resource_tbi : []
+    known_indels_tbi = WorkflowNfcasereports.create_index_channel(params.known_indels, params.known_indels_tbi, PREPARE_GENOME.out.known_indels_tbi, params.regenerate_reference_indices)
+    known_snps_tbi = WorkflowNfcasereports.create_index_channel(params.known_snps, params.known_snps_tbi, PREPARE_GENOME.out.known_snps_tbi, params.regenerate_reference_indices)
+    pon_tbi = WorkflowNfcasereports.create_index_channel(params.pon, params.pon_tbi, PREPARE_GENOME.out.pon_tbi, params.regenerate_reference_indices)
 
     // known_sites is made by grouping both the dbsnp and the known snps/indels resources
     // Which can either or both be optional

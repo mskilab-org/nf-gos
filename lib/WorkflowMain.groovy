@@ -39,8 +39,18 @@ class WorkflowMain {
         // Check AWS batch settings
         NfcoreTemplate.awsBatch(workflow, params)
 
+        // Deprecation warnings for reference flags
+        if (params.save_reference == false) {
+            log.warn "DEPRECATED: --save_reference is deprecated and will be removed in a future version. Generated reference files are always saved to the output directory."
+        }
+        if (params.build_only_index) {
+            log.warn "DEPRECATED: --build_only_index is deprecated. Use --regenerate_reference_indices without providing an input samplesheet instead."
+            // Auto-migrate behavior
+            params.regenerate_reference_indices = true
+        }
+
         // Check input has been provided
-        if (!params.input) {
+        if (!params.input && !params.build_only_index) {
             Nextflow.error("Please provide an input samplesheet to the pipeline e.g. '--input samplesheet.csv'")
         }
     }

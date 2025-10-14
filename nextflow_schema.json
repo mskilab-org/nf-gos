@@ -1197,14 +1197,21 @@
                 "save_reference": {
                     "type": "boolean",
                     "fa_icon": "fas fa-download",
-                    "description": "Save built references.",
-                    "help_text": "Set this parameter, if you wish to save all computed reference files. This is useful to avoid re-computation on future runs."
+                    "description": "[DEPRECATED] Save built references.",
+                    "help_text": "DEPRECATED: Generated reference files are always saved. This parameter will be removed in a future version."
                 },
                 "build_only_index": {
                     "type": "boolean",
                     "fa_icon": "fas fa-download",
-                    "description": "Only built references.",
-                    "help_text": "Set this parameter, if you wish to compute and save all computed reference files. No alignment or any other downstream steps will be performed."
+                    "description": "[DEPRECATED] Only build references.",
+                    "help_text": "DEPRECATED: Use --regenerate_reference_indices without providing an input samplesheet instead. This parameter will be removed in a future version."
+                },
+                "regenerate_reference_indices": {
+                    "type": "boolean",
+                    "fa_icon": "fas fa-sync-alt",
+                    "description": "Force regeneration of reference indices from FASTA file.",
+                    "help_text": "When using a custom FASTA file, set this to true to regenerate all reference indices (.fai, .dict, BWA index) from your FASTA. This ensures your custom reference is paired with matching indices. Generated files are saved to the output directory.",
+                    "default": false
                 },
                 "download_cache": {
                     "type": "boolean",
