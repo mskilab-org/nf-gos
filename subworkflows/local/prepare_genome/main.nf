@@ -13,6 +13,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 
 
+include { BWA_INDEX                              } from '../../../modules/nf-core/bwa/index/main'
 include { GATK4_CREATESEQUENCEDICTIONARY         } from '../../../modules/nf-core/gatk4/createsequencedictionary/main'
 include { MSISENSORPRO_SCAN                      } from '../../../modules/nf-core/msisensorpro/scan/main'
 include { SAMTOOLS_FAIDX                         } from '../../../modules/nf-core/samtools/faidx/main'
@@ -51,6 +52,9 @@ workflow PREPARE_GENOME {
     versions = Channel.empty()
 
     GATK4_CREATESEQUENCEDICTIONARY(fasta)
+    
+    BWA_INDEX(fasta)
+    
     // only run msisensorpro_scan if the msisensorpro_list is an empty channel
     println "params.msisensorpro_list: ${params.msisensorpro_list}"
     def is_msisensorpro_list_present = params.msisensorpro_list ? Files.exists(Paths.get(params.msisensorpro_list)) : false
@@ -112,6 +116,7 @@ workflow PREPARE_GENOME {
 
 
     // Gather versions of all tools used
+    versions = versions.mix(BWA_INDEX.out.versions)
     versions = versions.mix(SAMTOOLS_FAIDX.out.versions)
     versions = versions.mix(GATK4_CREATESEQUENCEDICTIONARY.out.versions)
     // versions = versions.mix(MSISENSORPRO_SCAN.out.versions)
@@ -124,7 +129,8 @@ workflow PREPARE_GENOME {
 
 
     emit:
-    bwa                  = bwa
+    bwa                   = BWA_INDEX.out.index.map{ meta, index -> [index] }                      // path: bwa/
+    bwamem2               = bwa                                                                    // path: bwamem2/ (not generated yet)
     dbsnp_tbi             = TABIX_DBSNP.out.tbi.map{ meta, tbi -> [tbi] }.collect()               // path: dbsnb.vcf.gz.tbi
     dict                  = GATK4_CREATESEQUENCEDICTIONARY.out.dict                               // path: genome.fasta.dict
     fasta_fai             = SAMTOOLS_FAIDX.out.fai.map{ meta, fai -> [fai] }                      // path: genome.fasta.fai
