@@ -707,13 +707,17 @@ workflow NFJABBA {
 
     // Gather built indices or get them from the params
     // Built from the fasta file:
-    dict       = params.dict        ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect()
+    dict       = (params.dict && !params.regenerate_reference_indices)
+                                    ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect()
                                     : PREPARE_GENOME.out.dict
-    fasta_fai  = params.fasta_fai   ? Channel.fromPath(params.fasta_fai).collect()
+    fasta_fai  = (params.fasta_fai && !params.regenerate_reference_indices)
+                                    ? Channel.fromPath(params.fasta_fai).collect()
                                     : PREPARE_GENOME.out.fasta_fai
-    bwa        = params.bwa         ? Channel.fromPath(params.bwa).collect()
+    bwa        = (params.bwa && !params.regenerate_reference_indices)
+                                    ? Channel.fromPath(params.bwa).collect()
                                     : PREPARE_GENOME.out.bwa
-    bwamem2    = params.bwamem2     ? Channel.fromPath(params.bwamem2).collect()
+    bwamem2    = (params.bwamem2 && !params.regenerate_reference_indices)
+                                    ? Channel.fromPath(params.bwamem2).collect()
                                     : PREPARE_GENOME.out.bwamem2
 
     // Gather index for mapping given the chosen aligner
@@ -731,11 +735,11 @@ workflow NFJABBA {
     rt_file                = PREPARE_GENOME.out.rt_file
 
     // Tabix indexed vcf files:
-    dbsnp_tbi              = params.dbsnp                   ? params.dbsnp_tbi             ? Channel.fromPath(params.dbsnp_tbi).collect()             : PREPARE_GENOME.out.dbsnp_tbi             : Channel.value([])
-    germline_resource_tbi  = params.germline_resource       ? params.germline_resource_tbi ? Channel.fromPath(params.germline_resource_tbi).collect() : PREPARE_GENOME.out.germline_resource_tbi : [] //do not change to Channel.value([]), the check for its existence then fails for Getpileupsumamries
-    known_indels_tbi       = params.known_indels            ? params.known_indels_tbi      ? Channel.fromPath(params.known_indels_tbi).collect()      : PREPARE_GENOME.out.known_indels_tbi      : Channel.value([])
-    known_snps_tbi         = params.known_snps              ? params.known_snps_tbi        ? Channel.fromPath(params.known_snps_tbi).collect()        : PREPARE_GENOME.out.known_snps_tbi        : Channel.value([])
-    pon_tbi                = params.pon                     ? params.pon_tbi               ? Channel.fromPath(params.pon_tbi).collect()               : PREPARE_GENOME.out.pon_tbi               : Channel.value([])
+    dbsnp_tbi              = params.dbsnp                   ? (params.dbsnp_tbi && !params.regenerate_reference_indices)             ? Channel.fromPath(params.dbsnp_tbi).collect()             : PREPARE_GENOME.out.dbsnp_tbi             : Channel.value([])
+    germline_resource_tbi  = params.germline_resource       ? (params.germline_resource_tbi && !params.regenerate_reference_indices) ? Channel.fromPath(params.germline_resource_tbi).collect() : PREPARE_GENOME.out.germline_resource_tbi : [] //do not change to Channel.value([]), the check for its existence then fails for Getpileupsumamries
+    known_indels_tbi       = params.known_indels            ? (params.known_indels_tbi && !params.regenerate_reference_indices)      ? Channel.fromPath(params.known_indels_tbi).collect()      : PREPARE_GENOME.out.known_indels_tbi      : Channel.value([])
+    known_snps_tbi         = params.known_snps              ? (params.known_snps_tbi && !params.regenerate_reference_indices)        ? Channel.fromPath(params.known_snps_tbi).collect()        : PREPARE_GENOME.out.known_snps_tbi        : Channel.value([])
+    pon_tbi                = params.pon                     ? (params.pon_tbi && !params.regenerate_reference_indices)               ? Channel.fromPath(params.pon_tbi).collect()               : PREPARE_GENOME.out.pon_tbi               : Channel.value([])
 
     // known_sites is made by grouping both the dbsnp and the known snps/indels resources
     // Which can either or both be optional

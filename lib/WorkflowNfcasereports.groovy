@@ -41,9 +41,9 @@ class WorkflowNfcasereports {
         return parameter ? Channel.value(parameter) : Channel.empty()
     }
 
-    public static create_index_channel(param, param_tbi, prepare_genome_out) {
+    public static create_index_channel(param, param_tbi, prepare_genome_out, regenerate = false) {
         if (param) {
-            if (param_tbi) {
+            if (param_tbi && !regenerate) {
                 return Channel.fromPath(param_tbi).collect()
             } else {
                 return prepare_genome_out

@@ -4,6 +4,8 @@
 
 include { SNV_MULTIPLICITY } from '../../../modules/local/snv_multiplicity/main.nf'
 
+dryclean_field		    = WorkflowNfcasereports.create_value_channel(params.field_cbs) // channel: [mandatory] dryclean field to use for SNV multiplicity (same as for CBS)
+
 workflow VCF_SNV_MULTIPLICITY {
     // defining inputs
     take:
@@ -17,7 +19,8 @@ workflow VCF_SNV_MULTIPLICITY {
     snv_multiplicity_hets_rds	= Channel.empty()
 
     SNV_MULTIPLICITY(
-        input
+        input,
+        dryclean_field
     )
 
     // initializing outputs from snv_multiplicity

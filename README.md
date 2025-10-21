@@ -64,12 +64,17 @@ TCXX49,XX,0,TCXX49_N,lane_1,/path/to/fastq_1.fq.gz,/path/to/fastq_2.gz
 Each row represents a pair of fastq files (paired end) for a single sample (in
 this case a normal sample, status: 0).
 
-After the input file is ready, you can run the pipeline using our `gOSh` CLI.
+After the input file is ready, you can run the pipeline using our [`gOSh`](https://github.com/mskilab-org/gosh) CLI. For `gOSh` installation instructions, see https://github.com/mskilab-org/gosh. 
 
+**The recommended way to run nf-gos is through the gOSh CLI.**
+
+
+With a samplesheet.csv in the run directory, nf-gOS is ready to be run through the `gOSh` wrapper.
 ```bash
-pip install bin/gosh # install gosh
 gosh run pipeline
 ```
+
+The first time the pipeline is executed in a run directory, a wizard will prompt the user through several essential configuration parameters (like reference assembly to use, and pipeline presets).
 
 You can also run the pipeline directly using the following command:
 
@@ -99,6 +104,79 @@ If you want to run only the HRD pipeline, you can use the following command:
 
 ```bash
 gosh run pipeline --preset hrd
+```
+
+### Using Custom Reference Genomes
+
+The pipeline supports using custom reference genomes in addition to the pre-configured iGenomes references (GATK.GRCh37, GATK.GRCh38).
+
+#### Option 1: Use a custom FASTA with automatic index generation
+
+For most users, this is the recommended approach. The pipeline will automatically generate all required indices (.fai, .dict, BWA index) from your FASTA file:
+
+```bash
+nextflow run mskilab-org/nf-casereports \
+   -profile <docker|singularity|institute> \
+   --input samplesheet.csv \
+   --outdir <OUTDIR> \
+   --genome GATK.GRCh37 \
+   --fasta /path/to/custom/genome.fasta \
+   --regenerate_reference_indices true
+```
+
+**Important:** The `--regenerate_reference_indices` flag ensures that all reference indices are regenerated to match your custom FASTA. Without this flag, the pipeline may use mismatched indices from the original genome, which will cause errors.
+
+Generated indices will be saved to `${outdir}/reference/` and can be reused in future runs.
+
+#### Option 2: Provide pre-built indices
+
+If you already have pre-built indices, you can provide them directly:
+
+```bash
+nextflow run mskilab-org/nf-casereports \
+   -profile <docker|singularity|institute> \
+   --input samplesheet.csv \
+   --outdir <OUTDIR> \
+   --fasta /path/to/genome.fasta \
+   --fasta_fai /path/to/genome.fasta.fai \
+   --dict /path/to/genome.dict \
+   --bwa /path/to/bwa_index/
+```
+
+#### Option 3: Build reference bundle only (no analysis)
+
+To pre-build reference indices without running the full pipeline:
+
+```bash
+nextflow run mskilab-org/nf-casereports \
+   -profile <docker|singularity|institute> \
+   --outdir <OUTDIR> \
+   --fasta /path/to/genome.fasta \
+   --regenerate_reference_indices true
+```
+
+Note: No `--input` samplesheet is needed. Generated indices will be saved to `${outdir}/reference/`.
+
+#### Performance Notes
+
+- **BWA index generation** takes ~60-90 minutes for human genome (single-threaded)
+- **Memory requirement:** ~8GB for human genome
+- Generated indices can be reused in subsequent runs by providing them explicitly (Option 2)
+
+#### Custom Reference with Annotation Files
+
+If you need to provide custom annotation files (dbSNP, known sites, etc.) along with your custom reference:
+
+```bash
+nextflow run mskilab-org/nf-casereports \
+   -profile <docker|singularity|institute> \
+   --input samplesheet.csv \
+   --outdir <OUTDIR> \
+   --fasta /path/to/genome.fasta \
+   --regenerate_reference_indices true \
+   --dbsnp /path/to/dbsnp.vcf.gz \
+   --known_indels /path/to/known_indels.vcf.gz \
+   --known_snps /path/to/known_snps.vcf.gz
 ```
 
 
