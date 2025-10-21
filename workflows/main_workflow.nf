@@ -445,12 +445,28 @@ workflow TOOLS {
     // Iteratively select tools based on available inputs
     skip_tools = params.skip_tools ? params.skip_tools.split(',').collect { it.trim() } : []
     println "Skipping tools: ${skip_tools}"
+    run_tools = params.only_tools ? params.only_tools.split(',').collect { it -> it.trim() } : []
+    is_run_tools_populated = ! run_tools.isEmpty()
+    if (is_run_tools_populated) {
+        println "Running tools: ${run_tools}" 
+    }
+    
+    is_overlapping = run_tools.any { it ->
+        skip_tools.contains(it)
+    }
+    if (is_overlapping) {
+        println "Overlapping tool sets specified in skip and only tools parameters.. defaulting to running the tool specified"
+    }
     // TODO: if GRIDSS - skip if vcf is found, but not if vcf_raw is present.
     selected_tools = []
     tools_qc = ["collect_wgs_metrics", "collect_multiple_metrics", "estimate_library_complexity"]
     selected_tools_map = [:]
+    // is_scenario1 = run_tools not specified, so try to add to selected tools from the menu (tool_input_output_map)
+    // is_scenario2 = run_tools is specified, so try to see if the tool matches the menu
     tool_input_output_map.each { tool, io ->
-        if (!selected_tools.contains(tool) && !skip_tools.contains(tool)) {
+        def is_scenario1 = ! is_run_tools_populated && !selected_tools.contains(tool) && !skip_tools.contains(tool)
+        def is_scenario2 = ! is_scenario1 && run_tools.contains(tool)
+        if (is_scenario1 || is_scenario2) {
 
             def inputsRequired = io.inputs
             def inputsPresent = inputsRequired.every { available_inputs.contains(it) }
@@ -691,7 +707,7 @@ workflow NFGOS {
 
     // Always build indices
     // ##############################
-    PREPARE_GENOME()
+    PREPARE_GENOME(inputs_unlaned)
 
     // Gather built indices or get them from the params
     // Built from the fasta file:
