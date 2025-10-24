@@ -54,23 +54,26 @@ workflow PREPARE_GENOME {
 
     versions = Channel.empty()
 
-    fasta_bam_matches = CHECK_REFERENCE_BAM_MATCH(
-        inputs_unlaned.filter{ it -> !it.bam.isEmpty() }.unique{ it -> it.bam }.map { it -> 
-            [ it.meta, it.bam ]
-        },
-        Channel.value(params.fasta),
-        Channel.value(params.fasta_fai) 
-    )
-    
-    fasta_bam_matches.is_fully_matched.toList().map { it ->
-        def unmatched_meta = it.findAll { _meta, is_matched, _bam_path -> ! is_matched }.collect{ meta, _is_matched, bam_path -> 
-            println "${meta.sample}: ${bam_path} has mismatched rnames with ${params.fasta_fai}; see ./${params.outdir}/check_bam_fasta_rname/${meta.sample}/ for rname mismatches"
-            meta
+    do_check_reference_bam_match = params.match_reference_and_bam ? params.match_reference_and_bam : false
+    if (do_check_reference_bam_match) {
+        fasta_bam_matches = CHECK_REFERENCE_BAM_MATCH(
+            inputs_unlaned.filter{ it -> !it.bam.isEmpty() }.unique{ it -> it.bam }.map { it -> 
+                [ it.meta, it.bam ]
+            },
+            Channel.value(params.fasta),
+            Channel.value(params.fasta_fai) 
+        )
+        
+        fasta_bam_matches.is_fully_matched.toList().map { it ->
+            def unmatched_meta = it.findAll { _meta, is_matched, _bam_path -> ! is_matched }.collect{ meta, _is_matched, bam_path -> 
+                println "${meta.sample}: ${bam_path} has mismatched rnames with ${params.fasta_fai}; see ./${params.outdir}/check_bam_fasta_rname/${meta.sample}/ for rname mismatches"
+                meta
+            }
+            if (! unmatched_meta.isEmpty()) {
+                error("Reference rname mismatches between bam and fasta detected! Halting nextflow")
+            }
+            return(it)
         }
-        if (! unmatched_meta.isEmpty()) {
-            error("Reference rname mismatches between bam and fasta detected! Halting nextflow")
-        }
-        return(it)
     }
 
     GATK4_CREATESEQUENCEDICTIONARY(fasta)
