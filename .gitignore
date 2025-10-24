@@ -19,3 +19,4 @@ bin/gosh/tests/test_data/
 bin/gosh/tests/test_data/
 tests/
 .aider*
+*workspace
