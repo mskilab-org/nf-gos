@@ -59,6 +59,7 @@ class Globals {
         "lp_phased_balance": [ inputs: ['ni_balanced_gg'], outputs: ['lp_balanced_gg'] ],
         "events": [ inputs: ['ni_balanced_gg'], outputs: ['events'] ],
         "fusions": [ inputs: ['ni_balanced_gg'], outputs: ['fusions'] ],
+        "echtvar": [ inputs: ['snv_somatic_vcf'], outputs: ['echtvar_variant_somatic_bcf'] ],
         "snpeff": [ inputs: ['snv_somatic_vcf'], outputs: ['variant_somatic_ann', 'variant_somatic_bcf'] ],
         "snv_multiplicity": [ inputs: ['jabba_gg', 'variant_somatic_ann'], outputs: ['snv_multiplicity'] ],
         "oncokb": [ inputs: ['variant_somatic_ann', 'snv_multiplicity', 'jabba_gg', 'fusions'], outputs: ['oncokb_maf', 'oncokb_fusions', 'oncokb_cna'] ],

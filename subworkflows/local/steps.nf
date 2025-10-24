@@ -1767,6 +1767,73 @@ workflow VARIANT_ANNOTATION_STEP {
     snv_germline_bcf_annotations
 }
 
+include { 
+    VCF_ECHTVAR as VCF_ECHTVAR_SOMATIC;
+    VCF_ECHTVAR as VCF_ECHTVAR_GERMLINE
+} from './vcf_echtvar/main.nf'
+workflow ECHTVAR_STEP {
+    take:
+    inputs_unlaned
+    snv_somatic_bcf_annotations
+    snv_germline_bcf_annotations
+    tools_used
+
+    main:
+    // Existing
+    somatic_echtvar_outputs = inputs_unlaned
+        .filter { it -> it.meta.status.toString() == "1" }
+        .map { it -> [it.meta, it.echtvar_variant_somatic_bcf] }
+
+    
+    germline_echtvar_outputs = inputs_unlaned
+        .filter { it -> it.meta.status.toString() == "1" }
+        .map { it -> [it.meta, it.echtvar_variant_germline_bcf] }
+    
+    // Default Emit
+    echtvar_somatic = somatic_echtvar_outputs.filter { it -> !it[1].isEmpty() }
+    echtvar_germline = germline_echtvar_outputs.filter { it -> !it[1].isEmpty() }
+
+    // Inputs
+
+    somatic_echtvar_input_key = somatic_echtvar_outputs
+        .filter { it -> it[1].isEmpty() }
+        .map { it -> it[0].patient }
+        .unique()
+    
+    germline_echtvar_input_key = germline_echtvar_outputs
+        .filter { it -> it[1].isEmpty() }
+        .map { it -> it[0].patient }
+        .unique()
+
+    somatic_echtvar_inputs = snv_somatic_bcf_annotations
+        .map { it -> [ it[0].patient, [ it ] ] } // meta.patient, [ meta, somatic snv bcf ]
+        .join(somatic_echtvar_input_key)
+        .map { it -> it[1] } // meta, somatic snv bcf, tbi
+    
+    germline_echtvar_inputs = snv_germline_bcf_annotations
+        .map { it -> [ it[0].patient, [ it ] ] } // meta.patient, [ meta, germline snv bcf ]
+        .join(germline_echtvar_input_key)
+        .map { it -> it[1] } // meta, germline snv bcf, tbi
+
+    if (tools_used.contains("all") || tools_used.contains("echtvar")) {
+        out_somatic_echtvar = VCF_ECHTVAR_SOMATIC(
+            somatic_echtvar_inputs
+        ) 
+        
+        echtvar_somatic = echtvar_somatic.mix(out_somatic_echtvar.bcf)
+
+        out_echtvar_germline = VCF_ECHTVAR_GERMLINE(
+            germline_echtvar_inputs
+        )
+        echtvar_germline = echtvar_germline.mix(out_echtvar_germline.bcf)
+    }
+
+    emit:
+    echtvar_somatic
+    echtvar_germline
+
+}   
+
 // COBALT
 include { BAM_COBALT } from './bam_cobalt/main'
 workflow COBALT_STEP {

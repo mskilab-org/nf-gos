@@ -142,6 +142,7 @@ include {
     CBS_STEP;
     VARIANT_CALLING_STEP;
     VARIANT_ANNOTATION_STEP;
+    ECHTVAR_STEP;
     JABBA_STEP;
     NON_INTEGER_BALANCE_STEP;
     LP_PHASED_BALANCE_STEP;
@@ -225,6 +226,9 @@ workflow SETUP {
         ],
         "snpeff"     : [
             params.snpeff_cache
+        ],
+        "echtvar"  : [
+            params.echtvar_dbnsfp
         ],
         "sage"       : [
             params.ensembl_data_dir,
@@ -1027,6 +1031,17 @@ workflow NFGOS {
     
     snv_germline_annotations_for_merge = VARIANT_ANNOTATION_STEP.out.snv_germline_annotations
                 .map { it -> [ it[0].patient, it[1] ] } // meta.patient, annotated germline snv vcf
+    
+    snv_somatic_bcf_annotations = VARIANT_ANNOTATION_STEP.out.snv_somatic_bcf_annotations
+
+    snv_germline_bcf_annotations = VARIANT_ANNOTATION_STEP.out.snv_germline_bcf_annotations
+    
+    ECHTVAR_STEP(
+        inputs_unlaned,
+        snv_somatic_bcf_annotations,
+        snv_germline_bcf_annotations,
+        tools_used
+    )
 
 
     PURPLE_STEP(
