@@ -1708,7 +1708,7 @@ workflow VARIANT_ANNOTATION_STEP {
     snv_germline_bcf_annotations = variant_germline_bcf_existing_outputs
 
     variant_somatic_ann_inputs = inputs_unlaned
-            .filter { it.variant_somatic_ann.isEmpty() || it.variant_somatic_bcf.isEmpty() }
+            .filter { it -> it.variant_somatic_ann.isEmpty() || it.variant_somatic_bcf.isEmpty() }
             .map { it -> [it.meta.patient, it.meta + [id: it.meta.sample ]] }.unique()
 
     variant_ann_input_somatic = variant_somatic_ann_inputs
