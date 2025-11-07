@@ -16,10 +16,11 @@ workflow VCF_ECHTVAR {
     //Creating empty channels for output
     main:
     fasta = WorkflowNfcasereports.create_file_channel(params.fasta)
-    echtvar_database = WorkflowNfcasereports.create_file_channel(params.echtvar_dbnsfp) // use dbnsfp database
+    echtvar_dbnsfp = WorkflowNfcasereports.create_file_channel(params.echtvar_dbnsfp) // use dbnsfp database
+    echtvar_clinvar = WorkflowNfcasereports.create_file_channel(params.echtvar_clinvar) // use dbnsfp database
     echtvar_bcf  = Channel.empty()
 
-    versions        = Channel.empty()
+    versions = Channel.empty()
 
     // decompose VCF first (generally not needed)
     // DECOMPOSE_VCF(
@@ -29,9 +30,13 @@ workflow VCF_ECHTVAR {
 
     // echtvar_input = input.map { meta, vcf, _tbi -> [ meta, vcf ] }
 
+    echtvar_database = echtvar_dbnsfp.mix(echtvar_clinvar).collect()
+
     ECHTVAR_ANNO(
-        echtvar_input,
+        echtvar_input
+        .dump(tag: "ECHTVAR_ANNO input", pretty: true),
         echtvar_database
+        .dump(tag: "ECHTVAR_ANNO database", pretty: true)
     )
 
     // initializing outputs from echtvar

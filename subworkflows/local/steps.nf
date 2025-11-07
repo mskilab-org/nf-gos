@@ -1802,6 +1802,7 @@ workflow ECHTVAR_STEP {
     somatic_echtvar_input_key = somatic_echtvar_outputs
         .filter { it -> it[1].isEmpty() }
         .map { it -> it[0].patient }
+        .dump(tag: "somatic_echtvar_input_key", pretty: true)
         .unique()
     
     germline_echtvar_input_key = germline_echtvar_outputs
@@ -1811,25 +1812,27 @@ workflow ECHTVAR_STEP {
 
     somatic_echtvar_inputs = snv_somatic_bcf_annotations
         .map { it -> [ it[0].patient, [ it ] ] } // meta.patient, [ meta, somatic snv bcf ]
+        .dump(tag: "somatic_echtvar_inputs before key join", pretty: true)
         .join(somatic_echtvar_input_key)
-        .map { it -> it[1] } // meta, somatic snv bcf, tbi
+        .dump(tag: "somatic_echtvar_inputs after key join", pretty: true)
+        .map { it -> it[1][0] } // meta, somatic snv bcf
     
     germline_echtvar_inputs = snv_germline_bcf_annotations
         .map { it -> [ it[0].patient, [ it ] ] } // meta.patient, [ meta, germline snv bcf ]
         .join(germline_echtvar_input_key)
-        .map { it -> it[1] } // meta, germline snv bcf, tbi
+        .map { it -> it[1][0] } // meta, germline snv bcf
 
     if (tools_used.contains("all") || tools_used.contains("echtvar")) {
         out_somatic_echtvar = VCF_ECHTVAR_SOMATIC(
             somatic_echtvar_inputs
         ) 
         
-        echtvar_somatic = echtvar_somatic.mix(out_somatic_echtvar.bcf)
+        echtvar_somatic = echtvar_somatic.mix(out_somatic_echtvar.echtvar_bcf)
 
         out_echtvar_germline = VCF_ECHTVAR_GERMLINE(
             germline_echtvar_inputs
         )
-        echtvar_germline = echtvar_germline.mix(out_echtvar_germline.bcf)
+        echtvar_germline = echtvar_germline.mix(out_echtvar_germline.echtvar_bcf)
     }
 
     emit:

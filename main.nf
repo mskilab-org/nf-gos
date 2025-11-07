@@ -101,7 +101,8 @@ params.mask_non_integer_balance = WorkflowMain.getGenomeAttribute(params, 'mask_
 params.mask_lp_phased_balance = WorkflowMain.getGenomeAttribute(params, 'mask_lp_phased_balance')
 params.ref_hrdetect = WorkflowMain.getGenomeAttribute(params, 'ref_hrdetect')
 params.heme_db = WorkflowMain.getGenomeAttribute(params, 'heme_db')
-params.echtvar_dbnfsp = WorkflowMain.getGenomeAttribute(params, 'echtvar_dbnsfp')
+params.echtvar_dbnsfp = WorkflowMain.getGenomeAttribute(params, 'echtvar_dbnsfp')
+params.echtvar_clinvar = WorkflowMain.getGenomeAttribute(params, 'echtvar_clinvar')
 //params.blacklist_junctions_jabba = WorkflowMain.getGenomeAttribute(params, 'blacklist_junctions_jabba')
 
 /*
