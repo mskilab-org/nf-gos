@@ -382,8 +382,12 @@ workflow ALIGNMENT_STEP {
             .map { it -> [it[0].sample, it[0], it[1], it[2]] }
             .unique{ it -> it[0] }
         
-        samples_chimera_to_run = all_inputs_chimera_filter.filter { it ->  it[1].isEmpty() }.map{ it -> it[0] } // sample
-        outputs_existing_chimera = all_inputs_chimera_filter.filter { it ->  ! it[1].isEmpty() }
+        samples_chimera_to_run = all_inputs_chimera_filter
+            .filter { it ->  
+                it[2].isEmpty()
+            }
+            .map{ it -> it[0] } // sample≤
+        outputs_existing_chimera = all_inputs_chimera_filter.filter { it ->  ! it[2].isEmpty() }
                 
         BAM_CHIMERA_FILTER(
             alignment_bams_final_branch.tumor
