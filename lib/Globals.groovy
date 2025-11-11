@@ -22,10 +22,7 @@ class Globals {
         ],
         "conpair": [
             inputs: ['bam'],
-            outputs: [
-                ['conpair_concordance'],
-                ['conpair_contamination']
-            ]
+            outputs: ['conpair_concordance', 'conpair_contamination']
         ],
         "estimate_library_complexity": [ inputs: ['bam'], outputs: ['qc_dup_rate'] ],
         // "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics', "estimate_library_complexity"] ],
