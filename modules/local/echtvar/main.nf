@@ -20,7 +20,7 @@ process ECHTVAR_ANNO {
     prefix    = task.ext.prefix ?: "${meta.id}"
     def input = databases.collectMany { file -> ["-e", file] }.join(" ")
     """
-    echo "break hash"
+
     echtvar \\
         anno \\
         ${args} \\

@@ -103,6 +103,7 @@ params.ref_hrdetect = WorkflowMain.getGenomeAttribute(params, 'ref_hrdetect')
 params.heme_db = WorkflowMain.getGenomeAttribute(params, 'heme_db')
 params.echtvar_dbnsfp = WorkflowMain.getGenomeAttribute(params, 'echtvar_dbnsfp')
 params.echtvar_clinvar = WorkflowMain.getGenomeAttribute(params, 'echtvar_clinvar')
+params.echtvar_civic = WorkflowMain.getGenomeAttribute(params, 'echtvar_civic')
 //params.blacklist_junctions_jabba = WorkflowMain.getGenomeAttribute(params, 'blacklist_junctions_jabba')
 
 /*
