@@ -94,7 +94,7 @@ process PURPLE {
         ${target_region_msi_indels_arg} \\
         ${germline_del_arg} \\
         -gc_profile ${gc_profile} \\
-        -circos \$(which circos) \\
+        `# -circos \$(which circos)` \\
         -threads ${task.cpus} \\
         -output_dir purple/
 
