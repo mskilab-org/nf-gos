@@ -3,9 +3,13 @@ process SAGE_GERMLINE {
     tag "$meta.id"
     label 'process_medium'
 
+    // container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    //     'https://depot.galaxyproject.org/singularity/hmftools-sage:3.4--hdfd78af_1' :
+    //     'quay.io/biocontainers/hmftools-sage:3.4--hdfd78af_1' }"
+
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/hmftools-sage:3.4--hdfd78af_1' :
-        'quay.io/biocontainers/hmftools-sage:3.4--hdfd78af_1' }"
+        'https://depot.galaxyproject.org/singularity/hmftools-sage:4.2--hdfd78af_0' :
+        'quay.io/biocontainers/hmftools-sage:4.2--hdfd78af_0' }"
 
     input:
     tuple val(meta), path(normal_bam_wgs), path(normal_bai), path(tumor_bam_wgs), path(tumor_bai)
