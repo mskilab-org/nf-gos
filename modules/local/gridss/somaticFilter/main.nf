@@ -1,3 +1,69 @@
+process GRIPSS_SOMATIC_FILTER {
+    tag "$meta.id"
+    label 'process_medium'
+
+    // using events container since the dependencies are the same
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'docker://mskilab/unified:0.0.19-fusions':
+        'mskilab/unified:0.0.19-fusions' }"
+
+    input:
+    tuple val(meta), path(gridss_output), path(gridss_output_tbi)
+    path(pon_gridss_bedpe_svs)
+    path(pon_gridss_bed_breakends)
+    path(pon_gridss_known_hotspots_bedpe)
+    path(fasta)
+    path(fasta_fai)
+    val(pon_gridss_ref_genome_version)
+
+    output:
+    tuple val(meta), path("*.gripss.filtered.vcf.gz"), path("*.gripss.filtered.vcf.gz.tbi"), emit: somatic_high_vcf,          optional:false
+    tuple val(meta), path("*.gripss.vcf.gz"), emit: somatic_all_vcf, optional:false
+    path "versions.yml"                                                     , emit: versions
+
+    when:
+    task.ext.when == null || task.ext.when
+
+    script:
+    def args          = task.ext.args ?: ''
+    def prefix        = task.ext.prefix ?: "${meta.id}"
+    def VERSION       = '2.3.4' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
+    """
+
+    java -Xmx512g -jar \${NEXTFLOW_BIN_DIR}/jar/gripss_v2.3.4.jar \\
+         -log_debug \\
+         -log_level WARN \\
+         -pon_sv_file ${pon_gridss_bedpe_svs} \\
+         -pon_sgl_file ${pon_gridss_bed_breakends} \\
+         -known_hotspot_file ${pon_gridss_known_hotspots_bedpe} \\
+         -vcf ${gridss_output} \\
+         -ref_genome ${fasta} \\
+         -ref_genome_version ${pon_gridss_ref_genome_version} \\
+         -output_dir ./ \\
+         -sample ${meta.sample}
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        gripss: ${VERSION}
+    END_VERSIONS
+
+    """
+
+    stub:
+    def args = task.ext.args ?: ''
+    def prefix = task.ext.prefix ?: "${meta.id}"
+    def VERSION = '2.13.2' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
+    """
+    touch ${prefix}.high_confidence_somatic.vcf.bgz
+    touch ${prefix}.high_and_low_confidence_somatic.vcf.bgz
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        gridss: ${VERSION}
+    END_VERSIONS
+    """
+}
+
 process GRIDSS_SOMATIC_FILTER {
     tag "$meta.id"
     label 'process_medium'

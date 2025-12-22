@@ -814,21 +814,22 @@ workflow NFGOS {
     vcf_from_gridss_gridss = SV_CALLING_STEP.out.vcf_from_gridss_gridss
     vcf_raw_from_gridss_gridss = SV_CALLING_STEP.out.vcf_raw_from_gridss_gridss
 
-    do_filter_ffpe_chimera = params.filter_ffpe_chimera ?: false
-    if (do_filter_ffpe_chimera) {
+    do_sv_filter_ffpe_chimera = params.sv_filter_ffpe_chimera ?: false
+    println "do_sv_filter_ffpe_chimera: ${do_sv_filter_ffpe_chimera}"
+    if (do_sv_filter_ffpe_chimera) {
         chimera_outputs = inputs_unlaned.filter {it -> it.meta.status.toString() == "1" }.map { it -> 
             [it.meta, it.structural_variants_chimera_filtered, it.structural_variants_chimera_filtered_tbi]
         }
 
-        chimera_existing_outputs = chimera_outputs.filter { !it[1].isEmpty() && !it[2].isEmpty() }
-        chimera_inputs = chimera_outputs.filter { it[1].isEmpty() || it[2].isEmpty() }.map {it -> [ it[0].patient ] }.unique()
+        chimera_existing_outputs = chimera_outputs.filter { it -> !it[1].isEmpty() && !it[2].isEmpty() }
+        chimera_inputs = chimera_outputs.filter { it -> it[1].isEmpty() || it[2].isEmpty() }.map {it -> [ it[0].patient ] }.unique()
 
         chimera_raw_outputs = inputs_unlaned.filter {it -> it.meta.status.toString() == "1" }.map { it -> 
             [it.meta, it.structural_variants_raw_chimera_filtered, it.structural_variants_raw_chimera_filtered_tbi]
         }
 
-        chimera_raw_existing_outputs = chimera_raw_outputs.filter { !it[1].isEmpty() && !it[2].isEmpty() }
-        chimera_raw_inputs = chimera_raw_outputs.filter { it[1].isEmpty() || it[2].isEmpty() }.map {it -> [ it[0].patient ] }.unique()
+        chimera_raw_existing_outputs = chimera_raw_outputs.filter { it -> !it[1].isEmpty() && !it[2].isEmpty() }
+        chimera_raw_inputs = chimera_raw_outputs.filter { it -> it[1].isEmpty() || it[2].isEmpty() }.map {it -> [ it[0].patient ] }.unique()
 
         SV_CHIMERA_FILTER_VCF(
             vcf_from_gridss_gridss.map { it -> [ it[0].patient, it[0], it[1], it[2] ] } // meta.patient, meta, vcf, tbi
@@ -849,7 +850,7 @@ workflow NFGOS {
     */
     final_filtered_sv_rds_for_merge = Channel.empty()
     unfiltered_som_sv_for_merge = Channel.empty()
-    is_any_vcf_raw_provided = Globals.rowsAsMaps.any { ! ( it.vcf_raw == null || it.vcf_raw == [] || it.vcf_raw == '' ) }
+    is_any_vcf_raw_provided = Globals.rowsAsMaps.any { it -> ! ( it.vcf_raw == null || it.vcf_raw == [] || it.vcf_raw == '' ) }
     if (params.tumor_only) {
         vcf_from_sv_calling_for_merge = vcf_from_gridss_gridss
             .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
