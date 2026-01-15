@@ -1737,7 +1737,7 @@ workflow VARIANT_ANNOTATION_STEP {
 
         if (!params.tumor_only) {
             variant_germline_ann_inputs = inputs_unlaned
-                .filter { it.variant_germline_ann.isEmpty() || it.variant_germline_bcf.isEmpty() }
+                .filter { it -> it.variant_germline_ann.isEmpty() || it.variant_germline_bcf.isEmpty() }
                 .map { it -> [it.meta.patient, it.meta + [id: it.meta.sample ]] }
 
             variant_ann_input_germline = variant_germline_ann_inputs

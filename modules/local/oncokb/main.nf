@@ -7,9 +7,13 @@ process ONCOKB_ANNOTATOR {
     maxRetries 100
     maxErrors 100
 
+    // container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    //     'docker://mskilab/unified:0.0.12':
+    //     'mskilab/unified:0.0.12' }"
+
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/unified:0.0.12':
-        'mskilab/unified:0.0.12' }"
+        'docker://mskilab/unified:0.0.21-snpeff':
+        'mskilab/unified:0.0.21-snpeff' }"
 
     input:
     tuple val(meta), path(vcf), path(fusions), path(cna)

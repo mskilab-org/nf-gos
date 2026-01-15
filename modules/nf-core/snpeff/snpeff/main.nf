@@ -2,14 +2,19 @@ process SNPEFF_SNPEFF {
     tag "$meta.id"
     label 'process_medium'
 
+    // container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    //     'https://depot.galaxyproject.org/singularity/snpeff:5.1--hdfd78af_2' :
+    //     'biocontainers/snpeff:5.1--hdfd78af_2' }"
+
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/snpeff:5.1--hdfd78af_2' :
-        'biocontainers/snpeff:5.1--hdfd78af_2' }"
+        'docker://mskilab/unified:0.0.21-snpeff':
+        'mskilab/unified:0.0.21-snpeff' }"
 
     input:
     tuple val(meta), path(vcf), path(tbi)
     val(db)                       // e.g hg19 or GRch37.87
     tuple val(meta2), path(cache)
+    path(fasta)
 
     output:
     tuple val(meta), path("*.ann.vcf"),   emit: vcf
@@ -40,6 +45,30 @@ process SNPEFF_SNPEFF {
         $cache_command \\
         $vcf \\
         > ${prefix}.ann.vcf
+    
+    tmpvcf=\$( export TMPDIR=./ && mktemp -t tmp_XXXXXXXXXX.vcf )
+    tmpvcf2=\$( export TMPDIR=./ && mktemp -t tmp2_XXXXXXXXXX.vcf )
+    (
+        bcftools sort ${prefix}.ann.vcf | \\
+        bcftools norm --rm-dup none --multiallelics -any --site-win 1000000 --fasta-ref ${fasta} | \\
+        bcftools sort > \${tmpvcf}
+    )
+    
+    bcftools query -f '%CHROM\\t%POS\\t%REF\\t%ALT\\t%ID\\n' "\$tmpvcf" > old_ids.tsv
+    bgzip -f old_ids.tsv 
+    tabix -f -s 1 -b 2 -p vcf old_ids.tsv.gz
+
+    (
+        bcftools annotate \\
+        --header-lines <(echo '##INFO=<ID=OLD_ID,Number=1,Type=String,Description="Original ID before normalization">') \\
+        -a old_ids.tsv.gz \\
+        -c CHROM,POS,REF,ALT,INFO/OLD_ID \\
+        --set-id '%CHROM:%POS\\_%REF\\/%FIRST_ALT' \\
+        -Ov "\${tmpvcf}" > \${tmpvcf2} ; \\
+        mv \${tmpvcf2} ${prefix}.ann.vcf ; \\
+        rm -f \${tmpvcf}
+    )
+
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

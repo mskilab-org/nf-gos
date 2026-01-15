@@ -108,6 +108,7 @@ params.pon_gridss_bedpe_svs = WorkflowMain.getGenomeAttribute(params, 'pon_grids
 params.pon_gridss_bed_breakends = WorkflowMain.getGenomeAttribute(params, 'pon_gridss_bed_breakends')
 params.pon_gridss_known_hotspots_bedpe = WorkflowMain.getGenomeAttribute(params, 'pon_gridss_known_hotspots_bedpe')
 params.pon_gridss_ref_genome_version = WorkflowMain.getGenomeAttribute(params, 'pon_gridss_ref_genome_version')
+params.coverage_coding_bed = WorkflowMain.getGenomeAttribute(params, 'coverage_coding_bed')
 //params.blacklist_junctions_jabba = WorkflowMain.getGenomeAttribute(params, 'blacklist_junctions_jabba')
 
 /*

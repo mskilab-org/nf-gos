@@ -19,6 +19,7 @@ workflow VCF_ECHTVAR {
     echtvar_dbnsfp = WorkflowNfcasereports.create_file_channel(params.echtvar_dbnsfp) // use dbnsfp database
     echtvar_clinvar = WorkflowNfcasereports.create_file_channel(params.echtvar_clinvar) // use dbnsfp database
     echtvar_civic = WorkflowNfcasereports.create_file_channel(params.echtvar_civic) // use dbnsfp database
+    echtvar_gnomad = WorkflowNfcasereports.create_file_channel(params.echtvar_gnomad) // use dbnsfp database
     echtvar_bcf  = Channel.empty()
 
     versions = Channel.empty()
@@ -34,6 +35,7 @@ workflow VCF_ECHTVAR {
     echtvar_database = echtvar_dbnsfp
         .mix(echtvar_clinvar)
         .mix(echtvar_civic)
+        .mix(echtvar_gnomad)
         .collect()
 
     ECHTVAR_ANNO(

@@ -52,7 +52,8 @@ process SAGE_SOMATIC {
         -panel_bed ${panel_bed} \\
         -high_confidence_bed ${high_confidence_bed} \\
         -ensembl_data_dir ${ensembl_data_dir} \\
-        -disable_bqr \\
+        -bqr_disable \\
+        -skip_msi_jitter \\
         -threads ${task.cpus} \\
         -output_vcf ${meta.id}.sage.somatic.vcf.gz
 

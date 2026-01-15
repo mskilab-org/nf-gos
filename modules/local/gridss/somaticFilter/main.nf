@@ -28,9 +28,10 @@ process GRIPSS_SOMATIC_FILTER {
     def args          = task.ext.args ?: ''
     def prefix        = task.ext.prefix ?: "${meta.id}"
     def VERSION       = '2.3.4' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
+    def jvmheap_mem = (task.memory.toGiga() * 0.9).toInteger() // 
     """
 
-    java -Xmx512g -jar \${NEXTFLOW_BIN_DIR}/jar/gripss_v2.3.4.jar \\
+    java -Xmx${jvmheap_mem}g -jar \${NEXTFLOW_BIN_DIR}/jar/gripss_v2.3.4.jar \\
          -log_debug \\
          -log_level WARN \\
          -pon_sv_file ${pon_gridss_bedpe_svs} \\

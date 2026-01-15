@@ -20,11 +20,13 @@ workflow VCF_SNPEFF {
     snpeff_report		    = Channel.empty()
     snpeff_summary_html	= Channel.empty()
     snpeff_genes_txt		= Channel.empty()
+    fasta = Channel.fromPath(params.fasta).collect()
 
     SNPEFF_SNPEFF(
         input,
         snpeff_db,
-        snpeff_cache
+        snpeff_cache,
+        fasta
     )
 
     // initializing outputs from snpeff
