@@ -1,8 +1,8 @@
 process PARABRICKS_FQ2BAM {
     tag "$meta.id"
 
-    container "nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1"
-    containerOptions "${ workflow.containerEngine == "singularity" ? '--nv': ( workflow.containerEngine == "docker" ? '--gpus all': null ) }"
+    container "nvcr.io/nvidia/clara/clara-parabricks:4.5.0-1"
+    containerOptions "${ workflow.containerEngine == "singularity" ? "--nv --bind ${NEXTFLOW_C_DIR}/memcap.so:/memcap.so": ( workflow.containerEngine == "docker" ? '--gpus all': null ) }"
 
     input:
 	tuple val(meta), path(fq1), path(fq2), val(read_group)
@@ -60,11 +60,12 @@ process PARABRICKS_FQ2BAM {
     def qc_metrics_output = "--out-qc-metrics-dir ${prefix}___qc_metrics"
     // def mem_limit = (task.memory.toGiga() * 0.25).toInteger() // Calculation is necessary for slurm to keep well under the requested memory limit
     def mem_limit = task.ext.mem_limit
-    // def low_memory_command = low_memory ? "--low-memory" : ""
+    def process_mem_limit_mb = (task.memory.toMega() * 0.97).toInteger() // Leave some headroom for the process to avoid OOM killer. This is the value that will be passed to fq2bam via --memory-limit, which is different from the MEMLIMIT env variable that is used by memcap.so to limit GPU memory usage.
     def low_memory_command = task.ext.low_memory_command ?: ""
     def bwa_queue_capacity = task.ext.normalized_queue_capacity ?: 10
-    bwa_queue_capacity = (bwa_queue_capacity / task.accelerator.request).toInteger()
-    def num_cpus = (task.cpus / task.accelerator.request).toInteger()
+    // bwa_queue_capacity = (bwa_queue_capacity / task.accelerator.request).toInteger()
+    // def num_cpus = (task.cpus / task.accelerator.request).toInteger()
+    def num_cpus = task.cpus
     def bwa_streams_val = task.ext.bwa_streams ?: 2
 
     known_sites.eachWithIndex { site, idx ->
@@ -78,6 +79,9 @@ process PARABRICKS_FQ2BAM {
     """
     export TMPDIR=/tmp
     tdir=\$(mktemp -d)
+
+    export LD_PRELOAD=/memcap.so
+    export MEMLIMIT_MB=${process_mem_limit_mb}
 
     pbrun \\
         fq2bam \\
@@ -94,11 +98,12 @@ process PARABRICKS_FQ2BAM {
         --num-gpus $task.accelerator.request \\
         --memory-limit $mem_limit \\
         --num-cpu-threads-per-stage $num_cpus \\
-        `#--bwa-cpu-thread-pool $num_cpus` `# this is for fq2bamfast` \\
-        `#--bwa-nstreams $bwa_streams_val` `# this is for fq2bamfast` \\
-        `#--bwa-normalized-queue-capacity $bwa_queue_capacity` `# this is for fq2bamfast` \\
+        --bwa-cpu-thread-pool $num_cpus `# this is for fq2bamfast` \\
+        --bwa-nstreams $bwa_streams_val `# this is for fq2bamfast` \\
+        --bwa-normalized-queue-capacity $bwa_queue_capacity `# this is for fq2bamfast` \\
+        --monitor-usage \\
         --verbose \\
-        --tmp-dir \$tdir \\
+        `# --tmp-dir \$tdir` \\
         $low_memory_command \\
         $args
 

@@ -5,7 +5,7 @@ process GPU_COLLECTMULTIPLEMETRICS {
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'docker://nvcr.io/nvidia/clara/clara-parabricks:4.5.0-1' :
         'nvcr.io/nvidia/clara/clara-parabricks:4.5.0-1' }"
-	containerOptions "${ workflow.containerEngine == "singularity" ? '--nv': ( workflow.containerEngine == "docker" ? '--gpus all': null ) }"
+	containerOptions "${ workflow.containerEngine == "singularity" ? "--nv --bind ${NEXTFLOW_C_DIR}/memcap.so:/memcap.so": ( workflow.containerEngine == "docker" ? '--gpus all': null ) }"
 
     input:
     tuple val(meta) , path(bam), path(bai)
@@ -23,8 +23,13 @@ process GPU_COLLECTMULTIPLEMETRICS {
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     out_dir = "${prefix}_gpu_collectmultiplemetrics_qc"
+    def process_mem_limit_mb = (task.memory.toMega() * 0.97).toInteger() // Leave some headroom for the process to avoid OOM killer. This is the value that will be passed to fq2bam via --memory-limit, which is different from the MEMLIMIT env variable that is used by memcap.so to limit GPU memory usage.
 
     """
+
+    export LD_PRELOAD=/memcap.so
+    export MEMLIMIT_MB=${process_mem_limit_mb}
+
     pbrun collectmultiplemetrics \\
         --ref ${fasta} \\
         --bam ${bam} \\

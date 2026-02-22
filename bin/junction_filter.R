@@ -37,6 +37,22 @@ if (file.exists(opt$pon)) {
     this_path = opt$sv
     message("Reading in the filtered SV file from:", this_path)
     this_filt = gGnome:::read.juncs(this_path, verbose=TRUE)
+    mc = S4Vectors::mcols(this_filt)
+    env = as.environment(as.list(mc))
+    is_tier_absent_or_invalid = ! ( all(exists("tier", env)) && is.numeric(get("tier", envir = env))) 
+    is_filter_present = ( all(exists("FILTER", env)) && is.character(get("FILTER", envir = env)) ) 
+    if (is_tier_absent_or_invalid && is_filter_present) {
+        tiering = rep_len(3L, NROW(mc))
+        ix_pass = which(mc[["FILTER"]] == "PASS")
+        if (any(NROW(ix_pass) > 0)) {
+            tiering[ix_pass] = 2L
+        }
+        mc[["tier"]] = tiering
+        S4Vectors::mcols(this_filt) = mc
+        rm(tiering)
+    }
+    rm(env)
+    rm(mc)
     message("Checking overlaps between the provided SV vcf and Junction PON...")
     this_filt = gUtils::gr.fix(this_filt, pon_object)
     pon_object = gUtils::gr.fix(pon_object, this_filt)
