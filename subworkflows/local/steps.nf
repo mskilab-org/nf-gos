@@ -1114,14 +1114,29 @@ workflow SV_CALLING_STEP {
     gridss_existing_outputs = inputs_unlaned_split.tumor.map {
             it -> [it.meta, it.vcf, it.vcf_tbi] }
             .dump(tag: "gridss_existing_outputs", pretty: true)
-            .filter { !it[1].isEmpty() && !it[2].isEmpty() }
+            .filter { _meta, vcf, vcf_tbi ->
+                if (vcf =~ /\.vcf(\.gz|\.bgz)?$/) {
+                    return !vcf.isEmpty() && !vcf_tbi.isEmpty()
+                } else {
+                    return !vcf.isEmpty()
+                }
+            }
+            .dump(tag: "gridss_existing_outputs post filter", pretty: true)
+            // .filter { !it[1].isEmpty() && !it[2].isEmpty() }
     
     vcf_from_gridss_gridss = gridss_existing_outputs
         
     gridss_raw_existing_outputs = inputs_unlaned_split.tumor.map {
         it -> [it.meta, it.vcf_raw, it.vcf_raw_tbi] }
         .dump(tag: "gridss existing raw outputs", pretty: true)
-        .filter { !it[1].isEmpty() && !it[2].isEmpty() }
+        .filter { _meta, vcf_raw, vcf_raw_tbi ->
+            if (vcf_raw =~ /\.vcf(\.gz|\.bgz)?$/) {
+                return !vcf_raw.isEmpty() && !vcf_raw_tbi.isEmpty()
+            } else {
+                return !vcf_raw.isEmpty()
+            }
+        }
+        .dump(tag: "gridss_existing_raw_ outputs post filter", pretty: true)
     
     vcf_raw_from_gridss_gridss = gridss_raw_existing_outputs
 

@@ -1,387 +1,395 @@
-//GRIDSS
-include { BAM_SVCALLING_GRIDSS } from '../../../subworkflows/local/bam_svcalling_gridss/main'
-include { BAM_SVCALLING_GRIDSS_SOMATIC } from '../../../subworkflows/local/bam_svcalling_gridss/main'
+// //GRIDSS
+// include { BAM_SVCALLING_GRIDSS } from '../../../subworkflows/local/bam_svcalling_gridss/main'
+// include { BAM_SVCALLING_GRIDSS_SOMATIC } from '../../../subworkflows/local/bam_svcalling_gridss/main'
 
-include { GRIDSS_PREPROCESS as GRIDSS_PREPROCESS_TUMOR   } from '../../../modules/local/gridss/gridss/main.nf'
-include { GRIDSS_PREPROCESS as GRIDSS_PREPROCESS_NORMAL   } from '../../../modules/local/gridss/gridss/main.nf'
-include { GRIDSS_ASSEMBLE_SCATTER   } from '../../../modules/local/gridss/gridss/main.nf'
-include { GRIDSS_ASSEMBLE_GATHER   } from '../../../modules/local/gridss/gridss/main.nf'
-include { GRIDSS_CALL   } from '../../../modules/local/gridss/gridss/main.nf'
+// include { GRIDSS_PREPROCESS as GRIDSS_PREPROCESS_TUMOR   } from '../../../modules/local/gridss/gridss/main.nf'
+// include { GRIDSS_PREPROCESS as GRIDSS_PREPROCESS_NORMAL   } from '../../../modules/local/gridss/gridss/main.nf'
+// include { GRIDSS_ASSEMBLE_SCATTER   } from '../../../modules/local/gridss/gridss/main.nf'
+// include { GRIDSS_ASSEMBLE_GATHER   } from '../../../modules/local/gridss/gridss/main.nf'
+// include { GRIDSS_CALL   } from '../../../modules/local/gridss/gridss/main.nf'
 
-workflow SV_CALLING_STEP {
-    take:
-    inputs_unlaned
-    alignment_bams_final
-    bwa_index
-    tools_used
+// workflow SV_CALLING_STEP {
+//     take:
+//     inputs_unlaned
+//     alignment_bams_final
+//     bwa_index
+//     tools_used
 
-    main:
-    fasta                               = WorkflowNfcasereports.create_file_channel(params.fasta)
-    fasta_fai                           = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
-    blacklist_gridss                    = WorkflowNfcasereports.create_file_channel(params.blacklist_gridss)
-
-
-    // versions               = Channel.empty()
-    // vcf                    = Channel.empty()
-    // vcf_index              = Channel.empty()
-    // assembly_bam           = Channel.empty()
-    vcf_from_gridss_gridss = Channel.empty()
-    vcf_raw_from_gridss_gridss = Channel.empty()
+//     main:
+//     fasta                               = WorkflowNfcasereports.create_file_channel(params.fasta)
+//     fasta_fai                           = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
+//     blacklist_gridss                    = WorkflowNfcasereports.create_file_channel(params.blacklist_gridss)
 
 
-    parallelize_gridss = params.parallelize_gridss ?: true
+//     // versions               = Channel.empty()
+//     // vcf                    = Channel.empty()
+//     // vcf_index              = Channel.empty()
+//     // assembly_bam           = Channel.empty()
+//     vcf_from_gridss_gridss = Channel.empty()
+//     vcf_raw_from_gridss_gridss = Channel.empty()
 
-    inputs_unlaned_split = inputs_unlaned
-        .branch { it -> 
-            tumor: it.meta.status.toString() == "1"
-            normal: it.meta.status.toString() == "0"
-        }
 
-    def normal_ids = inputs_unlaned_split.normal.map { it.meta.patient }.unique().collect().ifEmpty(["NO_NORMALS_PRESENT___MD7cicQBtB"]).view { "Normal IDs: $it" }
-    def tumor_ids = inputs_unlaned_split.tumor.map { it.meta.patient }.unique().collect().view { "Tumor IDs: $it" }
+//     parallelize_gridss = params.parallelize_gridss ?: true
 
-    def total_jobnodes = params.get("gridss_total_job_nodes", 12)
+//     inputs_unlaned_split = inputs_unlaned
+//         .branch { it -> 
+//             tumor: it.meta.status.toString() == "1"
+//             normal: it.meta.status.toString() == "0"
+//         }
 
-    // gridss_existing_outputs = inputs_unlaned.map {
-    //         it -> [it.meta, it.vcf, it.vcf_tbi] }
-    //         .filter { !it[1].isEmpty() && !it[2].isEmpty() }
+//     def normal_ids = inputs_unlaned_split.normal.map { it.meta.patient }.unique().collect().ifEmpty(["NO_NORMALS_PRESENT___MD7cicQBtB"]).view { "Normal IDs: $it" }
+//     def tumor_ids = inputs_unlaned_split.tumor.map { it -> it.meta.patient }.unique().collect().view { it -> "Tumor IDs: $it" }
+
+//     def total_jobnodes = params.get("gridss_total_job_nodes", 12)
+
+//     // gridss_existing_outputs = inputs_unlaned.map {
+//     //         it -> [it.meta, it.vcf, it.vcf_tbi] }
+//     //         .filter { !it[1].isEmpty() && !it[2].isEmpty() }
+
     
-    gridss_existing_outputs = inputs_unlaned_split.tumor.map {
-            it -> [it.meta, it.vcf, it.vcf_tbi] }
-            .dump(tag: "gridss_existing_outputs", pretty: true)
-            .filter { !it[1].isEmpty() && !it[2].isEmpty() }
+//     gridss_existing_outputs = inputs_unlaned_split.tumor.map { it -> 
+//             [it.meta, it.vcf, it.vcf_tbi] 
+//         }
+//         .dump(tag: "gridss_existing_outputs", pretty: true)
+//         .filter { _meta, vcf, vcf_tbi ->
+//             !vcf.isEmpty() && !vcf_tbi.isEmpty()
+//         }
+//         .dump(tag: "gridss_existing_outputs post filter", pretty: true)
     
-    vcf_from_gridss_gridss = gridss_existing_outputs
+//     vcf_from_gridss_gridss = gridss_existing_outputs
         
-    gridss_raw_existing_outputs = inputs_unlaned_split.tumor.map {
-        it -> [it.meta, it.vcf_raw, it.vcf_raw_tbi] }
-        .filter { !it[1].isEmpty() && !it[2].isEmpty() }
-    
-    vcf_raw_from_gridss_gridss = gridss_raw_existing_outputs
+//     gridss_raw_existing_outputs = inputs_unlaned_split.tumor.map {
+//         it -> [it.meta, it.vcf_raw, it.vcf_raw_tbi] }
+//         .dump(tag: "gridss_raw_existing_outputs", pretty: true)
+//         .filter { _meta, vcf_raw, vcf_raw_tbi ->
+//                 !vcf_raw.isEmpty() && !vcf_raw_tbi.isEmpty()
+//         }
+//         .dump(tag: "gridss_raw_existing_outputs post filter", pretty: true)
+//     vcf_raw_from_gridss_gridss = gridss_raw_existing_outputs
 
 
-    // SV Calling
-    // ##############################
-    if (tools_used.contains("all") || tools_used.contains("gridss") || params.is_run_junction_filter) {
+//     // SV Calling
+//     // ##############################
+//     if (tools_used.contains("all") || tools_used.contains("gridss") || params.is_run_junction_filter) {
 
         
 
-        // Filter out bams for which SV calling has already been done
-        // FIXME: vcf to vcf_raw
-        bam_sv_inputs = inputs_unlaned.filter { it.vcf_raw.isEmpty() }.map { it -> [it.meta.sample] }.unique()
-        bam_sv_calling = alignment_bams_final // meta.sample, meta, bam, bai
-            .combine(bam_sv_inputs, by: 0) // 
-            .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
-            .dump ( tag: "BAM SV calling input", pretty: true )
+//         // Filter out bams for which SV calling has already been done
+//         // FIXME: vcf to vcf_raw
+//         bam_sv_inputs = inputs_unlaned.filter { it.vcf_raw.isEmpty() }.map { it -> [it.meta.sample] }.unique()
+//         bam_sv_calling = alignment_bams_final // meta.sample, meta, bam, bai
+//             .combine(bam_sv_inputs, by: 0) // 
+//             .map { it -> [ it[1], it[2], it[3] ] } // meta, bam, bai
+//             .dump ( tag: "BAM SV calling input", pretty: true )
 
-        bam_sv_calling_status = bam_sv_calling.branch{
-            normal: it[0].status.toString() == "0"
-            tumor:  it[0].status.toString() == "1"
-        }
+//         bam_sv_calling_status = bam_sv_calling.branch{
+//             normal: it[0].status.toString() == "0"
+//             tumor:  it[0].status.toString() == "1"
+//         }
         
-        if (parallelize_gridss) {
+//         if (parallelize_gridss) {
 
-            gridss_preprocess_tumor = GRIDSS_PREPROCESS_TUMOR(bam_sv_calling_status.tumor, fasta, fasta_fai, bwa_index, blacklist_gridss)
-            gridss_preprocess_normal = GRIDSS_PREPROCESS_NORMAL(bam_sv_calling_status.normal.unique { it -> it[0].sample }, fasta, fasta_fai, bwa_index, blacklist_gridss)
+//             gridss_preprocess_tumor = GRIDSS_PREPROCESS_TUMOR(bam_sv_calling_status.tumor, fasta, fasta_fai, bwa_index, blacklist_gridss)
+//             gridss_preprocess_normal = GRIDSS_PREPROCESS_NORMAL(bam_sv_calling_status.normal.unique { it -> it[0].sample }, fasta, fasta_fai, bwa_index, blacklist_gridss)
             
-            gridss_preprocess_tumor_for_merge = gridss_preprocess_tumor.gridss_preprocess_dir
-                .map { meta, gridss_preprocess_dir ->
-                    [ meta.patient, gridss_preprocess_dir ]
-                }
+//             gridss_preprocess_tumor_for_merge = gridss_preprocess_tumor.gridss_preprocess_dir
+//                 .map { meta, gridss_preprocess_dir ->
+//                     [ meta.patient, gridss_preprocess_dir ]
+//                 }
 
-            sample_meta_map = bam_sv_calling_status.normal
-                .map { it -> [ it[0].sample, it[0] ] }
-                .unique()
+//             sample_meta_map = bam_sv_calling_status.normal
+//                 .map { it -> [ it[0].sample, it[0] ] }
+//                 .unique()
 
-            gridss_preprocess_normal_for_merge = gridss_preprocess_normal.gridss_preprocess_dir
-                .map { meta, gridss_preprocess_dir ->
-                    [ meta.sample, gridss_preprocess_dir ]
-                }
-                .cross(sample_meta_map)
-                .map { preproc_out, sample_meta ->
-                    def meta_complete = sample_meta[1]
-                    def gridss_preprocess_dir = preproc_out[1]
-                    [ meta_complete.patient, gridss_preprocess_dir ]
-                }
+//             gridss_preprocess_normal_for_merge = gridss_preprocess_normal.gridss_preprocess_dir
+//                 .map { meta, gridss_preprocess_dir ->
+//                     [ meta.sample, gridss_preprocess_dir ]
+//                 }
+//                 .cross(sample_meta_map)
+//                 .map { preproc_out, sample_meta ->
+//                     def meta_complete = sample_meta[1]
+//                     def gridss_preprocess_dir = preproc_out[1]
+//                     [ meta_complete.patient, gridss_preprocess_dir ]
+//                 }
 
-            mixed_ids = tumor_ids
-                .concat(normal_ids)
-                .collect(flat: false)
+//             mixed_ids = tumor_ids
+//                 .concat(normal_ids)
+//                 .collect(flat: false)
 
-            tumor_only_ids = mixed_ids
-                .map{ tumor, normal ->
-                    tumor.findAll { !normal.contains(it) }
-                }
-                .flatten()
-                .view { "Tumor IDs without normal: $it" }
+//             tumor_only_ids = mixed_ids
+//                 .map{ tumor, normal ->
+//                     tumor.findAll { !normal.contains(it) }
+//                 }
+//                 .flatten()
+//                 .view { "Tumor IDs without normal: $it" }
             
-            tumor_paired_ids = mixed_ids
-                .map{ tumor, normal ->
-                    tumor.findAll { normal.contains(it) }
-                }
-                .flatten()
-                .view { "Tumor IDs with normal: $it" }
+//             tumor_paired_ids = mixed_ids
+//                 .map{ tumor, normal ->
+//                     tumor.findAll { normal.contains(it) }
+//                 }
+//                 .flatten()
+//                 .view { "Tumor IDs with normal: $it" }
 
-            assembly_preinput_tumor_paired = bam_sv_calling_status.tumor
-                .map{ it ->
-                    [it[0].patient, it[0], it[1], it[2]]
-                }
-                .join(tumor_paired_ids)
-                .join(gridss_preprocess_tumor_for_merge) // patient, meta, bam, bai, gridss_preprocess_dir
-                // .view { "Assembly preinput tumor paired: $it" }
+//             assembly_preinput_tumor_paired = bam_sv_calling_status.tumor
+//                 .map{ it ->
+//                     [it[0].patient, it[0], it[1], it[2]]
+//                 }
+//                 .join(tumor_paired_ids)
+//                 .join(gridss_preprocess_tumor_for_merge) // patient, meta, bam, bai, gridss_preprocess_dir
+//                 // .view { "Assembly preinput tumor paired: $it" }
 
-            assembly_preinput_normal = bam_sv_calling_status.normal
-                .map{ it ->
-                    [it[0].patient, it[0], it[1], it[2]]
-                }
-                .join(gridss_preprocess_normal_for_merge) // patient, meta, bam, bai, gridss_preprocess_dir
-                // .view { "Assembly preinput normal: $it" }
+//             assembly_preinput_normal = bam_sv_calling_status.normal
+//                 .map{ it ->
+//                     [it[0].patient, it[0], it[1], it[2]]
+//                 }
+//                 .join(gridss_preprocess_normal_for_merge) // patient, meta, bam, bai, gridss_preprocess_dir
+//                 // .view { "Assembly preinput normal: $it" }
 
-            assembly_paired_input = assembly_preinput_tumor_paired
-                .cross(assembly_preinput_normal) { v -> v[0] }
-                .flatMap { tumor, normal ->
-                    def meta_id = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
-                    ( 0..< total_jobnodes ).collect { i ->
-                        [
-                            patient: tumor[0],
-                            meta: tumor[1] + [id: meta_id, tumor_id: tumor[1].sample, normal_id: normal[1].sample], 
-                            tumor_bam: tumor[2], 
-                            tumor_bai: tumor[3], 
-                            tumor_gridss_preprocess: tumor[4],
-                            normal_bam: normal[2],
-                            normal_bai: normal[3],
-                            normal_gridss_preprocess: normal[4],
-                            jobnodes: total_jobnodes,
-                            jobindex: i
-                        ]
-                    }
-                }
-                .map { 
-                    it.values()
-                }
+//             assembly_paired_input = assembly_preinput_tumor_paired
+//                 .cross(assembly_preinput_normal) { v -> v[0] }
+//                 .flatMap { tumor, normal ->
+//                     def meta_id = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
+//                     ( 0..< total_jobnodes ).collect { i ->
+//                         [
+//                             patient: tumor[0],
+//                             meta: tumor[1] + [id: meta_id, tumor_id: tumor[1].sample, normal_id: normal[1].sample], 
+//                             tumor_bam: tumor[2], 
+//                             tumor_bai: tumor[3], 
+//                             tumor_gridss_preprocess: tumor[4],
+//                             normal_bam: normal[2],
+//                             normal_bai: normal[3],
+//                             normal_gridss_preprocess: normal[4],
+//                             jobnodes: total_jobnodes,
+//                             jobindex: i
+//                         ]
+//                     }
+//                 }
+//                 .map { 
+//                     it.values()
+//                 }
                 
 
-            assembly_tumoronly_input = bam_sv_calling_status.tumor
-                .map{ it ->
-                    [it[0].patient, it[0], it[1], it[2]]
-                }
-                .dump(tag: "bam_sv_calling_status.tumor.map", pretty: true)
-                .join(tumor_only_ids)
-                .join(gridss_preprocess_tumor_for_merge)
-                .flatMap { tumor ->
-                    ( 0..<total_jobnodes ).collect { i ->
-                        [
-                            patient: tumor[1].patient, 
-                            meta: tumor[1] + [id: tumor[1].sample, tumor_id: tumor[1].sample, normal_id: ""], 
-                            tumor_bam: tumor[2], 
-                            tumor_bai: tumor[3], 
-                            tumor_gridss_preprocess: tumor[4],
-                            normal_bam: [],
-                            normal_bai: [],
-                            normal_gridss_preprocess: [],
-                            jobnodes: total_jobnodes,
-                            jobindex: i
-                        ]
-                    }
-                }
-                .map { 
-                    it.values()
-                }
+//             assembly_tumoronly_input = bam_sv_calling_status.tumor
+//                 .map{ it ->
+//                     [it[0].patient, it[0], it[1], it[2]]
+//                 }
+//                 .dump(tag: "bam_sv_calling_status.tumor.map", pretty: true)
+//                 .join(tumor_only_ids)
+//                 .join(gridss_preprocess_tumor_for_merge)
+//                 .flatMap { tumor ->
+//                     ( 0..<total_jobnodes ).collect { i ->
+//                         [
+//                             patient: tumor[1].patient, 
+//                             meta: tumor[1] + [id: tumor[1].sample, tumor_id: tumor[1].sample, normal_id: ""], 
+//                             tumor_bam: tumor[2], 
+//                             tumor_bai: tumor[3], 
+//                             tumor_gridss_preprocess: tumor[4],
+//                             normal_bam: [],
+//                             normal_bai: [],
+//                             normal_gridss_preprocess: [],
+//                             jobnodes: total_jobnodes,
+//                             jobindex: i
+//                         ]
+//                     }
+//                 }
+//                 .map { 
+//                     it.values()
+//                 }
             
-            assembly_mixed_input = assembly_paired_input
-                .mix(assembly_tumoronly_input)
-                .map{ it.toList()[1..-1] }
-                // .view{ "assembly_mixed_input $it" }
+//             assembly_mixed_input = assembly_paired_input
+//                 .mix(assembly_tumoronly_input)
+//                 .map{ it.toList()[1..-1] }
+//                 // .view{ "assembly_mixed_input $it" }
             
-            GRIDSS_ASSEMBLE_SCATTER(assembly_mixed_input, fasta, fasta_fai, bwa_index, blacklist_gridss)
+//             GRIDSS_ASSEMBLE_SCATTER(assembly_mixed_input, fasta, fasta_fai, bwa_index, blacklist_gridss)
 
-            collected_assembly_dirs = GRIDSS_ASSEMBLE_SCATTER.out.gridss_workdir
-                .map { meta, gridss_scatter_assembly_paths_per_jobnode ->
-                    [meta.patient, gridss_scatter_assembly_paths_per_jobnode]
-                }
-                .groupTuple(by: 0, size: total_jobnodes) // [meta.patient, list[workdirs0, workdirs1, ...]]
-                .map { patient, list_of_gridss_scatter_assembly_paths ->
-                    def gridss_scatter_assembly_paths = list_of_gridss_scatter_assembly_paths.flatten()
-                    def assembly_dir = gridss_scatter_assembly_paths.collect{ it.getParent().getName().toString() }.unique()[0]
-                    gridss_scatter_assembly_paths = gridss_scatter_assembly_paths.findAll { it =~ /.*chunk.*\.(bam|bai)$/ }
-                    [patient, assembly_dir, gridss_scatter_assembly_paths]
-                }
-                // .view { "collected_assembly_dirs: $it" }
+//             collected_assembly_dirs = GRIDSS_ASSEMBLE_SCATTER.out.gridss_workdir
+//                 .map { meta, gridss_scatter_assembly_paths_per_jobnode ->
+//                     [meta.patient, gridss_scatter_assembly_paths_per_jobnode]
+//                 }
+//                 .groupTuple(by: 0, size: total_jobnodes) // [meta.patient, list[workdirs0, workdirs1, ...]]
+//                 .map { patient, list_of_gridss_scatter_assembly_paths ->
+//                     def gridss_scatter_assembly_paths = list_of_gridss_scatter_assembly_paths.flatten()
+//                     def assembly_dir = gridss_scatter_assembly_paths.collect{ it.getParent().getName().toString() }.unique()[0]
+//                     gridss_scatter_assembly_paths = gridss_scatter_assembly_paths.findAll { it =~ /.*chunk.*\.(bam|bai)$/ }
+//                     [patient, assembly_dir, gridss_scatter_assembly_paths]
+//                 }
+//                 // .view { "collected_assembly_dirs: $it" }
             
-            gatherassembly_mixed_input = assembly_mixed_input
-                .map{ meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, _jobnodes, _jobindex ->
-                    [
-                        meta.patient, 
-                        meta, 
-                        tumor_bam, 
-                        tumor_bai,
-                        tumor_gridss_preprocess,
-                        normal_bam, 
-                        normal_bai,
-                        normal_gridss_preprocess
-                    ]
-                }
-                .distinct()
-                .join(
-                    collected_assembly_dirs
-                )
-                .map{ _patient, meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths ->
-                    [
-                        meta, 
-                        tumor_bam, 
-                        tumor_bai,
-                        tumor_gridss_preprocess,
-                        normal_bam, 
-                        normal_bai,
-                        normal_gridss_preprocess,
-                        gridss_assembly_dir,
-                        gridss_scatter_assembly_paths
+//             gatherassembly_mixed_input = assembly_mixed_input
+//                 .map{ meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, _jobnodes, _jobindex ->
+//                     [
+//                         meta.patient, 
+//                         meta, 
+//                         tumor_bam, 
+//                         tumor_bai,
+//                         tumor_gridss_preprocess,
+//                         normal_bam, 
+//                         normal_bai,
+//                         normal_gridss_preprocess
+//                     ]
+//                 }
+//                 .distinct()
+//                 .join(
+//                     collected_assembly_dirs
+//                 )
+//                 .map{ _patient, meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths ->
+//                     [
+//                         meta, 
+//                         tumor_bam, 
+//                         tumor_bai,
+//                         tumor_gridss_preprocess,
+//                         normal_bam, 
+//                         normal_bai,
+//                         normal_gridss_preprocess,
+//                         gridss_assembly_dir,
+//                         gridss_scatter_assembly_paths
                         
-                    ]
-                }
-                // .view { "GRIDSS_ASSEMBLE_GATHER input: $it" }
+//                     ]
+//                 }
+//                 // .view { "GRIDSS_ASSEMBLE_GATHER input: $it" }
             
-            GRIDSS_ASSEMBLE_GATHER(gatherassembly_mixed_input, fasta, fasta_fai, bwa_index, blacklist_gridss)
+//             GRIDSS_ASSEMBLE_GATHER(gatherassembly_mixed_input, fasta, fasta_fai, bwa_index, blacklist_gridss)
 
-            call_input = gatherassembly_mixed_input.map{ meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths ->
-                    [
-                        meta.patient, 
-                        meta, 
-                        tumor_bam, 
-                        tumor_bai,
-                        tumor_gridss_preprocess, 
-                        normal_bam, 
-                        normal_bai,
-                        normal_gridss_preprocess, 
-                        gridss_assembly_dir,
-                        gridss_scatter_assembly_paths
-                    ]
-                }
-                .distinct()
-                .join(
-                    GRIDSS_ASSEMBLE_GATHER.out.gridss_final_assembly
-                        .map { meta, gridss_final_assembly, gridss_gather_assembly_paths ->
-                            [meta.patient, gridss_final_assembly, gridss_gather_assembly_paths]
-                        }
-                )
-                .map{ _patient, meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths, gridss_final_assembly, gridss_gather_assembly_paths ->
-                    [
-                        meta, 
-                        tumor_bam, 
-                        tumor_bai, 
-                        tumor_gridss_preprocess, 
-                        normal_bam, 
-                        normal_bai,
-                        normal_gridss_preprocess,
-                        gridss_assembly_dir,
-                        gridss_scatter_assembly_paths + gridss_gather_assembly_paths,
-                        gridss_final_assembly
-                    ]
-                }
-                // .view { "GRIDSS_CALL input: $it" }
+//             call_input = gatherassembly_mixed_input.map{ meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths ->
+//                     [
+//                         meta.patient, 
+//                         meta, 
+//                         tumor_bam, 
+//                         tumor_bai,
+//                         tumor_gridss_preprocess, 
+//                         normal_bam, 
+//                         normal_bai,
+//                         normal_gridss_preprocess, 
+//                         gridss_assembly_dir,
+//                         gridss_scatter_assembly_paths
+//                     ]
+//                 }
+//                 .distinct()
+//                 .join(
+//                     GRIDSS_ASSEMBLE_GATHER.out.gridss_final_assembly
+//                         .map { meta, gridss_final_assembly, gridss_gather_assembly_paths ->
+//                             [meta.patient, gridss_final_assembly, gridss_gather_assembly_paths]
+//                         }
+//                 )
+//                 .map{ _patient, meta, tumor_bam, tumor_bai, tumor_gridss_preprocess, normal_bam, normal_bai, normal_gridss_preprocess, gridss_assembly_dir, gridss_scatter_assembly_paths, gridss_final_assembly, gridss_gather_assembly_paths ->
+//                     [
+//                         meta, 
+//                         tumor_bam, 
+//                         tumor_bai, 
+//                         tumor_gridss_preprocess, 
+//                         normal_bam, 
+//                         normal_bai,
+//                         normal_gridss_preprocess,
+//                         gridss_assembly_dir,
+//                         gridss_scatter_assembly_paths + gridss_gather_assembly_paths,
+//                         gridss_final_assembly
+//                     ]
+//                 }
+//                 // .view { "GRIDSS_CALL input: $it" }
             
-            GRIDSS_CALL(call_input, fasta, fasta_fai, bwa_index, blacklist_gridss)
+//             GRIDSS_CALL(call_input, fasta, fasta_fai, bwa_index, blacklist_gridss)
 
-            vcf_from_gridss_gridss = GRIDSS_CALL.out.filtered_vcf
-                .mix(gridss_existing_outputs)
+//             vcf_from_gridss_gridss = GRIDSS_CALL.out.filtered_vcf
+//                 .mix(gridss_existing_outputs)
             
-            raw_vcf = GRIDSS_CALL.out.vcf
-            raw_vcf = raw_vcf
-                .map { meta, vcf_list, tbi_list ->
-                    def i_v = vcf_list.findIndexOf { it.name.contains('gridss.vcf.gz') } 
-                    def i_t = tbi_list.findIndexOf { it.name.contains('gridss.vcf.gz.tbi') } 
+//             raw_vcf = GRIDSS_CALL.out.vcf
+//             raw_vcf = raw_vcf
+//                 .map { meta, vcf_list, tbi_list ->
+//                     def i_v = vcf_list.findIndexOf { it.name.contains('gridss.vcf.gz') } 
+//                     def i_t = tbi_list.findIndexOf { it.name.contains('gridss.vcf.gz.tbi') } 
 
-                    def vcfOut = vcf_list[i_v]
-                    def tbi = tbi_list[i_t]
-                    [ meta, vcfOut, tbi ]
-                }
-                .dump (tag: "raw vcf", pretty: true)
+//                     def vcfOut = vcf_list[i_v]
+//                     def tbi = tbi_list[i_t]
+//                     [ meta, vcfOut, tbi ]
+//                 }
+//                 .dump (tag: "raw vcf", pretty: true)
             
-            vcf_raw_from_gridss_gridss = raw_vcf
-                .mix(gridss_raw_existing_outputs)
-        } else {
+//             vcf_raw_from_gridss_gridss = raw_vcf
+//                 .mix(gridss_raw_existing_outputs)
+//         } else {
 
-            // gridss_existing_outputs = inputs_unlaned.map { it -> [it.meta, it.vcf, it.vcf_tbi] }.filter { !it[1].isEmpty() && !it[2].isEmpty() }
+//             // gridss_existing_outputs = inputs_unlaned.map { it -> [it.meta, it.vcf, it.vcf_tbi] }.filter { !it[1].isEmpty() && !it[2].isEmpty() }
             
-            if (params.tumor_only) {
-                // bam_sv_calling_status = bam_sv_calling.branch{
-                //     tumor:  it[0].status.toString() == "1"ring() == "1"
-                // }
+//             if (params.tumor_only) {
+//                 // bam_sv_calling_status = bam_sv_calling.branch{
+//                 //     tumor:  it[0].status.toString() == "1"ring() == "1"
+//                 // }
 
-                // add empty arrays to stand-in for normals
-                bam_sv_calling_pair = bam_sv_calling_status.tumor.map{ meta, bam, bai -> [ meta + [tumor_id: meta.sample], [], [], bam, bai ] }
-            } else {
-                // getting the tumor and normal cram files separated
-                // bam_sv_calling_status = bam_sv_calling.branch{
-                //     normal: it[0].status.toString() == "0"
-                //     tumor:  it[0].status.toString() == "1"
-                // }
+//                 // add empty arrays to stand-in for normals
+//                 bam_sv_calling_pair = bam_sv_calling_status.tumor.map{ meta, bam, bai -> [ meta + [tumor_id: meta.sample], [], [], bam, bai ] }
+//             } else {
+//                 // getting the tumor and normal cram files separated
+//                 // bam_sv_calling_status = bam_sv_calling.branch{
+//                 //     normal: it[0].status.toString() == "0"
+//                 //     tumor:  it[0].status.toString() == "1"
+//                 // }
 
-                // All normal samples
-                bam_sv_calling_normal_for_crossing = bam_sv_calling_status.normal.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }.dump(tag: " Normal samples for crossing:", pretty: true)
+//                 // All normal samples
+//                 bam_sv_calling_normal_for_crossing = bam_sv_calling_status.normal.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }.dump(tag: " Normal samples for crossing:", pretty: true)
 
-                // All tumor samples
-                bam_sv_calling_tumor_for_crossing = bam_sv_calling_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }.dump(tag: " Tumor samples for crossing", pretty: true)
+//                 // All tumor samples
+//                 bam_sv_calling_tumor_for_crossing = bam_sv_calling_status.tumor.map{ meta, bam, bai -> [ meta.patient, meta, bam, bai ] }.dump(tag: " Tumor samples for crossing", pretty: true)
 
-                // Crossing the normal and tumor samples to create tumor and normal pairs
-                bam_sv_calling_pair = bam_sv_calling_normal_for_crossing.cross(bam_sv_calling_tumor_for_crossing)
-                    .map { normal, tumor ->
-                        def meta = [:]
+//                 // Crossing the normal and tumor samples to create tumor and normal pairs
+//                 bam_sv_calling_pair = bam_sv_calling_normal_for_crossing.cross(bam_sv_calling_tumor_for_crossing)
+//                     .map { normal, tumor ->
+//                         def meta = [:]
 
-                        meta.id         = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
-                        meta.normal_id  = normal[1].sample
-                        meta.patient    = normal[0]
-                        meta.sex        = normal[1].sex
-                        meta.tumor_id   = tumor[1].sample
+//                         meta.id         = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
+//                         meta.normal_id  = normal[1].sample
+//                         meta.patient    = normal[0]
+//                         meta.sex        = normal[1].sex
+//                         meta.tumor_id   = tumor[1].sample
 
-                        [ meta, normal[2], normal[3], tumor[2], tumor[3] ]
-                }
-            }
+//                         [ meta, normal[2], normal[3], tumor[2], tumor[3] ]
+//                 }
+//             }
 
-            BAM_SVCALLING_GRIDSS(
-                bam_sv_calling_pair,
-                bwa_index
-            )
-            vcf_from_gridss_gridss = BAM_SVCALLING_GRIDSS.out.vcf
-                .mix(gridss_existing_outputs)
+//             BAM_SVCALLING_GRIDSS(
+//                 bam_sv_calling_pair,
+//                 bwa_index
+//             )
+//             vcf_from_gridss_gridss = BAM_SVCALLING_GRIDSS.out.vcf
+//                 .mix(gridss_existing_outputs)
 
-            vcf_raw_from_gridss_gridss = BAM_SVCALLING_GRIDSS.out.vcf
-                .mix(gridss_raw_existing_outputs)
+//             vcf_raw_from_gridss_gridss = BAM_SVCALLING_GRIDSS.out.vcf
+//                 .mix(gridss_raw_existing_outputs)
 
-        }
+//         }
 
-        // vcf_from_gridss_gridss = Channel.empty()
-        //     .mix(BAM_SVCALLING_GRIDSS.out.vcf)
-        //     .mix(gridss_existing_outputs)
-        // versions = versions.mix(BAM_SVCALLING_GRIDSS.out.versions)
+//         // vcf_from_gridss_gridss = Channel.empty()
+//         //     .mix(BAM_SVCALLING_GRIDSS.out.vcf)
+//         //     .mix(gridss_existing_outputs)
+//         // versions = versions.mix(BAM_SVCALLING_GRIDSS.out.versions)
 
-        // if (params.tumor_only) {
-        //     vcf_from_sv_calling_for_merge = vcf_from_gridss_gridss
-        //         .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
+//         // if (params.tumor_only) {
+//         //     vcf_from_sv_calling_for_merge = vcf_from_gridss_gridss
+//         //         .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
 
-        //     JUNCTION_FILTER(vcf_from_gridss_gridss)
+//         //     JUNCTION_FILTER(vcf_from_gridss_gridss)
 
-        //     pon_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.pon_filtered_sv_rds)
-        //     final_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.final_filtered_sv_rds)
-        //     final_filtered_sv_rds_for_merge = final_filtered_sv_rds
-        //         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, rds
-        // } else {
-        //     //somatic filter for GRIDSS
-        //     BAM_SVCALLING_GRIDSS_SOMATIC(vcf_from_gridss_gridss)
+//         //     pon_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.pon_filtered_sv_rds)
+//         //     final_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER.out.final_filtered_sv_rds)
+//         //     final_filtered_sv_rds_for_merge = final_filtered_sv_rds
+//         //         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, rds
+//         // } else {
+//         //     //somatic filter for GRIDSS
+//         //     BAM_SVCALLING_GRIDSS_SOMATIC(vcf_from_gridss_gridss)
 
-        //     versions = versions.mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.versions)
-        //     vcf_somatic_high_conf = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_high_confidence)
-        //     vcf_from_sv_calling_for_merge = vcf_somatic_high_conf
-        //         .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
+//         //     versions = versions.mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.versions)
+//         //     vcf_somatic_high_conf = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_high_confidence)
+//         //     vcf_from_sv_calling_for_merge = vcf_somatic_high_conf
+//         //         .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
 
-        //     unfiltered_som_sv = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_all)
-        //     unfiltered_som_sv_for_merge = unfiltered_som_sv
-        //         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
-        // }
-    }
+//         //     unfiltered_som_sv = Channel.empty().mix(BAM_SVCALLING_GRIDSS_SOMATIC.out.somatic_all)
+//         //     unfiltered_som_sv_for_merge = unfiltered_som_sv
+//         //         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
+//         // }
+//     }
     
-    emit:
-    vcf_from_gridss_gridss
-    vcf_raw_from_gridss_gridss
+//     emit:
+//     vcf_from_gridss_gridss
+//     vcf_raw_from_gridss_gridss
 
-}
+// }

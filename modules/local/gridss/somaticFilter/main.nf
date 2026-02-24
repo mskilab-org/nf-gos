@@ -18,7 +18,7 @@ process GRIPSS_SOMATIC_FILTER {
 
     output:
     tuple val(meta), path("*.gripss.filtered.vcf.gz"), path("*.gripss.filtered.vcf.gz.tbi"), emit: somatic_high_vcf,          optional:false
-    tuple val(meta), path("*.gripss.vcf.gz"), emit: somatic_all_vcf, optional:false
+    tuple val(meta), path("*.gripss.vcf.gz"), path("*.gripss.vcf.gz.tbi"), emit: somatic_all_vcf, optional:false
     path "versions.yml"                                                     , emit: versions
 
     when:

@@ -920,7 +920,7 @@ workflow NFGOS {
 
 
         unfiltered_som_sv = Channel.empty().mix(GRIDSS_SOMATIC_FILTER_STEP.out.somatic_all)
-        unfiltered_som_sv_for_merge = unfiltered_som_sv.map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
+        unfiltered_som_sv_for_merge = unfiltered_som_sv.map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
     } else {
         vcf_from_sv_calling_for_merge = vcf_from_gridss_gridss
             .map { it -> 
@@ -930,7 +930,7 @@ workflow NFGOS {
         // unfiltered_som_sv_for_merge = inputs_unlaned.map{ it ->
         //     [ it.meta.patient, [] ]
         // }
-        unfiltered_som_sv_for_merge = vcf_raw_from_gridss_gridss.map { it -> [ it[0].patient, it[1] ] }
+        unfiltered_som_sv_for_merge = vcf_raw_from_gridss_gridss.map { it -> [ it[0].patient, it[1], it[2] ] }
     }
 
 
