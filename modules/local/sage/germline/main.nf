@@ -3,9 +3,13 @@ process SAGE_GERMLINE {
     tag "$meta.id"
     label 'process_medium'
 
+    // container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    //     'https://depot.galaxyproject.org/singularity/hmftools-sage:3.4--hdfd78af_1' :
+    //     'quay.io/biocontainers/hmftools-sage:3.4--hdfd78af_1' }"
+
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/hmftools-sage:3.4--hdfd78af_1' :
-        'quay.io/biocontainers/hmftools-sage:3.4--hdfd78af_1' }"
+        'https://depot.galaxyproject.org/singularity/hmftools-sage:4.2--hdfd78af_0' :
+        'quay.io/biocontainers/hmftools-sage:4.2--hdfd78af_0' }"
 
     input:
     tuple val(meta), path(normal_bam_wgs), path(normal_bai), path(tumor_bam_wgs), path(tumor_bai)
@@ -14,9 +18,10 @@ process SAGE_GERMLINE {
     path(ref_genome_dict)
     val(ref_genome_version)
     path(ensembl_data_dir)
-    path(somatic_hotspots)
+    path(germline_hotspots)
     path(panel_bed)
     path(high_confidence_bed)
+    path(coverage_coding_bed)
 
     output:
     tuple val(meta), path('*.sage.germline.vcf.gz'), path('*.sage.germline.vcf.gz.tbi'), emit: vcf
@@ -40,19 +45,22 @@ process SAGE_GERMLINE {
         -tumor_bam ${normal_bam_wgs} \\
         -ref_genome ${ref} \\
         -ref_genome_version ${ref_genome_version} \\
-        -hotspots ${somatic_hotspots} \\
+        -hotspots ${germline_hotspots} \\
+        -germline \\
         -panel_bed ${panel_bed} \\
         -high_confidence_bed ${high_confidence_bed} \\
         -ensembl_data_dir ${ensembl_data_dir} \\
-        -hotspot_min_tumor_qual 50 \\
-        -panel_min_tumor_qual 75 \\
-        -hotspot_max_germline_vaf 100 \\
-        -hotspot_max_germline_rel_raw_base_qual 100 \\
-        -panel_max_germline_vaf 100 \\
-        -panel_max_germline_rel_raw_base_qual 100 \\
+        `#-coverage_bed ${coverage_coding_bed}` \\
+        `#-hotspot_min_tumor_qual 50` \\
+        `#-panel_min_tumor_qual 75` \\
+        `#-hotspot_max_germline_vaf 100` \\
+        `#-hotspot_max_germline_rel_raw_base_qual 100` \\
+        `#-panel_max_germline_vaf 100` \\
+        `#-panel_max_germline_rel_raw_base_qual 100` \\
         -ref_sample_count 0 \\
         -panel_only \\
-        -disable_bqr \\
+        -bqr_disable \\
+        -skip_msi_jitter \\
         -threads ${task.cpus} \\
         -output_vcf ${meta.tumor_id}.sage.germline.vcf.gz
 

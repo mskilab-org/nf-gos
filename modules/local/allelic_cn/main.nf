@@ -60,7 +60,7 @@ process NON_INTEGER_BALANCE {
     unset R_HOME
     echo "USING LIBRARIES: \$(Rscript -e 'print(.libPaths())')"
 
-    export RSCRIPT_PATH=\$(echo "${baseDir}/bin/non_integer_balance.R")
+    export RSCRIPT_PATH=\$(echo "\${NEXTFLOW_PROJECT_DIR}/bin/non_integer_balance.R")
 
     Rscript \$RSCRIPT_PATH \\
         --id $id \\
@@ -148,7 +148,7 @@ process LP_PHASED_BALANCE {
     def VERSION = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
     """
-    export RSCRIPT_PATH=\$(echo "${baseDir}/bin/lp_phased_balance.R")
+    export RSCRIPT_PATH=\$(echo "\${NEXTFLOW_PROJECT_DIR}/bin/lp_phased_balance.R")
 
     # Remove 'chr' from chromosome names in sites.txt (for hg38)
     awk 'BEGIN{OFS=" "} {gsub(/^chr/,"",\$1); print}' sites.txt > sites.tmp && mv sites.tmp sites.txt

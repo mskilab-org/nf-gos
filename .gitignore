@@ -21,3 +21,4 @@ tests/
 .aider*
 nf-gos.code-workspace
 workflows/nf-gos.code-workspace
+*workspace

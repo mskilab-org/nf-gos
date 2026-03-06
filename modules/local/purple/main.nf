@@ -3,9 +3,11 @@ process PURPLE {
     label 'process_low'
 
     conda "${moduleDir}/environment.yml"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/hmftools-purple:4.0.2--hdfd78af_0' :
-        'biocontainers/hmftools-purple:4.0.2--hdfd78af_0' }"
+    // container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    //     'https://depot.galaxyproject.org/singularity/hmftools-purple:4.0.2--hdfd78af_0' :
+    //     'biocontainers/hmftools-purple:4.0.2--hdfd78af_0' }"
+
+    container "biocontainers/hmftools-purple:4.2--hdfd78af_0"
 
     input:
     tuple val(meta), path(amber), path(cobalt), path(sv_tumor_vcf), path(sv_tumor_tbi), path(smlv_tumor_vcf), path(smlv_tumor_tbi), path(smlv_normal_vcf), path(smlv_normal_tbi)
@@ -13,6 +15,9 @@ process PURPLE {
     val genome_ver
     val highly_diploid_percentage
     val min_purity
+    val max_purity
+    val min_ploidy
+    val max_ploidy
     val ploidy_penalty_factor
     path genome_fai
     path genome_dict
@@ -49,6 +54,9 @@ process PURPLE {
 
     def highly_diploid_percentage_arg = highly_diploid_percentage ? "-highly_diploid_percentage ${highly_diploid_percentage}" : ''
     def min_purity_arg = min_purity ? "-min_purity ${min_purity}" : ''
+    def max_purity_arg = max_purity ? "-max_purity ${max_purity}" : ''
+    def min_ploidy_arg = min_ploidy ? "-min_ploidy ${min_ploidy}" : ''
+    def max_ploidy_arg = max_ploidy ? "-max_ploidy ${max_ploidy}" : ''
     def ploidy_penalty_factor_arg = ploidy_penalty_factor ? "-ploidy_penalty_factor ${ploidy_penalty_factor}" : ''
 
     def sage_known_hotspots_germline_arg = sage_known_hotspots_germline ? "-germline_hotspots ${sage_known_hotspots_germline}" : ''
@@ -71,6 +79,9 @@ process PURPLE {
         ${smlv_normal_vcf_arg} \\
         ${highly_diploid_percentage_arg} \\
         ${min_purity_arg} \\
+        ${max_purity_arg} \\
+        ${min_ploidy_arg} \\
+        ${max_ploidy_arg} \\
         ${ploidy_penalty_factor_arg} \\
         -ref_genome ${genome_fasta} \\
         -ref_genome_version ${genome_ver} \\
@@ -83,7 +94,7 @@ process PURPLE {
         ${target_region_msi_indels_arg} \\
         ${germline_del_arg} \\
         -gc_profile ${gc_profile} \\
-        -circos \$(which circos) \\
+        `# -circos \$(which circos)` \\
         -threads ${task.cpus} \\
         -output_dir purple/
 
@@ -111,13 +122,66 @@ process PURPLE {
     """
 }
 
+process REVISE_PURITYPLOIDY {
+    tag "$meta.patient"
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'docker://mskilab/unified:0.0.18-fusions':
+        'mskilab/unified:0.0.18-fusions' }"
+
+    input:
+    tuple val(meta), path(purple_purity)
+    val(use_purple_range)
+    tuple val(meta2), path(purity_range)
+
+    output:
+    tuple val(meta), path("*.revised.tsv"), emit: purple_purity_revised
+
+    script:
+    def r_use_purple_range = use_purple_range ? 'TRUE' : 'FALSE'
+    """
+    #!/usr/bin/env Rscript
+
+    library(data.table)
+
+    purple_path = "${purple_purity}"
+
+    purple_out_path = paste0(
+        tools::file_path_sans_ext(purple_path),
+        ".revised.tsv"
+    )
+
+    fit = fread(purple_path)
+
+    fitcopy = copy(fit)
+
+    do_use_purple_range_in_r = identical(${r_use_purple_range}, TRUE)
+    no_tumor_initially_identified = identical(fitcopy\$status, "NO_TUMOR")
+    do_set_diploid = no_tumor_initially_identified && !do_use_purple_range_in_r
+    do_set_first_pp_range = no_tumor_initially_identified && do_use_purple_range_in_r
+
+    if (do_set_diploid) {
+        fitcopy[, c("purity", "ploidy", "status") := list(1.00, 2.00, "REVISED_DIPLOID")]
+    } else if (do_set_first_pp_range) {
+        pp = fread("${purity_range}")
+        first_pp = pp[1, ]
+        fitcopy[, c("purity", "ploidy", "status") := list(first_pp\$purity, first_pp\$ploidy, "REVISED_FROM_PP_RANGE")]
+    }
+    
+
+    fwrite(fitcopy, purple_out_path, sep = "\\t")
+
+    quit("no", status = 0)
+    """
+}
+
+
 process EXTRACT_PURITYPLOIDY {
     input:
     tuple val(meta), path(purple_purity)
 
     output:
-    tuple val(meta), env('purity_val'), emit: purity_val
-    tuple val(meta), env('ploidy_val'), emit: ploidy_val
+    tuple val(meta), env(purity_val), emit: purity_val
+    tuple val(meta), env(ploidy_val), emit: ploidy_val
 
     script:
     """

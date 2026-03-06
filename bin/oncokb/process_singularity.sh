@@ -73,7 +73,7 @@ if [ -e $VCF ] && [ ! $(wc -c <${VCF}) == 0 ]; then
 
     is_vcf_ucsc=false
     bcftools view -h ${VCF} | grep "^##contig=" | grep "ID=chr" >/dev/null && is_vcf_ucsc=true
-    if [ "${is_vcf_ucsc}" = "true" ]; then
+    if ${is_vcf_ucsc}; then
         echo "VCF has UCSC style contigs (i.e. contains chr)"
         tmprename="$(mktemp -t tmp.XXXXXXXXXX.vcf)"
         ${HOME}/scripts/vcf_convert_ucsc_to_ncbi_contigs.py ${VCF} ${tmprename}
@@ -111,16 +111,19 @@ if [ -e $VCF ] && [ ! $(wc -c <${VCF}) == 0 ]; then
         is_grch38=$( ( [ $(tolower $ASSEMBLY) == "hg38" ] || [ $(tolower $ASSEMBLY) == "grch38" ] ) && echo true || echo false )
         if $is_grch37; then
             ref_path=${VEP_DIR}/homo_sapiens/112_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz
+            vep_cache_version=112
         elif $is_grch38; then
             ref_path=${VEP_DIR}/homo_sapiens/113_GRCh38/Homo_sapiens.GRCh38.dna.toplevel.fa.gz
+            vep_cache_version=113
         else
             echo "VEP Reference FASTA not found/supported!"
             exit 1
         fi
 
-        perl ${HOME}/git/vcf2maf/vcf2maf.pl \
+        /opt/conda/envs/pact/bin/perl ${HOME}/git/vcf2maf/vcf2maf.pl \
             --inhibit-vep \
             --vep-data=${VEP_DIR} \
+            --cache-version ${vep_cache_version} \
             --ref-fasta ${ref_path} `# --ref-fasta ${VEP_DIR}/homo_sapiens/112_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz` \
             --vep-path /opt/conda/envs/pact/bin \
             --input-vcf ${VCF} \
@@ -140,22 +143,36 @@ if [ -e $VCF ] && [ ! $(wc -c <${VCF}) == 0 ]; then
         -o ./oncokb_annotated.maf \
         -b ${ONCOKB_TOKEN} \
         -r ${ASSEMBLY} \
-        -d || \
+        -d \
+        -a || \
         { echo "OncoKB Annotation failed!" && exit 1; }
 
+    num_fields=$( cat oncokb_annotated.maf | head -n+1 | awk -F'\t' '{print NF}' )
 
-
-    (
-        Rscript "${HOME}/scripts/add_role_to_oncokb_maf.R" \
-            --oncokb ${ONCOKB_GENES} \
-            --oncokb_output ./oncokb_annotated.maf \
-            --output_path ./ \
-            --multiplicity ${MULTIPLICITY} \
-            --cna ${CNA}
+        
+    ( 
+        Rscript --vanilla "${HOME}/scripts/add_role_to_oncokb_maf.R" \
+        --oncokb_output ./oncokb_annotated.maf \
+        --oncokb ${ONCOKB_GENES} \
+        --output_path ./ \
+        --expected_num_fields ${num_fields} \
+        `#--multiplicity ${MULTIPLICITY}` \
+        --cna ${CNA}
 
         # Output is "merged_oncokb.maf"
-
     )
+
+    # (
+    #     Rscript "${HOME}/scripts/add_role_to_oncokb_maf.R" \
+    #         --oncokb ${ONCOKB_GENES} \
+    #         --oncokb_output ./oncokb_annotated.maf \
+    #         --output_path ./ \
+    #         --multiplicity ${MULTIPLICITY} \
+    #         --cna ${CNA}
+
+    #     # Output is "merged_oncokb.maf"
+
+    # )
 fi
 
 if [ -e ${FUSIONS} ] && [ ! $(wc -c <${FUSIONS}) == 0 ]; then

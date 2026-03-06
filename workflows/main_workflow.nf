@@ -131,6 +131,7 @@ include {
 include { 
     ALIGNMENT_STEP; 
     BAM_QC;
+    ITDSEEK_STEP;
     MSISENSORPRO_STEP;
     SV_CALLING_STEP;
     FRAGCOUNTER_STEP;
@@ -141,6 +142,7 @@ include {
     CBS_STEP;
     VARIANT_CALLING_STEP;
     VARIANT_ANNOTATION_STEP;
+    ECHTVAR_STEP;
     JABBA_STEP;
     NON_INTEGER_BALANCE_STEP;
     LP_PHASED_BALANCE_STEP;
@@ -224,6 +226,9 @@ workflow SETUP {
         ],
         "snpeff"     : [
             params.snpeff_cache
+        ],
+        "echtvar"  : [
+            params.echtvar_dbnsfp
         ],
         "sage"       : [
             params.ensembl_data_dir,
@@ -444,12 +449,28 @@ workflow TOOLS {
     // Iteratively select tools based on available inputs
     skip_tools = params.skip_tools ? params.skip_tools.split(',').collect { it.trim() } : []
     println "Skipping tools: ${skip_tools}"
+    run_tools = params.only_tools ? params.only_tools.split(',').collect { it -> it.trim() } : []
+    is_run_tools_populated = ! run_tools.isEmpty()
+    if (is_run_tools_populated) {
+        println "Running tools: ${run_tools}" 
+    }
+    
+    is_overlapping = run_tools.any { it ->
+        skip_tools.contains(it)
+    }
+    if (is_overlapping) {
+        println "Overlapping tool sets specified in skip and only tools parameters.. defaulting to running the tool specified"
+    }
     // TODO: if GRIDSS - skip if vcf is found, but not if vcf_raw is present.
     selected_tools = []
     tools_qc = ["collect_wgs_metrics", "collect_multiple_metrics", "estimate_library_complexity"]
     selected_tools_map = [:]
+    // is_scenario1 = run_tools not specified, so try to add to selected tools from the menu (tool_input_output_map)
+    // is_scenario2 = run_tools is specified, so try to see if the tool matches the menu
     tool_input_output_map.each { tool, io ->
-        if (!selected_tools.contains(tool) && !skip_tools.contains(tool)) {
+        def is_scenario1 = ! is_run_tools_populated && !selected_tools.contains(tool) && !skip_tools.contains(tool)
+        def is_scenario2 = ! is_scenario1 && run_tools.contains(tool)
+        if (is_scenario1 || is_scenario2) {
 
             def inputsRequired = io.inputs
             def inputsPresent = inputsRequired.every { available_inputs.contains(it) }
@@ -690,7 +711,7 @@ workflow NFGOS {
 
     // Always build indices
     // ##############################
-    PREPARE_GENOME()
+    PREPARE_GENOME(inputs_unlaned)
 
     // Gather built indices or get them from the params
     // Built from the fasta file:
@@ -767,6 +788,9 @@ workflow NFGOS {
     dict_path = dict.map{ _meta, dictOut -> [dictOut] }
     BAM_QC(inputs, alignment_bams_final, dict_path, tools_used)
 
+
+    ITDSEEK_STEP(inputs_unlaned, alignment_bams_final, tools_used)
+
     // MSISensorPro
     // ##############################
     MSISENSORPRO_STEP(
@@ -790,12 +814,35 @@ workflow NFGOS {
     vcf_from_gridss_gridss = SV_CALLING_STEP.out.vcf_from_gridss_gridss
     vcf_raw_from_gridss_gridss = SV_CALLING_STEP.out.vcf_raw_from_gridss_gridss
 
-    do_filter_ffpe_chimera = params.filter_ffpe_chimera ?: false
-    if (do_filter_ffpe_chimera) {
-        SV_CHIMERA_FILTER_VCF(vcf_from_gridss_gridss)
-        SV_CHIMERA_FILTER_RAWVCF(vcf_raw_from_gridss_gridss)
-        vcf_from_gridss_gridss = SV_CHIMERA_FILTER_VCF.out.vcftbi
-        vcf_raw_from_gridss_gridss = SV_CHIMERA_FILTER_RAWVCF.out.vcftbi
+    do_sv_filter_ffpe_chimera = params.sv_filter_ffpe_chimera ?: false
+    println "do_sv_filter_ffpe_chimera: ${do_sv_filter_ffpe_chimera}"
+    if (do_sv_filter_ffpe_chimera) {
+        chimera_outputs = inputs_unlaned.filter {it -> it.meta.status.toString() == "1" }.map { it -> 
+            [it.meta, it.structural_variants_chimera_filtered, it.structural_variants_chimera_filtered_tbi]
+        }
+
+        chimera_existing_outputs = chimera_outputs.filter { it -> !it[1].isEmpty() && !it[2].isEmpty() }
+        chimera_inputs = chimera_outputs.filter { it -> it[1].isEmpty() || it[2].isEmpty() }.map {it -> [ it[0].patient ] }.unique()
+
+        chimera_raw_outputs = inputs_unlaned.filter {it -> it.meta.status.toString() == "1" }.map { it -> 
+            [it.meta, it.structural_variants_raw_chimera_filtered, it.structural_variants_raw_chimera_filtered_tbi]
+        }
+
+        chimera_raw_existing_outputs = chimera_raw_outputs.filter { it -> !it[1].isEmpty() && !it[2].isEmpty() }
+        chimera_raw_inputs = chimera_raw_outputs.filter { it -> it[1].isEmpty() || it[2].isEmpty() }.map {it -> [ it[0].patient ] }.unique()
+
+        SV_CHIMERA_FILTER_VCF(
+            vcf_from_gridss_gridss.map { it -> [ it[0].patient, it[0], it[1], it[2] ] } // meta.patient, meta, vcf, tbi
+            .join(chimera_inputs)
+            .map { _patient, meta, vcf, tbi -> [ meta, vcf, tbi ] }
+        )
+        SV_CHIMERA_FILTER_RAWVCF(
+            vcf_raw_from_gridss_gridss.map { it -> [ it[0].patient, it[0], it[1], it[2] ] } // meta.patient, meta, vcf, tbi
+            .join(chimera_raw_inputs)
+            .map { _patient, meta, vcf, tbi -> [ meta, vcf, tbi ] }
+        )
+        vcf_from_gridss_gridss = SV_CHIMERA_FILTER_VCF.out.vcftbi.mix(chimera_existing_outputs)
+        vcf_raw_from_gridss_gridss = SV_CHIMERA_FILTER_RAWVCF.out.vcftbi.mix(chimera_raw_existing_outputs)
     }
 
     /* FIXME: Junction Filtering step
@@ -803,7 +850,7 @@ workflow NFGOS {
     */
     final_filtered_sv_rds_for_merge = Channel.empty()
     unfiltered_som_sv_for_merge = Channel.empty()
-    def is_any_vcf_raw_provided = Globals.rowsAsMaps.any { ! ( it.vcf_raw == null || it.vcf_raw == [] || it.vcf_raw == '' ) }
+    is_any_vcf_raw_provided = Globals.rowsAsMaps.any { it -> ! ( it.vcf_raw == null || it.vcf_raw == [] || it.vcf_raw == '' ) }
     if (params.tumor_only) {
         vcf_from_sv_calling_for_merge = vcf_from_gridss_gridss
             .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
@@ -811,7 +858,20 @@ workflow NFGOS {
         vcf_from_gridss_gridss.dump(tag: "vcf_from_gridss_gridss", pretty: true)
 
         // JUNCTION_FILTER(vcf_from_gridss_gridss)
-        JUNCTION_FILTER__OUT = JUNCTION_FILTER_STEP(vcf_raw_from_gridss_gridss)
+        vcf_raw_to_filter = vcf_raw_from_gridss_gridss
+            .map{ meta, vcf, tbi -> [ meta.patient, meta, vcf, tbi ] }
+            .join(
+                inputs_unlaned
+                    .filter{ it -> 
+                        it.meta.status.toString() == "1" &&
+                        it.vcf.isEmpty()
+                    }
+                    .map{ it -> [ it.meta.patient ] }
+                    .unique()
+            )
+            .map { _patient, meta, vcf, tbi -> [ meta, vcf, tbi ] }
+        
+        JUNCTION_FILTER__OUT = JUNCTION_FILTER_STEP(vcf_raw_to_filter)
 
         pon_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER__OUT.pon_filtered_sv_rds)
         final_filtered_sv_rds = Channel.empty().mix(JUNCTION_FILTER__OUT.final_filtered_sv_rds)
@@ -830,27 +890,47 @@ workflow NFGOS {
                     .unique()
             )
 
-    } else if (params.gridss_somatic_filter && is_any_vcf_raw_provided) {
+    } else if (params.gridss_somatic_filter) {
         //somatic filter for GRIDSS
-        GRIDSS_SOMATIC_FILTER_STEP(vcf_raw_from_gridss_gridss)
+
+        // output_gridss_somatic_filter = vcf_from_gridss_gridss.map { meta, vcf, tbi -> [ meta.patient , [ meta, vcf, tbi ] ] }
+        // vcf_raw_gridss_filter_input = vcf_raw_from_gridss_gridss.map { meta, vcf_raw, tbi_raw ->
+        //         [ meta.get("patient"), [ meta, vcf_raw, tbi_raw ] ]
+        //     }
+        //     .join(
+        //         output_gridss_somatic_filter,
+        //         remainder: true
+        //     )
+        //     .filter { patient, raw_list, vcf_list ->
+        //         vcf_list == null // vcf_list will be null if key is not matched
+        //     }
+        //     .map { patient, raw_list, vcf_list ->
+        //         raw_list
+        //     }
+        
+        GRIDSS_SOMATIC_FILTER_STEP(
+            vcf_raw_from_gridss_gridss
+        )
 
         versions = versions.mix(GRIDSS_SOMATIC_FILTER_STEP.out.versions)
         vcf_somatic_high_conf = Channel.empty().mix(GRIDSS_SOMATIC_FILTER_STEP.out.somatic_high_confidence)
-        vcf_from_sv_calling_for_merge = vcf_somatic_high_conf
-            .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
+        vcf_from_gridss_gridss = vcf_somatic_high_conf
+        vcf_from_sv_calling_for_merge = vcf_from_gridss_gridss.map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
+
+
 
         unfiltered_som_sv = Channel.empty().mix(GRIDSS_SOMATIC_FILTER_STEP.out.somatic_all)
-        unfiltered_som_sv_for_merge = unfiltered_som_sv
-            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, vcf
+        unfiltered_som_sv_for_merge = unfiltered_som_sv.map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, vcf, tbi
     } else {
         vcf_from_sv_calling_for_merge = vcf_from_gridss_gridss
             .map { it -> 
                 [ it[0].patient, it[1], it[2] ]  // meta.patient, vcf, tbi
             }
             .dump(tag: "sv output for paired run starting from 'vcf' column", pretty: true)
-        unfiltered_som_sv_for_merge = inputs_unlaned.map{ it ->
-            [ it.meta.patient, [] ]
-        }
+        // unfiltered_som_sv_for_merge = inputs_unlaned.map{ it ->
+        //     [ it.meta.patient, [] ]
+        // }
+        unfiltered_som_sv_for_merge = vcf_raw_from_gridss_gridss.map { it -> [ it[0].patient, it[1], it[2] ] }
     }
 
 
@@ -952,6 +1032,17 @@ workflow NFGOS {
     
     snv_germline_annotations_for_merge = VARIANT_ANNOTATION_STEP.out.snv_germline_annotations
                 .map { it -> [ it[0].patient, it[1] ] } // meta.patient, annotated germline snv vcf
+    
+    snv_somatic_bcf_annotations = VARIANT_ANNOTATION_STEP.out.snv_somatic_bcf_annotations
+
+    snv_germline_bcf_annotations = VARIANT_ANNOTATION_STEP.out.snv_germline_bcf_annotations
+    
+    ECHTVAR_STEP(
+        inputs_unlaned,
+        snv_somatic_bcf_annotations,
+        snv_germline_bcf_annotations,
+        tools_used
+    )
 
 
     PURPLE_STEP(

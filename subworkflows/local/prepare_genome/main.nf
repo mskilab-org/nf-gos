@@ -8,9 +8,9 @@
 // Condition is based on params.step and params.tools
 // If and extra condition exists, it's specified in comments
 
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
+// import java.nio.file.Files
+// import java.nio.file.Path
+// import java.nio.file.Paths
 
 
 include { GATK4_CREATESEQUENCEDICTIONARY         } from '../../../modules/nf-core/gatk4/createsequencedictionary/main'
@@ -26,34 +26,60 @@ include { UNZIP as UNZIP_ALLELES                 } from '../../../modules/nf-cor
 include { UNZIP as UNZIP_GC                      } from '../../../modules/nf-core/unzip/main'
 include { UNZIP as UNZIP_LOCI                    } from '../../../modules/nf-core/unzip/main'
 include { UNZIP as UNZIP_RT                      } from '../../../modules/nf-core/unzip/main'
+include { CHECK_REFERENCE_BAM_MATCH } from '../../../modules/local/process.nf'
 
-ascat_alleles                       = WorkflowNfcasereports.create_file_channel(params.ascat_alleles)
-ascat_loci                          = WorkflowNfcasereports.create_file_channel(params.ascat_loci)
-ascat_loci_gc                       = WorkflowNfcasereports.create_file_channel(params.ascat_loci_gc)
-ascat_loci_rt                       = WorkflowNfcasereports.create_file_channel(params.ascat_loci_rt)
-chr_dir                             = WorkflowNfcasereports.create_file_channel(params.chr_dir)
-dbsnp                               = WorkflowNfcasereports.create_file_channel(params.dbsnp)
-fasta                               = WorkflowNfcasereports.create_file_channel(params.fasta)
-fasta_fai                           = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
-bwa                                 = WorkflowNfcasereports.create_file_channel(params.bwa)
-germline_resource                   = WorkflowNfcasereports.create_file_channel(params.germline_resource)
-known_indels                        = WorkflowNfcasereports.create_file_channel(params.known_indels)
-known_snps                          = WorkflowNfcasereports.create_file_channel(params.known_snps)
-pon                                 = WorkflowNfcasereports.create_file_channel(params.pon)
-msisensorpro_list                   = WorkflowNfcasereports.create_file_channel(params.msisensorpro_list)
 
 workflow PREPARE_GENOME {
+    take:
+    inputs_unlaned
 
     main:
-    fasta = fasta.map{ fasta -> [ [ id:fasta.baseName[0] ], fasta ] }
+    ascat_alleles                       = WorkflowNfcasereports.create_file_channel(params.ascat_alleles)
+    ascat_loci                          = WorkflowNfcasereports.create_file_channel(params.ascat_loci)
+    ascat_loci_gc                       = WorkflowNfcasereports.create_file_channel(params.ascat_loci_gc)
+    ascat_loci_rt                       = WorkflowNfcasereports.create_file_channel(params.ascat_loci_rt)
+    chr_dir                             = WorkflowNfcasereports.create_file_channel(params.chr_dir)
+    dbsnp                               = WorkflowNfcasereports.create_file_channel(params.dbsnp)
+    fasta                               = WorkflowNfcasereports.create_file_channel(params.fasta)
+    fasta_fai                           = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
+    bwa                                 = WorkflowNfcasereports.create_file_channel(params.bwa)
+    germline_resource                   = WorkflowNfcasereports.create_file_channel(params.germline_resource)
+    known_indels                        = WorkflowNfcasereports.create_file_channel(params.known_indels)
+    known_snps                          = WorkflowNfcasereports.create_file_channel(params.known_snps)
+    pon                                 = WorkflowNfcasereports.create_file_channel(params.pon)
+    msisensorpro_list                   = WorkflowNfcasereports.create_file_channel(params.msisensorpro_list)
+
+    fasta = fasta.map{ fasta_path -> [ [ id:fasta_path.baseName[0] ], fasta_path ] }
     fasta.dump(tag: "fasta in PREPARE_GENOME", pretty: true)
 
     versions = Channel.empty()
 
+    do_check_reference_bam_match = params.match_reference_and_bam ? params.match_reference_and_bam : false
+    if (do_check_reference_bam_match) {
+        fasta_bam_matches = CHECK_REFERENCE_BAM_MATCH(
+            inputs_unlaned.filter{ it -> !it.bam.isEmpty() }.unique{ it -> it.bam }.map { it -> 
+                [ it.meta, it.bam ]
+            },
+            Channel.value(params.fasta),
+            Channel.value(params.fasta_fai) 
+        )
+        
+        fasta_bam_matches.is_fully_matched.toList().map { it ->
+            def unmatched_meta = it.findAll { _meta, is_matched, _bam_path -> ! is_matched }.collect{ meta, _is_matched, bam_path -> 
+                println "${meta.sample}: ${bam_path} has mismatched rnames with ${params.fasta_fai}; see ./${params.outdir}/check_bam_fasta_rname/${meta.sample}/ for rname mismatches"
+                meta
+            }
+            if (! unmatched_meta.isEmpty()) {
+                error("Reference rname mismatches between bam and fasta detected! Halting nextflow")
+            }
+            return(it)
+        }
+    }
+
     GATK4_CREATESEQUENCEDICTIONARY(fasta)
     // only run msisensorpro_scan if the msisensorpro_list is an empty channel
     println "params.msisensorpro_list: ${params.msisensorpro_list}"
-    def is_msisensorpro_list_present = params.msisensorpro_list ? Files.exists(Paths.get(params.msisensorpro_list)) : false
+    def is_msisensorpro_list_present = params.msisensorpro_list ? java.nio.file.Files.exists(java.nio.file.Paths.get(params.msisensorpro_list)) : false
     println "is_msisensorpro_list_present: ${is_msisensorpro_list_present}"
     if (! is_msisensorpro_list_present) {
         MSISENSORPRO_SCAN(fasta)

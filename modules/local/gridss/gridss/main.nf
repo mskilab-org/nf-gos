@@ -186,6 +186,7 @@ process GRIDSS_ASSEMBLE_SCATTER {
 
     output:
     tuple val(meta), path("*assembly.bam.gridss.working/**"), emit: gridss_workdir, optional:false
+    tuple val(meta), path("*.assembly.bam"), emit: gridss_scatter_assembly_bam, optional:true
     path "versions.yml", emit: versions
 
     when:

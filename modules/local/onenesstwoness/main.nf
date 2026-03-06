@@ -26,7 +26,7 @@ process ONENESS_TWONESS {
     def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
     """
-    export RSCRIPT_PATH=\$(echo "${baseDir}/bin/OnenessTwoness.R")
+    export RSCRIPT_PATH=\$(echo "\${NEXTFLOW_PROJECT_DIR}/bin/OnenessTwoness.R")
 
     Rscript \$RSCRIPT_PATH \\
     --complex $events_output \\

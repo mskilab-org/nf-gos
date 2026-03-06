@@ -1,5 +1,5 @@
 //
-// This file holds several functions specific to the workflow/nfcasereports.nf in the mskilab-org/nf-casereports pipeline
+// This file holds several functions specific to the workflow/nfcasereports.nf in the mskilab-org/nf-gos pipeline
 //
 
 import nextflow.Nextflow
@@ -35,6 +35,9 @@ class WorkflowNfcasereports {
     }
 
     public static create_value_channel(parameter) {
+        if (parameter instanceof Boolean) {
+            return Channel.value(parameter)
+        }
         return parameter ? Channel.value(parameter) : Channel.empty()
     }
 

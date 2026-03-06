@@ -1,4 +1,4 @@
-# NF-CaseReports (Nextflow - Case Reports Pipeline)
+# nf-gos (Nextflow - Case Reports Pipeline)
 
 [![Cite with Zenodo](http://img.shields.io/badge/DOI-10.5281/zenodo.XXXXXXX-1073c8?labelColor=000000)](https://doi.org/10.5281/zenodo.XXXXXXX)
 
@@ -8,7 +8,7 @@
 
 ## Introduction
 
-**mskilab-org/nf-casereports** is a bioinformatics pipeline from [`mskilab-org`](https://www.mskilab.org/) for running [`JaBbA`](https://github.com/mskilab-org/JaBbA/), our algorithm for MIP based joint inference of copy number and rearrangement state in cancer whole genome sequence data. This pipeline runs all the pre-requisite tools (among others) and generates the necessary inputs for running JaBbA and loading into [gOS](https://github.com/mskilab-org/gOS), our clinical front-end. It is designed to take paired tumor-normal samples or tumor-only samples as input.
+**mskilab-org/nf-gos** is a bioinformatics pipeline from [`mskilab-org`](https://www.mskilab.org/) for running [`JaBbA`](https://github.com/mskilab-org/JaBbA/), our algorithm for MIP based joint inference of copy number and rearrangement state in cancer whole genome sequence data. This pipeline runs all the pre-requisite tools (among others) and generates the necessary inputs for running JaBbA and loading into [gOS](https://github.com/mskilab-org/gOS), our clinical front-end. It is designed to take paired tumor-normal samples or tumor-only samples as input.
 
 ## Workflow Summary:
 1. Align to Reference Genome (currently supports `BWA-MEM`, `BWA-MEM2`, and GPU accelerated `fq2bam`).
@@ -48,7 +48,7 @@ path** for inputs inside the samplesheet rather than relative paths.*
 For paired tumor-normal samples, use the same `patient` ID, but different
 `sample` names. Indicate their respective tumor/normal `status`, where **1** in
 the `status` field indicates a tumor sample, and **0** indicates a normal
-sample. You may pass multiple `sample` IDs per patient, `nf-casereports` will
+sample. You may pass multiple `sample` IDs per patient, `nf-gos` will
 consider them as separate samples belonging to the same patient and output the
 results accordingly.
 
@@ -79,7 +79,7 @@ The first time the pipeline is executed in a run directory, a wizard will prompt
 You can also run the pipeline directly using the following command:
 
 ```bash
-nextflow run mskilab-org/nf-casereports \
+nextflow run mskilab-org/nf-gos \
    -profile <docker|singularity|institute> \
    --input samplesheet.csv \
    --outdir <OUTDIR> \

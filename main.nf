@@ -101,6 +101,14 @@ params.mask_non_integer_balance = WorkflowMain.getGenomeAttribute(params, 'mask_
 params.mask_lp_phased_balance = WorkflowMain.getGenomeAttribute(params, 'mask_lp_phased_balance')
 params.ref_hrdetect = WorkflowMain.getGenomeAttribute(params, 'ref_hrdetect')
 params.heme_db = WorkflowMain.getGenomeAttribute(params, 'heme_db')
+params.echtvar_dbnsfp = WorkflowMain.getGenomeAttribute(params, 'echtvar_dbnsfp')
+params.echtvar_clinvar = WorkflowMain.getGenomeAttribute(params, 'echtvar_clinvar')
+params.echtvar_civic = WorkflowMain.getGenomeAttribute(params, 'echtvar_civic')
+params.pon_gridss_bedpe_svs = WorkflowMain.getGenomeAttribute(params, 'pon_gridss_bedpe_svs')
+params.pon_gridss_bed_breakends = WorkflowMain.getGenomeAttribute(params, 'pon_gridss_bed_breakends')
+params.pon_gridss_known_hotspots_bedpe = WorkflowMain.getGenomeAttribute(params, 'pon_gridss_known_hotspots_bedpe')
+params.pon_gridss_ref_genome_version = WorkflowMain.getGenomeAttribute(params, 'pon_gridss_ref_genome_version')
+params.coverage_coding_bed = WorkflowMain.getGenomeAttribute(params, 'coverage_coding_bed')
 //params.blacklist_junctions_jabba = WorkflowMain.getGenomeAttribute(params, 'blacklist_junctions_jabba')
 
 /*

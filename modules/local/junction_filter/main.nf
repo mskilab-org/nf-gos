@@ -128,7 +128,7 @@ process JUNCTION_FILTER {
     val(padding)
 
     output:
-    tuple val(meta), path("somatic.filtered.gnoMAD.sv.rds"), emit: final_filtered_sv_rds, optional:false
+    tuple val(meta), path("somatic.filtered.gnomAD.sv.rds"), emit: final_filtered_sv_rds, optional:false
     tuple val(meta), path("somatic.filtered.sv.rds"), emit: pon_filtered_sv_rds, optional: false
     path "versions.yml", emit: versions, optional:false
 
@@ -138,7 +138,7 @@ process JUNCTION_FILTER {
     script:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
-    def VERSION = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
+    def VERSION = '0.16' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
     """
     #!/bin/bash
@@ -160,7 +160,7 @@ process JUNCTION_FILTER {
 
     stub:
     prefix = task.ext.prefix ?: "${meta.id}"
-    def VERSION = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
+    def VERSION = '0.16' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
     """
     touch somatic.filtered.gnoMAD.sv.rds somatic.filtered.sv.rds
     cat <<-END_VERSIONS > versions.yml

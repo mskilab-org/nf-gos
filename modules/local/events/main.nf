@@ -31,7 +31,7 @@ process EVENTS {
     source /opt/conda/etc/profile.d/conda.sh && \
     conda activate pact
 
-    export RSCRIPT_PATH=\$(echo "${baseDir}/bin/Events.R")
+    export RSCRIPT_PATH=\$(echo "\${NEXTFLOW_PROJECT_DIR}/bin/Events.R")
 
     Rscript \$RSCRIPT_PATH \\
 	--id $id \\

@@ -8,6 +8,7 @@ class Globals {
 
   static Map tool_input_output_map = [
         "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
+        "itdseek": [ inputs: ['bam'], outputs: ['itdseek_vcf', 'itdseek_rds'] ],
         "collect_wgs_metrics": [
             inputs: ['bam'],
             outputs: ['qc_coverage_metrics']
@@ -21,10 +22,7 @@ class Globals {
         ],
         "conpair": [
             inputs: ['bam'],
-            outputs: [
-                ['conpair_concordance'],
-                ['conpair_contamination']
-            ]
+            outputs: ['conpair_concordance', 'conpair_contamination']
         ],
         "estimate_library_complexity": [ inputs: ['bam'], outputs: ['qc_dup_rate'] ],
         // "bamqc": [ inputs: ['bam'], outputs: ['wgs_metrics', 'alignment_metrics', 'insert_size_metrics', "estimate_library_complexity"] ],
@@ -59,6 +57,7 @@ class Globals {
         "events": [ inputs: ['ni_balanced_gg'], outputs: ['events'] ],
         "fusions": [ inputs: ['ni_balanced_gg'], outputs: ['fusions'] ],
         "snpeff": [ inputs: ['snv_somatic_vcf'], outputs: ['variant_somatic_ann', 'variant_somatic_bcf'] ],
+        "echtvar": [ inputs: ['variant_somatic_bcf'], outputs: ['echtvar_variant_somatic_bcf'] ],
         "snv_multiplicity": [ inputs: ['jabba_gg', 'variant_somatic_ann'], outputs: ['snv_multiplicity'] ],
         "oncokb": [ inputs: ['variant_somatic_ann', 'snv_multiplicity', 'jabba_gg', 'fusions'], outputs: ['oncokb_maf', 'oncokb_fusions', 'oncokb_cna'] ],
         "signatures": [ inputs: ['variant_somatic_ann'], outputs: ['sbs_signatures', 'indel_signatures', 'signatures_matrix'] ],

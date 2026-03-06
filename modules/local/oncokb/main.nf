@@ -7,9 +7,13 @@ process ONCOKB_ANNOTATOR {
     maxRetries 100
     maxErrors 100
 
+    // container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    //     'docker://mskilab/unified:0.0.12':
+    //     'mskilab/unified:0.0.12' }"
+
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/unified:0.0.12':
-        'mskilab/unified:0.0.12' }"
+        'docker://mskilab/unified:0.0.28-rebuild':
+        'mskilab/unified:0.0.28-rebuild' }"
 
     input:
     tuple val(meta), path(vcf), path(fusions), path(cna)
@@ -31,7 +35,7 @@ process ONCOKB_ANNOTATOR {
     script:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
-    def libdir = "${baseDir}/oncokb"
+    def libdir = "\${NEXTFLOW_PROJECT_DIR}/oncokb"
     def verbose = "TRUE"
     def tumor_type = "unknown"
     def VERSION = '0.1'
@@ -44,7 +48,7 @@ process ONCOKB_ANNOTATOR {
 	export TMPDIR=${safe_tmpdir}
     set +u  # Disable unbound variable check
     source /opt/conda/etc/profile.d/conda.sh
-    conda activate pact
+    # conda activate mskilab
     \${NEXTFLOW_PROJECT_DIR}/bin/oncokb/process_singularity.sh ${vcf} ${fusions} ${cna} ${multiplicity} ${assembly} ${task.cpus} ${do_vep} ${verbose} ${tumor_type} ${vep_dir} ${oncokb_genes} ${gencode}
 
     cat <<-END_VERSIONS > versions.yml

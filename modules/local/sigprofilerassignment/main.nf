@@ -40,7 +40,7 @@ process SIGPROFILERASSIGNMENT {
     def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
     """
-    export SIGPROFILER_PATH=\$(echo "${baseDir}/bin/sigprofilerassignment.py")
+    export SIGPROFILER_PATH=\$(echo "\${NEXTFLOW_PROJECT_DIR}/bin/sigprofilerassignment.py")
 
 	if  [ ! -f ${vcf_gz} ]; then
 		bgzip -c ${vcf} > ${vcf_gz}

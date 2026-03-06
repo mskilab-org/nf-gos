@@ -47,6 +47,8 @@ workflow BAM_SAGE {
     sage_pass_filtered_somatic_vcf = SAGE_PASS_FILTER.out.vcf
 
     if (!params.tumor_only) {
+        germline_hotspots = Channel.fromPath(params.germline_hotspots).collect()
+        coverage_coding_bed = Channel.fromPath(params.coverage_coding_bed).collect()
         SAGE_GERMLINE(
             inputs,
             ref,
@@ -54,9 +56,10 @@ workflow BAM_SAGE {
             ref_genome_dict,
             ref_genome_version,
             ensembl_data_dir,
-            somatic_hotspots,
+            germline_hotspots,
             panel_bed,
-            high_confidence_bed
+            high_confidence_bed,
+            coverage_coding_bed
         )
 
         sage_germline_vcf = SAGE_GERMLINE.out.vcf

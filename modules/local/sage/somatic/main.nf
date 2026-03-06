@@ -3,9 +3,13 @@ process SAGE_SOMATIC {
     tag "$meta.id"
     label 'process_medium'
 
+    // container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    //     'https://depot.galaxyproject.org/singularity/hmftools-sage:3.4--hdfd78af_1' :
+    //     'quay.io/biocontainers/hmftools-sage:3.4--hdfd78af_1' }"
+
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/hmftools-sage:3.4--hdfd78af_1' :
-        'quay.io/biocontainers/hmftools-sage:3.4--hdfd78af_1' }"
+        'https://depot.galaxyproject.org/singularity/hmftools-sage:4.2--hdfd78af_0' :
+        'quay.io/biocontainers/hmftools-sage:4.2--hdfd78af_0' }"
 
     input:
     tuple val(meta), path(normal_bam_wgs), path(normal_bai), path(tumor_bam_wgs), path(tumor_bai)
@@ -48,7 +52,8 @@ process SAGE_SOMATIC {
         -panel_bed ${panel_bed} \\
         -high_confidence_bed ${high_confidence_bed} \\
         -ensembl_data_dir ${ensembl_data_dir} \\
-        -disable_bqr \\
+        -bqr_disable \\
+        -skip_msi_jitter \\
         -threads ${task.cpus} \\
         -output_vcf ${meta.id}.sage.somatic.vcf.gz
 
@@ -324,7 +329,7 @@ process RESCUE_CH_HEME {
     source /opt/conda/etc/profile.d/conda.sh
     conda activate pact
 
-    export RSCRIPT_PATH=\$(echo "${baseDir}/bin/rescue_ch.R")
+    export RSCRIPT_PATH=\$(echo "\${NEXTFLOW_PROJECT_DIR}/bin/rescue_ch.R")
 
     Rscript \$RSCRIPT_PATH \\
         --vcf ${sage_vcf} \\

@@ -27,15 +27,15 @@ process HETPILEUPS {
 
     """
 
-    ## export RSCRIPT_PATH=\$(if [[ ${workflow.containerEngine} == "singularity" && !task.ext.singularity_pull_docker_container ]]; then echo "/Pileup.R"; else echo "\${baseDir}/bin/Pileup.R"; fi)
+    ## export RSCRIPT_PATH=\$(if [[ ${workflow.containerEngine} == "singularity" && !task.ext.singularity_pull_docker_container ]]; then echo "/Pileup.R"; else echo "\\${NEXTFLOW_PROJECT_DIR}/bin/Pileup.R"; fi)
 
     ##export RSCRIPT_PATH=\$(if [[ ${workflow.containerEngine} == "singularity" && !task.ext.singularity_pull_docker_container ]]; then
     ##                                echo "/Pileup.R"
     ##                            else
-    ##                                echo "${baseDir}/bin/Pileup.R"
+    ##                                echo "\${NEXTFLOW_PROJECT_DIR}/bin/Pileup.R"
     ##                        fi)
 
-    export RSCRIPT_PATH=\$(echo "${baseDir}/bin/Pileups.R")
+    export RSCRIPT_PATH=\$(echo "\${NEXTFLOW_PROJECT_DIR}/bin/Pileups.R")
 
     Rscript \$RSCRIPT_PATH \\
 	--tbam $tumor_bam_wgs \\

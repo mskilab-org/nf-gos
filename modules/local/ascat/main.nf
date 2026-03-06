@@ -30,8 +30,8 @@ process ASCAT_SEG {
     def VERSION = '2.5.2'                              // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
 
     """
-    ## RSCRIPT_PATH=\$(if [[ ${workflow.containerEngine} == "singularity" && !task.ext.singularity_pull_docker_container ]]; then echo "/usr/bin/ascat_seg.R"; else echo "\${baseDir}/bin/ascat_seg.R"; fi)
-    export RSCRIPT_PATH=\$(echo "${baseDir}/bin/ascat_seg.R")
+    ## RSCRIPT_PATH=\$(if [[ ${workflow.containerEngine} == "singularity" && !task.ext.singularity_pull_docker_container ]]; then echo "/usr/bin/ascat_seg.R"; else echo "\\${NEXTFLOW_PROJECT_DIR}/bin/ascat_seg.R"; fi)
+    export RSCRIPT_PATH=\$(echo "\${NEXTFLOW_PROJECT_DIR}/bin/ascat_seg.R")
 
     Rscript \$RSCRIPT_PATH       \\
     --id          ${meta.id}     \\
