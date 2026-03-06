@@ -19,3 +19,5 @@ bin/gosh/tests/test_data/
 bin/gosh/tests/test_data/
 tests/
 .aider*
+nf-gos.code-workspace
+workflows/nf-gos.code-workspace
