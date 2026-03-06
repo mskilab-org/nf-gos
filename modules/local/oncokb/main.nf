@@ -12,8 +12,8 @@ process ONCOKB_ANNOTATOR {
     //     'mskilab/unified:0.0.12' }"
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/unified:0.0.21-snpeff':
-        'mskilab/unified:0.0.21-snpeff' }"
+        'docker://mskilab/unified:0.0.28-rebuild':
+        'mskilab/unified:0.0.28-rebuild' }"
 
     input:
     tuple val(meta), path(vcf), path(fusions), path(cna)
@@ -48,7 +48,7 @@ process ONCOKB_ANNOTATOR {
 	export TMPDIR=${safe_tmpdir}
     set +u  # Disable unbound variable check
     source /opt/conda/etc/profile.d/conda.sh
-    conda activate pact
+    # conda activate mskilab
     \${NEXTFLOW_PROJECT_DIR}/bin/oncokb/process_singularity.sh ${vcf} ${fusions} ${cna} ${multiplicity} ${assembly} ${task.cpus} ${do_vep} ${verbose} ${tumor_type} ${vep_dir} ${oncokb_genes} ${gencode}
 
     cat <<-END_VERSIONS > versions.yml

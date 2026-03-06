@@ -111,16 +111,19 @@ if [ -e $VCF ] && [ ! $(wc -c <${VCF}) == 0 ]; then
         is_grch38=$( ( [ $(tolower $ASSEMBLY) == "hg38" ] || [ $(tolower $ASSEMBLY) == "grch38" ] ) && echo true || echo false )
         if $is_grch37; then
             ref_path=${VEP_DIR}/homo_sapiens/112_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz
+            vep_cache_version=112
         elif $is_grch38; then
             ref_path=${VEP_DIR}/homo_sapiens/113_GRCh38/Homo_sapiens.GRCh38.dna.toplevel.fa.gz
+            vep_cache_version=113
         else
             echo "VEP Reference FASTA not found/supported!"
             exit 1
         fi
 
-        perl ${HOME}/git/vcf2maf/vcf2maf.pl \
+        /opt/conda/envs/pact/bin/perl ${HOME}/git/vcf2maf/vcf2maf.pl \
             --inhibit-vep \
             --vep-data=${VEP_DIR} \
+            --cache-version ${vep_cache_version} \
             --ref-fasta ${ref_path} `# --ref-fasta ${VEP_DIR}/homo_sapiens/112_GRCh37/Homo_sapiens.GRCh37.dna.toplevel.fa.gz` \
             --vep-path /opt/conda/envs/pact/bin \
             --input-vcf ${VCF} \
