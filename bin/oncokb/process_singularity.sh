@@ -177,14 +177,28 @@ fi
 
 if [ -e ${FUSIONS} ] && [ ! $(wc -c <${FUSIONS}) == 0 ]; then
 
-        # Below must be inside parentheses so the environment change happens within a subshell
-        (
-            Rscript ${HOME}/scripts/parse_fusions_for_oncokb.R --libdir ${LIBDIR} --fusions ${FUSIONS} --path ./input_fusions.tsv
-        )
+        
+        Rscript ${HOME}/scripts/parse_fusions_for_oncokb.R --libdir ${LIBDIR} --fusions ${FUSIONS} --path ./input_fusions.tsv
+        
         set -x
         python ${HOME}/git/oncokb-annotator/FusionAnnotator.py \
             -i ./input_fusions.tsv \
             -o ./oncokb_fusions.tsv \
+            $( test ! $(tolower ${TUMOR_TYPE}) = unknown && printf %s "-t ${TUMOR_TYPE}" )  \
+            -b $ONCOKB_TOKEN \
+            -d
+        
+        python ${HOME}/git/oncokb-annotator/MafAnnotator.py \
+            -i ./partial_tandem_duplication.maf \
+            -o ./oncokb_partial_tandem_duplication.tsv \
+            $( test ! $(tolower ${TUMOR_TYPE}) = unknown && printf %s "-t ${TUMOR_TYPE}" )  \
+            -b $ONCOKB_TOKEN \
+            -d \
+            -a
+        
+        python ${HOME}/git/oncokb-annotator/StructuralVariantAnnotator.py \
+            -i ./intragenic_del.tsv \
+            -o ./oncokb_intragenic_del.tsv \
             $( test ! $(tolower ${TUMOR_TYPE}) = unknown && printf %s "-t ${TUMOR_TYPE}" )  \
             -b $ONCOKB_TOKEN \
             -d

@@ -12,8 +12,8 @@ process ONCOKB_ANNOTATOR {
     //     'mskilab/unified:0.0.12' }"
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/unified:0.0.28-rebuild':
-        'mskilab/unified:0.0.28-rebuild' }"
+        'docker://mskilab/unified:0.0.29-rebuild':
+        'mskilab/unified:0.0.29-rebuild' }"
 
     input:
     tuple val(meta), path(vcf), path(fusions), path(cna)
@@ -26,6 +26,11 @@ process ONCOKB_ANNOTATOR {
     output:
     path "merged_oncokb.maf", emit: merged_oncokb_vcf
     path "merged_oncokb_fusions.tsv", emit: merged_oncokb_fusions
+    path "merged_oncokb_fusions.json", emit: merged_oncokb_fusions_json, optional: true
+    path "merged_oncokb_intragenic_del.tsv", emit: merged_oncokb_intragenic_del
+    path "merged_oncokb_intragenic_del.json", emit: merged_oncokb_intragenic_del_json, optional: true
+    path "merged_oncokb_partial_tandem_duplication.tsv", emit: merged_oncokb_partial_tandem_duplication
+    path "merged_oncokb_partial_tandem_duplication.json", emit: merged_oncokb_partial_tandem_duplication_json, optional: true
     path "merged_oncokb_cna.tsv", emit: merged_oncokb_cna
     path "versions.yml",      emit: versions
 
