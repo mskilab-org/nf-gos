@@ -47,6 +47,7 @@ workflow BAM_SVCALLING_GRIDSS {
 workflow GRIDSS_SOMATIC_FILTER_STEP {
     take:
     vcf
+    inputs_unlaned
 
     main:
     // pondir_gridss = WorkflowNfcasereports.create_file_channel(params.pon_gridss)
@@ -61,6 +62,26 @@ workflow GRIDSS_SOMATIC_FILTER_STEP {
     somatic_all             = Channel.empty()
     somatic_high_confidence = Channel.empty()
 
+    vcf = vcf.map { it -> 
+        [ it[0].patient, [ it[0], it[1], it[2] ] ] // meta.patient, [vcf, vcf_index]
+    }
+    .join(
+        inputs_unlaned.filter {it -> it.meta.status.toString() == "0"}.map { it ->  [ it.meta.patient, [ it.meta + [ normal_id: it.meta.sample ] ] ]}.unique(),
+        remainder: true
+    )
+    .dump(tag: "right after join vcf_joined_with_inputs for GRIDSS_SOMATIC_FILTER_STEP", pretty: true)
+    .map { it -> // patient, [ meta (vcf), vcf (vcf), vcf_tbi (vcf) ], [ meta with normal id (inputs) ]
+        def (_key, existing, meta_input_lst) = (it + [null, null])[0..2]
+        def (meta_existing, vcf_existing, tbi_existing) = existing ?: [null, null, null]
+        def meta_input = meta_input_lst ? meta_input_lst[0] : null // should only be one entry in the list since we unique by patient, but just in case we take the first
+        if (meta_input != null) {
+            meta_existing = meta_existing + [ normal_id: meta_input.normal_id ]
+        }
+        [ meta_existing, vcf_existing, tbi_existing ]
+    }
+    .dump(tag: "vcf_joined_with_inputs for GRIDSS_SOMATIC_FILTER_STEP", pretty: true)
+    .filter { it -> it[0] != null } // filter out any entries that don't have meta (shouldn't be any since we join with remainder: true, but just in case)
+    
     GRIPSS_SOMATIC_FILTER(
         vcf, 
         pon_gridss_bedpe_svs,

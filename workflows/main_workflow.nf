@@ -909,7 +909,8 @@ workflow NFGOS {
         //     }
         
         GRIDSS_SOMATIC_FILTER_STEP(
-            vcf_raw_from_gridss_gridss
+            vcf_raw_from_gridss_gridss,
+            inputs_unlaned
         )
 
         versions = versions.mix(GRIDSS_SOMATIC_FILTER_STEP.out.versions)

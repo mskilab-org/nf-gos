@@ -1985,7 +1985,6 @@ workflow PURPLE_STEP {
 
     // need a channel with patient and meta for merging with rest
     purple_inputs_for_merge = inputs_unlaned
-        .filter { it -> it.meta.status.toString() == "1" }
         .filter { it -> 
             (it.ploidy instanceof List && it.ploidy.isEmpty())
             || (it.purity instanceof List && it.purity.isEmpty())
@@ -2037,15 +2036,15 @@ workflow PURPLE_STEP {
             }
             .dump(tag: "meta_purple merged", pretty: true)
 
-    purple_inputs_cobalt_dir = purple_inputs_for_merge
+    purple_inputs_cobalt_dir = meta_purple_branched.tumor
         .join(cobalt_dir_for_merge)
         .map { it -> [ it[0], it[2] ] } // patient, cobalt_dir
 
-    purple_inputs_amber_dir = purple_inputs_for_merge
+    purple_inputs_amber_dir = meta_purple_branched.tumor
         .join(amber_dir_for_merge)
         .map { it -> [ it[0], it[2] ] } // patient, amber_dir
 
-    purple_inputs_sv = purple_inputs_for_merge.map { it -> [ it[0], [], [] ] }.unique{ it -> it[0] }
+    purple_inputs_sv = meta_purple_branched.tumor.map { it -> [ it[0], [], [] ] }.unique{ it -> it[0] }
     if (params.purple_use_svs) {
         sample_purple_use_svs = inputs_unlaned
             .filter { it -> it.meta.status.toString() == "1" }
@@ -2069,7 +2068,7 @@ workflow PURPLE_STEP {
                 println "purple_use_svs for sample ${it.meta.sample} set to ${value}"
                 [ it.meta.patient, [ value ] ]
             }
-        purple_inputs_sv = purple_inputs_for_merge.map { it -> [ it[0], [ it[1] ] ] } // patient, [meta]
+        purple_inputs_sv = meta_purple_branched.tumor.filter { it -> it[1].status.toString() == "1" }.map { it -> [ it[0], [ it[1] ] ] } // patient, [meta]
             .join(vcf_from_sv_calling_for_merge.map { it -> [ it[0] ] + [ it[1..-1] ] })
             .join(sample_purple_use_svs)
             .map { it -> // patient, meta, vcftbi_list, use_svs_list
@@ -2087,18 +2086,18 @@ workflow PURPLE_STEP {
                 // .map { it -> [ it[0], it[2], it[3] ] } // patient, vcf, tbi
     }
 
-    purple_inputs_snv = purple_inputs_for_merge.map { it -> [ it[0], [], [] ] }.unique{ it -> it[0] }
+    purple_inputs_snv = meta_purple_branched.tumor.map { it -> [ it[0], [], [] ] }.unique{ it -> it[0] }
     if (params.purple_use_smlvs) {
         println "Using Purple small variants"
-        purple_inputs_snv = purple_inputs_for_merge
+        purple_inputs_snv = meta_purple_branched.tumor.filter { it -> it[1].status.toString() == "1" }
             .join(filtered_somatic_vcf_for_merge)
             .map { it -> [ it[0], it[2], it[3] ] } // patient, vcf, tbi
     }
 
-    purple_inputs_snv_germline = purple_inputs_for_merge.map { it -> [ it[0], [], [] ] }.unique{ it -> it[0] }
+    purple_inputs_snv_germline = meta_purple_branched.tumor.map { it -> [ it[0], [], [] ] }.unique{ it -> it[0] }
 
     if (! params.tumor_only && params.purple_use_smlvs) {
-        purple_inputs_snv_germline = purple_inputs_for_merge
+        purple_inputs_snv_germline = meta_purple_branched.tumor.filter { it -> it[1].status.toString() == "1" }
             .join(germline_vcf_for_merge)
             .map { it -> [ it[0], it[2], it[3] ] } // patient, vcf, tbi
     }
