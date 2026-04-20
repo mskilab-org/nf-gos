@@ -19,7 +19,12 @@ process SV_CHIMERA_FILTER {
     def prefix = task.ext.prefix ?: "${meta.id}"
     def out_vcf = vcf.getName().replaceFirst(/\.vcf(\.gz|\.bgz)?$/, '.ffpe_filtered.vcf.gz')
     """
-    bcftools view -Oz -i "(FORMAT/SR[1] + FORMAT/RP[1]) > 6 && (INFO/AS) >= 1 && (FORMAT/QUAL[1]) >= 150" ${vcf} > ${out_vcf}
+    # Detect tumor sample name (first sample listed = tumor by GRIDSS/SvABA convention)
+    tumor_idx=\$(( \$(bcftools query -l ${vcf} | wc -l) - 1 ))
+    bcftools view -Oz \\
+        -i "(FORMAT/SR[\${tumor_idx}] + FORMAT/RP[\${tumor_idx}]) > 6 && (INFO/AS) >= 1 && (FORMAT/QUAL[\${tumor_idx}]) >= 150" \\
+        ${vcf} > ${out_vcf}
+    # bcftools view -Oz -i "(FORMAT/SR[1] + FORMAT/RP[1]) > 6 && (INFO/AS) >= 1 && (FORMAT/QUAL[1]) >= 150" ${vcf} > ${out_vcf}
 
     bcftools index --tbi ${out_vcf}
 
