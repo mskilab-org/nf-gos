@@ -65,6 +65,7 @@ workflow GRIDSS_SOMATIC_FILTER_STEP {
     vcf = vcf.map { it -> 
         [ it[0].patient, [ it[0], it[1], it[2] ] ] // meta.patient, [vcf, vcf_index]
     }
+    .dump(tag: "vcf mapped to patient for GRIDSS_SOMATIC_FILTER_STEP", pretty: true)
     .join(
         inputs_unlaned.filter {it -> it.meta.status.toString() == "0"}.map { it ->  [ it.meta.patient, [ it.meta + [ normal_id: it.meta.sample ] ] ]}.unique(),
         remainder: true
@@ -74,7 +75,7 @@ workflow GRIDSS_SOMATIC_FILTER_STEP {
         def (_key, existing, meta_input_lst) = (it + [null, null])[0..2]
         def (meta_existing, vcf_existing, tbi_existing) = existing ?: [null, null, null]
         def meta_input = meta_input_lst ? meta_input_lst[0] : null // should only be one entry in the list since we unique by patient, but just in case we take the first
-        if (meta_input != null) {
+        if (meta_existing && meta_input) { // Need to test for both because vcf may be an empty channel depending on state of the dag, i.e. if only aligner is specified as the tool, this process is still instantiated but the vcf channel default is not inherited from a prior process.
             meta_existing = meta_existing + [ normal_id: meta_input.normal_id ]
         }
         [ meta_existing, vcf_existing, tbi_existing ]
