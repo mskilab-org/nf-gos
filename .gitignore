@@ -20,3 +20,4 @@ bin/gosh/tests/test_data/
 tests/
 .aider*
 *workspace
+dag.dot

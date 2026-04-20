@@ -177,11 +177,13 @@ fi
 
 if [ -e ${FUSIONS} ] && [ ! $(wc -c <${FUSIONS}) == 0 ]; then
 
-        # Below must be inside parentheses so the environment change happens within a subshell
-        (
-            Rscript ${HOME}/scripts/parse_fusions_for_oncokb.R --libdir ${LIBDIR} --fusions ${FUSIONS} --path ./input_fusions.tsv
-        )
+        
+        touch ./input_fusions.tsv ./partial_tandem_duplication.maf ./intragenic_del.tsv
+
+        Rscript ${HOME}/scripts/parse_fusions_for_oncokb.R --libdir ${LIBDIR} --fusions ${FUSIONS} --path ./input_fusions.tsv
+        
         set -x
+        
         python ${HOME}/git/oncokb-annotator/FusionAnnotator.py \
             -i ./input_fusions.tsv \
             -o ./oncokb_fusions.tsv \
