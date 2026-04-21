@@ -146,9 +146,18 @@ include { validateParameters; paramsHelp } from 'plugin/nf-schema'
 //
 
 include { NFGOS } from './workflows/main_workflow.nf'
+include { NFTAPS } from './workflows/main_workflow___taps.nf'
 
 workflow {
-    NFGOS()
+    if (params.workflow == 'wgs') {
+        NFGOS()
+    } else if (params.workflow == 'taps') {
+        NFTAPS()
+    } else {
+        log.error "Invalid workflow specified: ${params.workflow}"
+        log.error "Please choose either 'wgs' or 'taps'"
+        System.exit(1)
+    }
 
     workflow.onComplete = {
         NfcoreTemplate.summary(workflow, params, log)
