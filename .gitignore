@@ -21,3 +21,4 @@ tests/
 .aider*
 *workspace
 dag.dot
+.vscode/settings.json

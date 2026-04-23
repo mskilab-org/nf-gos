@@ -152,7 +152,8 @@ include {
     ONCOKB_STEP;
     SIGNATURES_STEP;
     HRDETECT_STEP;
-    ONENESS_TWONESS_STEP
+    ONENESS_TWONESS_STEP;
+    TAPS_VARIANT_CALLING_STEP
 } from '../subworkflows/local/steps.nf'
 
 include {
@@ -429,21 +430,25 @@ workflow TOOLS {
     requiredFields = props.findAll { !it.value.containsKey('meta') }.keySet()
     println "requiredFields: $requiredFields"
 
-    missing_outputs = requiredFields.findAll { field ->
-        // Check if this field is missing (null or empty collection) in any sample
-        sampleList.any { sample ->
-            def value = sample[field]
-            // !value || (value instanceof Collection && value.empty) || value.toString() == ""
-            def truthy_val = (
-                (!value) ||
-                (value == null) ||
-                (value instanceof Collection && value.empty) ||
-                (value.toString().trim() == "") ||
-                (value instanceof String && value.replaceAll(/["']/, "").trim() == "")
-            )
-            truthy_val
-        }
+    // Direct per-field missingness probe — does not depend on the schema or on
+    // missing_outputs being populated. Utils.robustly_test_if_empty handles null
+    // (missing map key), empty collections, blank strings, and missing/empty
+    // files/paths uniformly.
+    is_field_missing_in_any_sample = { field ->
+        sampleList.any { sample -> Utils.robustly_test_if_empty(sample[field]) }
     }
+
+    // Union schema-declared output fields with fields declared as outputs anywhere in
+    // tool_input_output_map. This lets us mark a tool as "needed" based on its declared
+    // outputs even when those outputs are not yet enumerated in schema_input.json —
+    // avoiding the need to update the schema every time a tool is added or renamed.
+    // .flatten() handles both flat lists (most tools) and nested lists
+    // (e.g. collect_multiple_metrics: [['qc_alignment_summary'], ['qc_insert_size']]).
+    all_tool_output_fields = tool_input_output_map.values()
+        .collectMany { io -> io.outputs.flatten() as List } as Set
+    candidate_output_fields = ((requiredFields as Set) + all_tool_output_fields) as Set
+
+    missing_outputs = candidate_output_fields.findAll(is_field_missing_in_any_sample)
     println "Outputs MISSING from at least one sample: $missing_outputs"
 
     // Iteratively select tools based on available inputs
@@ -474,7 +479,10 @@ workflow TOOLS {
 
             def inputsRequired = io.inputs
             def inputsPresent = inputsRequired.every { available_inputs.contains(it) }
-            def outputsNeeded = io.outputs.any { missing_outputs.contains(it) }
+            // Probe each output field directly against sample rows rather than looking it
+            // up in missing_outputs — this way fields that are not (yet) in the schema
+            // still count as "needed" if absent from any sample.
+            def outputsNeeded = io.outputs.flatten().any(is_field_missing_in_any_sample)
 
             // special cases
             def is_sage_tumor_only = tool == "sage" && params.tumor_only
@@ -489,24 +497,16 @@ workflow TOOLS {
 
             // Treat special cases
             if (is_sage_tumor_only) {
-                outputsNeeded = ["snv_somatic_vcf", "snv_somatic_vcf_tumoronly_filtered"].any {
-                    missing_outputs.contains(it)
-                }
+                outputsNeeded = ["snv_somatic_vcf", "snv_somatic_vcf_tumoronly_filtered"].any(is_field_missing_in_any_sample)
             }
 
             if (is_sage_heme) {
-                outputsNeeded = ["snv_somatic_vcf", "snv_somatic_vcf_tumoronly_filtered", "snv_somatic_vcf_rescue_ch_heme"].any {
-                    missing_outputs.contains(it)
-                }
+                outputsNeeded = ["snv_somatic_vcf", "snv_somatic_vcf_tumoronly_filtered", "snv_somatic_vcf_rescue_ch_heme"].any(is_field_missing_in_any_sample)
             }
 
             if (is_current_tool_qc_multiple_metrics) {
-                def is_any_alignment_summary_absent = io.outputs[0].any {
-                    missing_outputs.contains(it)
-                }
-                def is_any_insert_size_absent = io.outputs[1].any {
-                    missing_outputs.contains(it)
-                }
+                def is_any_alignment_summary_absent = io.outputs[0].any(is_field_missing_in_any_sample)
+                def is_any_insert_size_absent = io.outputs[1].any(is_field_missing_in_any_sample)
                 outputsNeeded = is_any_alignment_summary_absent || is_any_insert_size_absent
             }
 
@@ -651,12 +651,18 @@ workflow NFTAPS {
     // selected_tools_map = TOOLS.out.selected_tools_map
 
     dbsnp = WorkflowNfcasereports.create_file_channel(params.dbsnp)
+    Globals.global_params.dbsnp = dbsnp
     fasta = WorkflowNfcasereports.create_file_channel(params.fasta)
+    Globals.global_params.fasta = fasta
     fasta_fai = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
     germline_resource = WorkflowNfcasereports.create_file_channel(params.germline_resource)
+    Globals.global_params.germline_resource = germline_resource
     known_indels = WorkflowNfcasereports.create_file_channel(params.known_indels)
+    Globals.global_params.known_indels = known_indels
     known_snps = WorkflowNfcasereports.create_file_channel(params.known_snps)
+    Globals.global_params.known_snps = known_snps
     pon = WorkflowNfcasereports.create_file_channel(params.pon)
+    Globals.global_params.pon = pon
     junction_pon_dir = WorkflowNfcasereports.create_file_channel(params.junction_pon_dir)
 
     // Initialize value channels based on params, defined in the params.genomes[params.genome] scope
@@ -715,10 +721,12 @@ workflow NFTAPS {
 
     // Gather built indices or get them from the params
     // Built from the fasta file:
-    dict = params.dict ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect()
-                                    : PREPARE_GENOME.out.dict
+    dict = params.dict ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect() : PREPARE_GENOME.out.dict
+    Globals.global_params.dict = dict
     fasta_fai = WorkflowNfcasereports.create_file_channel(params.fasta_fai, PREPARE_GENOME.out.fasta_fai)
+    Globals.global_params.fasta_fai = fasta_fai
     bwa = WorkflowNfcasereports.create_file_channel(params.bwa)
+    Globals.global_params.bwa = bwa
 
     // Gather index for mapping given the chosen aligner
     index_alignment = bwa
@@ -727,19 +735,28 @@ workflow NFTAPS {
     msisensorpro_scan = PREPARE_GENOME.out.msisensorpro_scan
 
     dbsnp_tbi =  WorkflowNfcasereports.create_index_channel(params.dbsnp, params.dbsnp_tbi, PREPARE_GENOME.out.dbsnp_tbi)
+    Globals.global_params.dbsnp_tbi = dbsnp_tbi
     //do not change to Channel.value([]), the check for its existence then fails for Getpileupsumamries
     germline_resource_tbi = params.germline_resource ? params.germline_resource_tbi ? Channel.fromPath(params.germline_resource_tbi).collect() : PREPARE_GENOME.out.germline_resource_tbi : []
+    Globals.global_params.germline_resource_tbi = germline_resource_tbi
     known_indels_tbi = WorkflowNfcasereports.create_index_channel(params.known_indels, params.known_indels_tbi, PREPARE_GENOME.out.known_indels_tbi)
+    Globals.global_params.known_indels_tbi = known_indels_tbi
     known_snps_tbi = WorkflowNfcasereports.create_index_channel(params.known_snps, params.known_snps_tbi, PREPARE_GENOME.out.known_snps_tbi)
+    Globals.global_params.known_snps_tbi = known_snps_tbi
     pon_tbi = WorkflowNfcasereports.create_index_channel(params.pon, params.pon_tbi, PREPARE_GENOME.out.pon_tbi)
+    Globals.global_params.pon_tbi = pon_tbi
 
     // known_sites is made by grouping both the dbsnp and the known snps/indels resources
     // Which can either or both be optional
     known_sites_indels = dbsnp.concat(known_indels).collect()
+    Globals.global_params.known_sites_indels = known_sites_indels
     known_sites_indels_tbi = dbsnp_tbi.concat(known_indels_tbi).collect()
+    Globals.global_params.known_sites_indels_tbi = known_sites_indels_tbi
 
     known_sites_snps = dbsnp.concat(known_snps).collect()
+    Globals.global_params.known_sites_snps = known_sites_snps
     known_sites_snps_tbi = dbsnp_tbi.concat(known_snps_tbi).collect()
+    Globals.global_params.known_sites_snps_tbi = known_sites_snps_tbi
 
     // Build intervals if needed
     PREPARE_INTERVALS(fasta_fai, params.intervals, params.no_intervals)
@@ -1003,20 +1020,20 @@ workflow NFTAPS {
         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, cbs_nseg
         .dump(tag: "cbs_nseg_for_merge", pretty: true)
 
-    VARIANT_CALLING_STEP(
+    TAPS_VARIANT_CALLING_STEP(
         inputs_unlaned,
         alignment_bams_final,
-        dbsnp_tbi,
-        known_indels_tbi,
         tools_used
     )
 
 
-    filtered_somatic_vcf_for_merge = VARIANT_CALLING_STEP.out.filtered_somatic_vcf
+    filtered_somatic_vcf_for_merge = TAPS_VARIANT_CALLING_STEP.out.tumor_only_filtered_vcf
         .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, filtered somatic snv vcf, tbi
     
-    germline_vcf_for_merge = VARIANT_CALLING_STEP.out.germline_vcf
-                .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, germline snv vcf, tbi
+    germline_vcf_for_merge = Channel.empty()
+    
+    // germline_vcf_for_merge = TAPS_VARIANT_CALLING_STEP.out.germline_vcf
+    //             .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, germline snv vcf, tbi
 
     VARIANT_ANNOTATION_STEP(
         inputs_unlaned,

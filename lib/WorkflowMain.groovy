@@ -55,4 +55,21 @@ class WorkflowMain {
         }
         return null
     }
+
+    //
+    // Promote every key from params.genomes[params.genome] onto the top-level params map.
+    // Existing values on params are preserved, so explicit user overrides (CLI or config)
+    // beat the genome preset. Keys present on params but set to null are treated as unset
+    // and get filled from the genome block.
+    //
+    public static void loadGenomeParams(params) {
+        if (!(params.genomes && params.genome && params.genomes.containsKey(params.genome))) {
+            return
+        }
+        params.genomes[ params.genome ].each { key, value ->
+            if (!params.containsKey(key) || params[key] == null) {
+                params[key] = value
+            }
+        }
+    }
 }

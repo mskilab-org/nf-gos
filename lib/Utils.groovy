@@ -61,18 +61,44 @@ class Utils {
     //     return truthy_val
     // }
     static boolean robustly_test_if_empty(value) {
-        if (!value) return true
         if (value == null) return true
-        if (value instanceof Collection && value.empty) return true
-        if (value instanceof String && value.replaceAll(/["']/, "").trim() == "") return true
 
-        try {
-            def val = value.toList()
-            if (val.empty) return true
-        } catch (Exception ignored) {
-            def dummy = null
+        // Collections / Maps / arrays: emptiness is definitive — do not fall through
+        // to the File check, since stringifying "[Path(/x)]" does not name a real file.
+        if (value instanceof Collection) return value.isEmpty()
+        if (value instanceof Map) return value.isEmpty()
+        if (value instanceof Object[]) return value.length == 0
+
+        // CharSequence covers String and GString; treat whitespace/quote-only as empty
+        if (value instanceof CharSequence) {
+            return value.toString().replaceAll(/["']/, "").trim() == ""
         }
 
+        // File / Path: empty iff missing, zero-length file, or empty directory
+        if (value instanceof File) {
+            if (!value.exists()) return true
+            if (value.isFile() && value.length() == 0) return true
+            if (value.isDirectory() && value.list().length == 0) return true
+            return false
+        }
+        if (value instanceof java.nio.file.Path) {
+            def f = value.toFile()
+            if (!f.exists()) return true
+            if (f.isFile() && f.length() == 0) return true
+            if (f.isDirectory() && f.list().length == 0) return true
+            return false
+        }
+
+        // Groovy-truthy fallback: 0, false, etc. → empty
+        if (!value) return true
+
+        // Iterables without a specific type above — try to realize to a list
+        try {
+            def val = value.toList()
+            if (val instanceof List) return val.isEmpty()
+        } catch (Exception ignored) { }
+
+        // Last resort: treat as a path-like string
         def f = new File(value.toString())
         if (!f.exists()) return true
         if (f.isFile() && f.length() == 0) return true

@@ -62,6 +62,10 @@ class Globals {
         "oncokb": [ inputs: ['variant_somatic_ann', 'snv_multiplicity', 'jabba_gg', 'fusions'], outputs: ['oncokb_maf', 'oncokb_fusions', 'oncokb_cna'] ],
         "signatures": [ inputs: ['variant_somatic_ann'], outputs: ['sbs_signatures', 'indel_signatures', 'signatures_matrix'] ],
         "hrdetect": [ inputs: ['hets', 'vcf', 'jabba_gg', 'variant_somatic_ann'], outputs: ['hrdetect'] ],
-        "onenesstwoness": [ inputs: ['events', 'hrdetect'], outputs: ['onenesstwoness'] ]
+        "onenesstwoness": [ inputs: ['events', 'hrdetect'], outputs: ['onenesstwoness'] ],
+        "rastair": [ inputs: ['bam'], outputs: ['rastair_vcf'] ],
+        "mutect2_taps": [ inputs: ['bam'], outputs: ['mutect2_taps_vcf'] ]
     ]
+
+    static Map global_params = [:]
 }
