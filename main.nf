@@ -112,6 +112,8 @@ params.coverage_coding_bed = WorkflowMain.getGenomeAttribute(params, 'coverage_c
 //params.blacklist_junctions_jabba = WorkflowMain.getGenomeAttribute(params, 'blacklist_junctions_jabba')
 params.taps_skeletal_bed = WorkflowMain.getGenomeAttribute(params, 'taps_skeletal_bed')
 
+// WorkflowMain.loadGenomeParams(params)
+
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     ALTERNATIVE INPUT FILE ON RESTART
