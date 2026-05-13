@@ -64,7 +64,8 @@ class Globals {
         "hrdetect": [ inputs: ['hets', 'vcf', 'jabba_gg', 'variant_somatic_ann'], outputs: ['hrdetect'] ],
         "onenesstwoness": [ inputs: ['events', 'hrdetect'], outputs: ['onenesstwoness'] ],
         "rastair": [ inputs: ['bam'], outputs: ['rastair_vcf'] ],
-        "mutect2_taps": [ inputs: ['bam'], outputs: ['mutect2_taps_vcf'] ]
+        "mutect2_taps": [ inputs: ['bam'], outputs: ['mutect2_taps_vcf'] ],
+        "ichorcna": [ inputs: ['bam'], outputs: ['purity', 'ploidy'] ]
     ]
 
     static Map global_params = [:]

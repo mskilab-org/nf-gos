@@ -2044,6 +2044,158 @@ workflow ECHTVAR_STEP {
 
 }   
 
+
+include { 
+    ICHORCNA  ;
+    EXTRACT_PURITYPLOIDY_ICHORCNA
+} from '../../modules/local/process.nf'
+workflow ICHORCNA_STEP {
+    take:
+    inputs_unlaned
+    alignment_bams_final
+    tools_used
+
+    main:
+    fasta = Globals.global_params.fasta
+    fasta_fai = Globals.global_params.fasta_fai
+    assembly = WorkflowNfcasereports.create_value_channel(params.ichorcna_assembly)
+
+    versions = Channel.empty()
+    inputs_unlaned_branch = inputs_unlaned.branch{ it -> 
+        tumor: it.meta.status.toString() == "1"
+        normal: it.meta.status.toString() == "0"
+    }
+    
+    existing_outputs_ploidy = inputs_unlaned_branch.tumor
+        .map { it -> 
+            [it.meta, it.ploidy] 
+        }
+        .filter { it -> 
+            ! Utils.robustly_test_if_empty(it[1])
+            // !(it[1] instanceof List && it[1].isEmpty())
+        }.unique()
+    existing_outputs_purity = inputs_unlaned_branch.tumor
+        .map { it -> 
+            [it.meta, it.purity] 
+        }
+        .filter { it -> 
+            ! Utils.robustly_test_if_empty(it[1])
+            // !(it[1] instanceof List && it[1].isEmpty())
+        }
+        .unique()
+    existing_outputs = inputs_unlaned_branch.tumor
+        .map { it -> 
+            [it.meta, it.ichorcna_params] 
+        }
+        .filter { it -> 
+            Utils.robustly_test_if_empty(it[1])
+        }
+        .unique()
+    // Emit
+    purity = existing_outputs_purity
+    ploidy = existing_outputs_ploidy
+
+    // need a channel with patient and meta for merging with rest
+    purity_ploidy_meta_inputs = inputs_unlaned_branch.tumor
+        .filter { it -> 
+            Utils.robustly_test_if_empty(it.ploidy) || 
+                Utils.robustly_test_if_empty(it.purity)
+            // (it.ploidy instanceof List && it.ploidy.isEmpty())
+            // || (it.purity instanceof List && it.purity.isEmpty())
+        }
+        .map { it -> [it.meta.patient, it.meta - it.meta.subMap(['tumor_id', 'normal_id'])] }
+        .unique()
+        .dump(tag: "ichorcna inputs for merge", pretty: true)
+    purity_ploidy_meta_inputs_branch = purity_ploidy_meta_inputs
+        .branch{ it ->
+            normal: it[1].status.toString() == "0"
+            tumor:  it[1].status.toString() == "1"
+        }
+    
+     purity_ploidy_meta_inputs_merged = purity_ploidy_meta_inputs_branch.tumor
+            .map { patient, meta ->
+                [ patient ] + [ meta + [tumor_id: meta.sample] ] // [ patient, [meta] ]
+            }
+            .join(
+                purity_ploidy_meta_inputs_branch.normal
+                    .map { patient, meta ->
+                        [ patient ] + [ meta + [normal_id: meta.sample] ] // [ patient, [meta] ]
+                    }
+                ,
+                remainder: true
+            )
+            .map { it -> // [ patient, [meta_tumor], [meta_normal] ]
+                def (patient, tumor, normal) = (it + [null, null])[0..2]
+                def meta_tumor = tumor ?: [null]
+                def meta_normal = normal ?: [null]
+                def meta_out = meta_tumor
+                meta_out = meta_out + [id: meta_tumor.sample ]
+                if (normal) {
+                    meta_out = meta_out + [ normal_id: meta_normal.normal_id ]
+                } else {
+                    meta_out = meta_out - meta_out.subMap("normal_id") // Ensure removal of normal_id if no normal
+                }
+                [ patient , meta_out ]
+            }
+            .dump(tag: "meta ichorcna merged", pretty: true)
+    
+    alignment_bams_final_branch = alignment_bams_final.branch { it ->
+        normal: it[1].status.toString() == "0"
+        tumor:  it[1].status.toString() == "1"
+    }
+    alignment_bams_final_tumor = alignment_bams_final_branch.tumor
+
+
+    purity_ploidy_inputs = purity_ploidy_meta_inputs_merged
+        .join(
+            alignment_bams_final_tumor
+            .map { _meta_sample, meta, bam, bai ->
+                [ meta.patient, bam, bai]
+            }
+        ) // meta.patient, meta, bam, bai
+        .map { it -> it.toList()[1..-1] } // remove patient from the beginning, now shape is [meta, bam, bai]
+        .dump(tag: "ichorcna inputs after join with bams", pretty: true)
+
+    if (tools_used.contains("all") || tools_used.contains("ichorcna")) {
+
+        ICHORCNA(
+            purity_ploidy_inputs,
+            assembly,
+            fasta,
+            fasta_fai
+        )
+
+        ichorcna_outputs = ICHORCNA.out.output_paths.map{ it -> it.toList()[0..-2] } // meta, params output path, list of paths (excluded)
+
+        EXTRACT_PURITYPLOIDY_ICHORCNA(
+            ichorcna_outputs
+        )
+
+        existing_outputs = existing_outputs.mix(ichorcna_outputs).unique({ it -> it[0].patient })
+
+        existing_outputs_purity = Channel.empty()
+            .mix(EXTRACT_PURITYPLOIDY_ICHORCNA.out.purity_val)
+            .mix(existing_outputs_purity)
+            .unique{ it -> it[0].patient}
+
+        existing_outputs_ploidy = Channel.empty()
+            .mix(EXTRACT_PURITYPLOIDY_ICHORCNA.out.ploidy_val)
+            .mix(existing_outputs_ploidy)
+            .unique{ it -> it[0].patient}
+
+    }
+
+    purity = existing_outputs_purity
+    ploidy = existing_outputs_ploidy
+    ichorcna_out = existing_outputs
+
+    emit:
+    purity
+    ploidy
+    ichorcna_out
+
+}
+
 // COBALT
 include { BAM_COBALT } from './bam_cobalt/main'
 workflow COBALT_STEP {

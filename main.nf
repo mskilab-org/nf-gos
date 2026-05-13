@@ -111,6 +111,7 @@ params.pon_gridss_ref_genome_version = WorkflowMain.getGenomeAttribute(params, '
 params.coverage_coding_bed = WorkflowMain.getGenomeAttribute(params, 'coverage_coding_bed')
 //params.blacklist_junctions_jabba = WorkflowMain.getGenomeAttribute(params, 'blacklist_junctions_jabba')
 params.taps_skeletal_bed = WorkflowMain.getGenomeAttribute(params, 'taps_skeletal_bed')
+params.ichorcna_assembly = WorkflowMain.getGenomeAttribute(params, 'ichorcna_assembly')
 
 // WorkflowMain.loadGenomeParams(params)
 

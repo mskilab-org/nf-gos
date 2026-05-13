@@ -22,3 +22,5 @@ tests/
 *workspace
 dag.dot
 *.vscode/settings.json*
+.codex
+bin/ichorCNA/session-ses_1eb3.md

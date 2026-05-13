@@ -230,7 +230,7 @@ EOF
     echo "Step 1/5: Running Rastair in VCF mode..."
     rastair call \\
         -@ ${threads} `# 32` \\
-        -q 50 \\
+        -q 60 \\
         -Q 20 \\
         --ml 0.8 \\
         --vcf-format-fields GT,DP,M5mC,ML \\
@@ -239,10 +239,10 @@ EOF
         "\$bam_file"
     index_vcf "\$rastair_raw_vcf"
 
-    echo "Step 2/5: Keeping Rastair records with ML but not M5mC..."
+    echo "Step 2/5: Keeping Rastair records with INFO/M5mC_Strands last value > 0 and FORMAT/ML present..."
     {
-    bcftools view -h "\$rastair_raw_vcf"
-    bcftools view -H "\$rastair_raw_vcf" | awk -F'\\t' '\$9 ~ /(^|:)ML(:|\$)/ && \$9 !~ /(^|:)M5mC(:|\$)/'
+        bcftools view -h "\$rastair_raw_vcf"
+        bcftools view -H -i 'INFO/M5mC_Strands[3] > 0' "\$rastair_raw_vcf" | awk -F'\t' '\$9 ~ /(^|:)ML(:|\$)/'
     } | bgzip > "\$rastair_ml_vcf"
     index_vcf "\$rastair_ml_vcf"
 
@@ -978,5 +978,156 @@ END_VERSIONS
     "${task.process}":
         sage: ${VERSION}
 END_VERSIONS
+    """
+}
+
+process ICHORCNA {
+    tag "$meta.id"
+
+    beforeScript """
+        module load parallel
+        . /gpfs/home/hadik01/load_mskilab_r4.4.2
+    """
+
+    input:
+    tuple val(meta), path(bam), path(bai)
+    val(reference_assembly)
+    path(fasta)
+    path(fasta_fai)
+
+    output:
+    tuple val(meta), path("*params.txt"), path("**"), emit: output_paths
+
+    when:
+    task.ext.when == null || task.ext.when
+
+    script:
+    """
+    CASEID=${meta.id}
+    TUMOR_BAM=${bam}
+    REF=${reference_assembly}
+    FASTA=${fasta}
+
+    # Reference files (using git library)
+    ICHOR_SCRIPT=\${NEXTFLOW_BIN_DIR}/ichorCNA/runIchorCNA.R
+    # Set reference-specific files based on REF parameter
+    if [ "\$REF" = "hg38" ]; then
+        GC_WIG=\$( Rscript -e 'cat(system.file("extdata", "gc_hg19_1000kb.wig",  package = "ichorCNA"))' )
+        MAP_WIG=\$( Rscript -e 'cat(system.file("extdata", "map_hg38_1000kb.wig",  package = "ichorCNA"))' )
+        CENTROMERE=\$( Rscript -e 'cat(system.file("extdata", "GRCh38.GCA_000001405.2_centromere_acen.txt",  package = "ichorCNA"))' )
+    elif [ "\$REF" = "hg19" ]; then
+        GC_WIG=\$( Rscript -e 'cat(system.file("extdata", "gc_hg19_1000kb.wig",  package = "ichorCNA"))' )
+        MAP_WIG=\$( Rscript -e 'cat(system.file("extdata", "map_hg19_1000kb.wig",  package = "ichorCNA"))' )
+        CENTROMERE=\$( Rscript -e 'cat(system.file("extdata", "GRCh37.p13_centromere_UCSC-gapTable.txt",  package = "ichorCNA"))' )
+    else
+        echo "Error: Unsupported reference genome: \$REF"
+        echo "Supported options: hg38, hg19"
+        exit 1
+    fi
+
+    # Debug output to see what we're working with
+    echo "CASEID: \$CASEID"
+    echo "TUMOR_BAM: \$TUMOR_BAM"
+
+    # Define output directory as current directory
+    OUTPUT_DIR="\$(pwd)"
+    LOGS_DIR="\${OUTPUT_DIR}/logs"
+
+    # Create directories if they don't exist
+    mkdir -p "\$OUTPUT_DIR"
+    mkdir -p "\$LOGS_DIR"
+
+    # Define output paths
+    WIG_OUT="\${OUTPUT_DIR}/\${CASEID}.tumor.wig"
+    RESULTS_DIR="\${OUTPUT_DIR}/\${CASEID}_ichor_results"
+
+    echo "Processing ichorCNA for sample: \$CASEID"
+    echo "Tumor BAM path: \$TUMOR_BAM"
+
+    # Check if the tumor BAM file exists
+    if [ ! -f "\$TUMOR_BAM" ]; then
+    echo "Error: Tumor BAM file does not exist: \$TUMOR_BAM"
+    echo "Current directory: \$(pwd)"
+    exit 1
+    fi
+
+    echo "Found tumor BAM: \$TUMOR_BAM"\
+
+    # Extract standard chromosome names from FASTA file
+    CHROMOSOMES=\$(awk '/^>/{print substr(\$1,2)}' "\$FASTA" | grep -E '^(chr)?[0-9]+\$|^(chr)?[XY]\$' | tr '\n' ',' | sed 's/,\$//')
+    echo "Using chromosomes: \$CHROMOSOMES"
+
+    # Step 1: Generate the .wig file (only if it doesn't exist)
+    if [ -f "\$WIG_OUT" ]; then
+    echo "WIG file already exists: \$WIG_OUT"
+    echo "Skipping readCounter step..."
+    else
+    echo "Generating .wig file..."
+    
+    readCounter --window 1000000 --quality 20 \
+        --chromosome "\${CHROMOSOMES}" \
+        "\$TUMOR_BAM" > "\$WIG_OUT"
+
+    if [ \$? -eq 0 ]; then
+        echo "WIG file generated successfully: \$WIG_OUT"
+    else
+        echo "Error: WIG file generation failed"
+        rm -f "\$WIG_OUT"
+        exit 1
+    fi
+    fi
+
+
+    # Step 2: Run ichorCNA analysis
+    echo "Running ichorCNA analysis..."
+    mkdir -p "\${RESULTS_DIR}"
+
+    # Display the Rscript command before running it
+    set -x
+    Rscript "\${ICHOR_SCRIPT}" --id "\${CASEID}" \
+    --WIG "\${WIG_OUT}" --ploidy "c(2,3)" --normal "c(0.5,0.6,0.7,0.8,0.9)" --maxCN 5 \
+    --gcWig "\${GC_WIG}" \
+    --mapWig "\${MAP_WIG}" \
+    --centromere "\${CENTROMERE}" \
+    --includeHOMD False --chrs 'c(1:22, "X")' --chrTrain 'c(1:22)' \
+    --estimateNormal True --estimatePloidy True --estimateScPrevalence True \
+    --scStates 'c(1,3)' --txnE 0.9999 --txnStrength 10000 --outDir "\${RESULTS_DIR}/"
+    set +x
+
+    if [ \$? -eq 0 ]; then
+        echo "ichorCNA analysis completed successfully!"
+        echo "Results are in: \${RESULTS_DIR}/"
+        echo "Main output: \${RESULTS_DIR}/\${CASEID}_genomeWide.pdf"
+    else
+        echo "Error: ichorCNA analysis failed"
+        exit 1
+    fi
+
+    printf "Softlinking *ichor_results files to the current directory: \$(pwd)\n\n"
+
+    export PARALLEL='-j 1' `# Setting default to 1 to ensure GNU parallel doesn't overuse cores` 
+
+    find \$( readlink -f \$( pwd ) )/*results -not -type d | \
+    parallel -j8 --verbose 'echo \$(readlink -f ./) && ln -nfs {} {/} '
+
+    echo "Pipeline completed successfully!"
+
+    """
+    
+}
+
+
+process EXTRACT_PURITYPLOIDY_ICHORCNA {
+    input:
+    tuple val(meta), path(purity_ploidy_params)
+    
+    output:
+    tuple val(meta), env(purity_val), emit: purity_val
+    tuple val(meta), env(ploidy_val), emit: ploidy_val
+
+    script:
+    """
+    export purity_val=\$(awk -F':[[:space:]]*' '/^Tumor Fraction:/ {print \$2; exit}' ${purity_ploidy_params})
+    export ploidy_val=\$(awk -F':[[:space:]]*' '/^Ploidy:/ {print \$2; exit}' ${purity_ploidy_params})
     """
 }

@@ -89,6 +89,14 @@ class Utils {
             return false
         }
 
+        // Respect custom isEmpty() implementations so this helper subsumes the
+        // plain `value.isEmpty()` checks used elsewhere in the workflow.
+        if (value.metaClass.respondsTo(value, 'isEmpty')) {
+            try {
+                return value.isEmpty()
+            } catch (Exception ignored) { }
+        }
+
         // Groovy-truthy fallback: 0, false, etc. → empty
         if (!value) return true
 

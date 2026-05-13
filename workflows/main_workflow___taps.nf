@@ -137,8 +137,9 @@ include {
     FRAGCOUNTER_STEP;
     DRYCLEAN_STEP;
     AMBER_STEP;
-    COBALT_STEP;
-    PURPLE_STEP;
+    ICHORCNA_STEP;
+    // COBALT_STEP;
+    // PURPLE_STEP;
     CBS_STEP;
     VARIANT_CALLING_STEP;
     VARIANT_ANNOTATION_STEP;
@@ -957,21 +958,21 @@ workflow NFTAPS {
         tools_used
     )
 
-    amber_dir_for_merge = AMBER_STEP.out.amber_dir
-        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, amber_dir
+    // amber_dir_for_merge = AMBER_STEP.out.amber_dir
+    //     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, amber_dir
 
     hets_sites_for_merge = AMBER_STEP.out.sites_from_het_pileups_wgs
         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, hets
         .dump(tag: "hets_sites_for_merge", pretty: true)
     
-    COBALT_STEP(
-        inputs_unlaned,
-        alignment_bams_final,
-        tools_used
-    )
+    // COBALT_STEP(
+    //     inputs_unlaned,
+    //     alignment_bams_final,
+    //     tools_used
+    // )
 
-    cobalt_dir_for_merge = COBALT_STEP.out.cobalt_dir
-            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, cobalt_dir
+    // cobalt_dir_for_merge = COBALT_STEP.out.cobalt_dir
+    //         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, cobalt_dir
 
     FRAGCOUNTER_STEP(
         inputs_unlaned,
@@ -1062,22 +1063,28 @@ workflow NFTAPS {
     )
 
 
-    PURPLE_STEP(
+    // PURPLE_STEP(
+    //     inputs_unlaned,
+    //     germline_vcf_for_merge,
+    //     filtered_somatic_vcf_for_merge,
+    //     cobalt_dir_for_merge,
+    //     amber_dir_for_merge,
+    //     vcf_from_sv_calling_for_merge,
+    //     tools_used
+    // )
+
+    ICHORCNA_STEP(
         inputs_unlaned,
-        germline_vcf_for_merge,
-        filtered_somatic_vcf_for_merge,
-        cobalt_dir_for_merge,
-        amber_dir_for_merge,
-        vcf_from_sv_calling_for_merge,
+        alignment_bams_final,
         tools_used
     )
     
-    purity_for_merge = PURPLE_STEP.out.purity // [ meta, purity ]
+    purity_for_merge = ICHORCNA_STEP.out.purity // [ meta, purity ]
         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, purity
-        .dump(tag: "PURPLE_STEP.out purity", pretty: true)
-    ploidy_for_merge = PURPLE_STEP.out.ploidy
+        .dump(tag: "ICHORCNA_STEP.out purity", pretty: true)
+    ploidy_for_merge = ICHORCNA_STEP.out.ploidy
         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, ploidy
-        .dump(tag: "PURPLE_STEP.out ploidy", pretty: true)
+        .dump(tag: "ICHORCNA_STEP.out ploidy", pretty: true)
 
     JABBA_STEP(
         inputs_unlaned,

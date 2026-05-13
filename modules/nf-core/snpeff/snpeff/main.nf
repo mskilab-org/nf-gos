@@ -18,6 +18,7 @@ process SNPEFF_SNPEFF {
 
     output:
     tuple val(meta), path("*.ann.vcf"),   emit: vcf
+    tuple val(meta), path("*.normalized.sorted.vcf"), emit: normalized_vcf
     tuple val(meta), path("*.csv"),       emit: report
     tuple val(meta), path("*.html"),      emit: summary_html
     tuple val(meta), path("*.genes.txt"), emit: genes_txt
@@ -37,24 +38,27 @@ process SNPEFF_SNPEFF {
     def prefix = task.ext.prefix ?: "${meta.id}"
     def cache_command = cache ? "-dataDir \${PWD}/${cache}" : ""
     """
+
+    tmpvcfnorm=\$( export TMPDIR=./ && mktemp -t tmp_XXXXXXXXXX.vcf )
+    (
+        bcftools sort $vcf | \\
+        bcftools norm --rm-dup none --multiallelics -any --site-win 1000000 --fasta-ref ${fasta} | \\
+        bcftools sort > \${tmpvcfnorm}
+    )
+    mv \${tmpvcfnorm} ${prefix}.normalized.sorted.vcf
+
     snpEff \\
         -Xmx${avail_mem}M \\
         $db \\
         $args \\
         -csvStats ${prefix}.csv \\
         $cache_command \\
-        $vcf \\
+        ${prefix}.normalized.sorted.vcf \\
         > ${prefix}.ann.vcf
-    
-    tmpvcf=\$( export TMPDIR=./ && mktemp -t tmp_XXXXXXXXXX.vcf )
+
     tmpvcf2=\$( export TMPDIR=./ && mktemp -t tmp2_XXXXXXXXXX.vcf )
-    (
-        bcftools sort ${prefix}.ann.vcf | \\
-        bcftools norm --rm-dup none --multiallelics -any --site-win 1000000 --fasta-ref ${fasta} | \\
-        bcftools sort > \${tmpvcf}
-    )
     
-    bcftools query -f '%CHROM\\t%POS\\t%REF\\t%ALT\\t%ID\\n' "\$tmpvcf" > old_ids.tsv
+    bcftools query -f '%CHROM\\t%POS\\t%REF\\t%ALT\\t%ID\\n' "${prefix}.ann.vcf" > old_ids.tsv
     bgzip -f old_ids.tsv 
     tabix -f -s 1 -b 2 -p vcf old_ids.tsv.gz
 
@@ -64,9 +68,8 @@ process SNPEFF_SNPEFF {
         -a old_ids.tsv.gz \\
         -c CHROM,POS,REF,ALT,INFO/OLD_ID \\
         --set-id '%CHROM:%POS\\_%REF\\/%FIRST_ALT' \\
-        -Ov "\${tmpvcf}" > \${tmpvcf2} ; \\
-        mv \${tmpvcf2} ${prefix}.ann.vcf ; \\
-        rm -f \${tmpvcf}
+        -Ov "${prefix}.ann.vcf" > \${tmpvcf2} ; \\
+        mv \${tmpvcf2} ${prefix}.ann.vcf
     )
 
 
