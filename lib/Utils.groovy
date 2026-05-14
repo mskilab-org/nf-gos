@@ -97,7 +97,11 @@ class Utils {
             } catch (Exception ignored) { }
         }
 
-        // Groovy-truthy fallback: 0, false, etc. → empty
+        // Numeric and boolean types are never empty if they exist (0, false, etc. are valid values)
+        if (value instanceof Number) return false
+        if (value instanceof Boolean) return false
+
+        // Groovy-truthy fallback for other types: treat falsy values as empty
         if (!value) return true
 
         // Iterables without a specific type above — try to realize to a list

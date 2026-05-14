@@ -346,6 +346,7 @@ process MUTECT2_TAPS {
         Outputs:
         <sample>.mutect2.raw.vcf.gz
         <sample>.mutect2.filtered.annotated.vcf.gz
+	<sample>.mutect2.filtered.annotated.no_mutect_filter_flags.vcf.gz
         <sample>.mutect2.filtered.annotated.no_gnomad.vcf.gz
         <sample>.mutect2.filtered.annotated.no_gnomad.no_pon.vcf.gz
         <sample>.mutect2.filtered.annotated.no_gnomad.no_pon.bidir_alt_support.vcf.gz
@@ -518,6 +519,7 @@ EOF
 
     mutect2_raw_vcf="\${output_dir}/\${sample_prefix}.mutect2.raw.vcf.gz"
     mutect2_filtered_vcf="\${output_dir}/\${sample_prefix}.mutect2.filtered.annotated.vcf.gz"
+    mutect2_no_filter_flags_vcf="\${output_dir}/\${sample_prefix}.mutect2.filtered.annotated.no_filter_flags.vcf.gz"
     mutect2_no_gnomad_vcf="\${output_dir}/\${sample_prefix}.mutect2.filtered.annotated.no_gnomad.vcf.gz"
     mutect2_no_gnomad_no_pon_vcf="\${output_dir}/\${sample_prefix}.mutect2.filtered.annotated.no_gnomad.no_pon.vcf.gz"
     mutect2_bidir_vcf="\${output_dir}/\${sample_prefix}.mutect2.filtered.annotated.no_gnomad.no_pon.bidir_alt_support.vcf.gz"
@@ -529,7 +531,7 @@ EOF
     }
     trap cleanup EXIT
 
-    echo "Step 1/6: Running Mutect2..."
+    echo "Step 1/7: Running Mutect2..."
     gatk Mutect2 \\
         -R "\$reference_fasta" \\
         -I "\$bam_file" \\
@@ -539,26 +541,34 @@ EOF
         -O "\$mutect2_raw_vcf"
     index_vcf "\$mutect2_raw_vcf"
 
-    echo "Step 2/6: Running FilterMutectCalls..."
+    echo "Step 2/7: Running FilterMutectCalls..."
     gatk FilterMutectCalls \\
         -R "\$reference_fasta" \\
         -V "\$mutect2_raw_vcf" \\
         --stats "\${mutect2_raw_vcf}.stats" \\
         -O "\$mutect2_filtered_vcf"
     index_vcf "\$mutect2_filtered_vcf"
+    
+    echo "Step 3/7: Removing Mutect2 calls with selected FILTER flags..."
+    bcftools view \
+    	-e 'FILTER~"weak_evidence" || FILTER~"panel_of_normals" || FILTER~"germline" || FILTER~"base_qual" || FILTER~"haplotype"' \
+  	-Oz \
+  	-o "\$mutect2_no_filter_flags_vcf" \
+  	"\$mutect2_filtered_vcf"
+    index_vcf "\$mutect2_no_filter_flags_vcf"
 
-    echo "Step 3/6: Removing Mutect2 calls found in gnomAD..."
+    echo "Step 4/7: Removing Mutect2 calls found in gnomAD..."
     bcftools isec \\
         -C \\
         -c none \\
         -w1 \\
         -Oz \\
         -o "\$mutect2_no_gnomad_vcf" \\
-        "\$mutect2_filtered_vcf" \\
+        "\$mutect2_no_filter_flags_vcf" \\
         "\$gnomad_vcf"
     index_vcf "\$mutect2_no_gnomad_vcf"
 
-    echo "Step 4/6: Removing Mutect2 calls found in the panel of normals..."
+    echo "Step 5/7: Removing Mutect2 calls found in the panel of normals..."
     bcftools isec \\
         -C \\
         -c none \\
@@ -569,13 +579,13 @@ EOF
         "\$pon_vcf"
     index_vcf "\$mutect2_no_gnomad_no_pon_vcf"
 
-    echo "Step 5/6: Tagging Mutect2 calls with bidirectional ALT support..."
+    echo "Step 6/7: Tagging Mutect2 calls with bidirectional ALT support..."
     tag_mutect_bidirectional_support \\
         "\$mutect2_no_gnomad_no_pon_vcf" \\
         "\$mutect2_bidir_vcf" \\
         "\${tmp_root}/tag_mutect"
 
-    echo "Step 6/6: Filtering Mutect2 C>T and G>A SNVs that lack bidirectional ALT support..."
+    echo "Step 7/7: Filtering Mutect2 C>T and G>A SNVs that lack bidirectional ALT support..."
     filter_ct_ga_without_bidir \\
         "\$mutect2_bidir_vcf" \\
         "\$mutect2_final_vcf" \\
@@ -586,6 +596,7 @@ EOF
     echo "Done."
     echo "Mutect2 raw VCF: \${mutect2_raw_vcf}"
     echo "Mutect2 filtered VCF: \${mutect2_filtered_vcf}"
+    echo "Mutect2 FILTER-flag-cleaned VCF: \${mutect2_no_filter_flags_vcf}"
     echo "Mutect2 no-gnomAD VCF: \${mutect2_no_gnomad_vcf}"
     echo "Mutect2 no-gnomAD/no-PoN VCF: \${mutect2_no_gnomad_no_pon_vcf}"
     echo "Mutect2 bidirectional-tagged VCF: \${mutect2_bidir_vcf}"
@@ -1128,6 +1139,9 @@ process EXTRACT_PURITYPLOIDY_ICHORCNA {
     script:
     """
     export purity_val=\$(awk -F':[[:space:]]*' '/^Tumor Fraction:/ {print \$2; exit}' ${purity_ploidy_params})
+    if awk -v val="\$purity_val" 'BEGIN {exit !(val == 0)}'; then
+        export purity_val=\$(echo "\$purity_val + 0.01" | bc -l)
+    fi
     export ploidy_val=\$(awk -F':[[:space:]]*' '/^Ploidy:/ {print \$2; exit}' ${purity_ploidy_params})
     """
 }
