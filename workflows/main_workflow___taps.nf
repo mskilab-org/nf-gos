@@ -421,7 +421,7 @@ workflow TOOLS {
         }
     }
 
-    println "Provided inputs: ${available_inputs}"
+    log.info "Provided inputs: ${available_inputs}"
 
     schemaFile = file("$projectDir/gos-assets/nf-gos/assets/schema_input.json")
     schema = new groovy.json.JsonSlurper().parse(schemaFile)
@@ -429,7 +429,7 @@ workflow TOOLS {
 
     props = schema.items.properties
     requiredFields = props.findAll { !it.value.containsKey('meta') }.keySet()
-    println "requiredFields: $requiredFields"
+    log.info "requiredFields: $requiredFields"
 
     // Direct per-field missingness probe — does not depend on the schema or on
     // missing_outputs being populated. Utils.robustly_test_if_empty handles null
@@ -450,22 +450,29 @@ workflow TOOLS {
     candidate_output_fields = ((requiredFields as Set) + all_tool_output_fields) as Set
 
     missing_outputs = candidate_output_fields.findAll(is_field_missing_in_any_sample)
-    println "Outputs MISSING from at least one sample: $missing_outputs"
+    log.info "Outputs MISSING from at least one sample: $missing_outputs"
 
     // Iteratively select tools based on available inputs
     skip_tools = params.skip_tools ? params.skip_tools.split(',').collect { it.trim() } : []
-    println "Skipping tools: ${skip_tools}"
+    log.info "Skipping tools: ${skip_tools}"
     run_tools = params.only_tools ? params.only_tools.split(',').collect { it -> it.trim() } : []
+    force_tools = params.force_tools ? params.force_tools.split(',').collect { it -> it.trim() } : []
+    run_tools = (run_tools + force_tools).unique()
     is_run_tools_populated = ! run_tools.isEmpty()
     if (is_run_tools_populated) {
-        println "Running tools: ${run_tools}" 
+        log.info "Running tools: ${run_tools}" 
     }
     
     is_overlapping = run_tools.any { it ->
         skip_tools.contains(it)
     }
     if (is_overlapping) {
-        println "Overlapping tool sets specified in skip and only tools parameters.. defaulting to running the tool specified"
+        log.info "Overlapping tool sets specified in skip and only tools parameters.. defaulting to running the tool specified"
+    }
+
+    
+    if (! ( force_tools.isEmpty() )) {
+        log.info "Forcing tools: ${force_tools}" 
     }
     // TODO: if GRIDSS - skip if vcf is found, but not if vcf_raw is present.
     selected_tools = []
@@ -511,10 +518,18 @@ workflow TOOLS {
                 outputsNeeded = is_any_alignment_summary_absent || is_any_insert_size_absent
             }
 
+            if (force_tools && force_tools.contains(tool)) {
+                log.info "Tool ${tool} is being forced to run by user request, so it will be added to the selected tools list even if its outputs are not needed or its inputs are not present."
+                outputsNeeded = true
+                
+            }
+            
             if (inputsPresent && outputsNeeded) {
                 selected_tools.add(tool)
                 available_inputs.addAll(io.outputs)
             }
+
+            log.info "tool: ${tool} \n inputsPresent: ${inputsPresent} \n outputsNeeded: ${outputsNeeded}"
 
 
 

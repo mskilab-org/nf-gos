@@ -503,7 +503,12 @@ workflow BAM_QC {
     }
 
 	is_run_qc_duplicates = params.is_run_qc_duplicates ?: false // if parameter doesn't exist, set to false
-	do_qc_duplicates = (tools_used.contains("all") || tools_used.contains("estimate_library_complexity")) && is_run_qc_duplicates && ! params.aligner == "fq2bam"
+	do_qc_duplicates = ( 
+        tools_used.contains("all") 
+        || (
+            tools_used.contains("estimate_library_complexity") && is_run_qc_duplicates &&  ! ( params.aligner == "fq2bam" )
+        )
+    )
     if (do_qc_duplicates) {
         estimate_library_complexity_inputs = inputs
             .filter { it.qc_dup_rate.isEmpty() }
