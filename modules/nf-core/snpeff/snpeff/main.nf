@@ -72,6 +72,8 @@ process SNPEFF_SNPEFF {
         mv \${tmpvcf2} ${prefix}.ann.vcf
     )
 
+    chmod ug+rw,o+r *
+
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
