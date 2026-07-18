@@ -15,11 +15,13 @@ workflow BAM_AMBER {
     inputs_unlaned // samplesheet input
 
     main:
-    genome_ver  = WorkflowNfcasereports.create_value_channel(params.genome_ver_amber)
-    het_sites   = WorkflowNfcasereports.create_file_channel(params.het_sites_amber)
+    (genome_ver, het_sites)  = WorkflowNfcasereports.create_channels(params, ["value": ["genome_ver_amber"], "file": ["het_sites_amber"]])
+    // addy_change Tuesday, Jun 09, 2026 04:16:12 PM
+    // het_sites   = WorkflowNfcasereports.create_channels(params, ["file": "het_sites_amber"])
     if (params.target_bed_amber != null) {
-        target_bed_input = Channel.fromPath(params.target_bed_amber)
-                            .map{ it -> [ [id: 'target_bed'], it ] }
+        target_bed_input = WorkflowNfcasereports.create_channels(params, ["file": "target_bed_amber"])[0].map{ it -> [ [id: 'target_bed'], it ] }
+        // target_bed_input = Channel.fromPath(params.target_bed_amber)
+        //                     .map{ it -> [ [id: 'target_bed'], it ] }
     } else {
         target_bed_input = Channel.value([id: 'target_bed'])
                             .map{ meta -> [ meta, [] ] }

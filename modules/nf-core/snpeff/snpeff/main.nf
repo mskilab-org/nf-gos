@@ -47,6 +47,8 @@ process SNPEFF_SNPEFF {
     )
     mv \${tmpvcfnorm} ${prefix}.normalized.sorted.vcf
 
+    rm -rf ${prefix}.ann.vcf
+
     snpEff \\
         -Xmx${avail_mem}M \\
         $db \\
@@ -58,7 +60,7 @@ process SNPEFF_SNPEFF {
 
     tmpvcf2=\$( export TMPDIR=./ && mktemp -t tmp2_XXXXXXXXXX.vcf )
     
-    bcftools query -f '%CHROM\\t%POS\\t%REF\\t%ALT\\t%ID\\n' "${prefix}.ann.vcf" > old_ids.tsv
+    bcftools query -f '%CHROM\\t%POS\\t%REF\\t%ALT\\t%ID\\n' ${prefix}.ann.vcf > old_ids.tsv
     bgzip -f old_ids.tsv 
     tabix -f -s 1 -b 2 -p vcf old_ids.tsv.gz
 
@@ -68,7 +70,7 @@ process SNPEFF_SNPEFF {
         -a old_ids.tsv.gz \\
         -c CHROM,POS,REF,ALT,INFO/OLD_ID \\
         --set-id '%CHROM:%POS\\_%REF\\/%FIRST_ALT' \\
-        -Ov "${prefix}.ann.vcf" > \${tmpvcf2} ; \\
+        -Ov ${prefix}.ann.vcf > \${tmpvcf2} ; \\
         mv \${tmpvcf2} ${prefix}.ann.vcf
     )
 

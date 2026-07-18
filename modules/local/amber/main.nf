@@ -73,7 +73,7 @@ process MAKE_HET_SITES {
 
     script:
     def args = task.ext.args ?: ''
-    def baf_tsv = "${amber_dir}/${meta.tumor_id}.amber.baf.tsv.gz"
+    // def baf_tsv = "${amber_dir}/${meta.tumor_id}.amber.baf.tsv.gz"
     def is_tumor_only = params.tumor_only ?: false
 
     """
@@ -83,7 +83,9 @@ process MAKE_HET_SITES {
         echo "seqnames start end alt.count.t ref.count.t alt.count.n ref.count.n alt.frac.t alt.frac.n" > sites.txt
     fi
 
-    zcat "$baf_tsv" | awk -v is_tumor_only="$is_tumor_only" 'NR>1 {
+
+    baf_tsv=\$( find amber/*amber.baf.tsv.gz | head -n 1 )
+    zcat "\$baf_tsv" | awk -v is_tumor_only="$is_tumor_only" 'NR>1 {
         chromosome=\$1
         start = \$2
         end = \$2

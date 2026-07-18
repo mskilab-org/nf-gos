@@ -50,12 +50,27 @@ workflow GRIDSS_SOMATIC_FILTER_STEP {
 
     main:
     // pondir_gridss = WorkflowNfcasereports.create_file_channel(params.pon_gridss)
-    pon_gridss_bedpe_svs = WorkflowNfcasereports.create_file_channel(params.pon_gridss_bedpe_svs)
-    pon_gridss_bed_breakends = WorkflowNfcasereports.create_file_channel(params.pon_gridss_bed_breakends)
-    pon_gridss_known_hotspots_bedpe = WorkflowNfcasereports.create_file_channel(params.pon_gridss_known_hotspots_bedpe)
-    pon_gridss_ref_genome_version = WorkflowNfcasereports.create_value_channel(params.pon_gridss_ref_genome_version)
-    fasta = WorkflowNfcasereports.create_file_channel(params.fasta)
-    fasta_fai = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
+    // pon_gridss_bedpe_svs = WorkflowNfcasereports.create_file_channel(params.pon_gridss_bedpe_svs)
+    // pon_gridss_bed_breakends = WorkflowNfcasereports.create_file_channel(params.pon_gridss_bed_breakends)
+    // pon_gridss_known_hotspots_bedpe = WorkflowNfcasereports.create_file_channel(params.pon_gridss_known_hotspots_bedpe)
+    // pon_gridss_ref_genome_version = WorkflowNfcasereports.create_value_channel(params.pon_gridss_ref_genome_version)
+    // fasta = WorkflowNfcasereports.create_file_channel(params.fasta)
+    // fasta_fai = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
+    (
+        pon_gridss_bedpe_svs, 
+        pon_gridss_bed_breakends, 
+        pon_gridss_known_hotspots_bedpe, 
+        fasta, 
+        fasta_fai,
+        pon_gridss_ref_genome_version
+    ) = WorkflowNfcasereports.create_channels(
+        params: params,
+        spec: [
+            "file": ['pon_gridss_bedpe_svs', 'pon_gridss_bed_breakends', 'pon_gridss_known_hotspots_bedpe', 'fasta', 'fasta_fai'],
+            "value": ['pon_gridss_ref_genome_version']    
+        ],
+        ignore_must_exist: null
+    )
 
     versions                = Channel.empty()
     somatic_all             = Channel.empty()

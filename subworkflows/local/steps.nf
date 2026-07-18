@@ -1145,7 +1145,7 @@ workflow SV_CALLING_STEP {
     
     vcf_raw_from_gridss_gridss = gridss_raw_existing_outputs
 
-    bam_sv_inputs = inputs_unlaned.filter { it.vcf_raw.isEmpty() }.map { it -> [it.meta.sample] }.unique()
+    bam_sv_inputs = inputs_unlaned.filter { it -> Utils.robustly_test_if_empty(it.vcf) && Utils.robustly_test_if_empty(it.vcf_raw) }.map { it -> [it.meta.sample] }.unique()
 
 
     // SV Calling
@@ -1525,7 +1525,8 @@ workflow VARIANT_CALLING_STEP {
     main:
     versions = Channel.empty()
 
-    dict = params.dict ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect() : Channel.empty()
+    dict = WorkflowNfcasereports.create_channels(params, ["file": ["dict"]])[0].map{ it -> [ [id:'dict'], it ] }
+    // dict = params.dict ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect() : Channel.empty()
 
     snv_somatic_existing_outputs = inputs_unlaned
         .map { it -> [it.meta, it.snv_somatic_vcf_raw, it.snv_somatic_vcf_raw_tbi] }
@@ -1837,7 +1838,7 @@ workflow TAPS_VARIANT_CALLING_STEP {
         .unique{ it -> it[0] } // unique by patient to avoid duplicated patients in case more than one tumor per patient
         .map{ it -> it[1..-1] } // remove patient from the beginning, now shape is [mutect2_meta, mutect2_vcf, mutect2_tbi, rastair_vcf, rastair_tbi]
     
-    
+    // if (tools_used.contains("combine_taps_variant_calls"))
     COMBINE_TAPS_VARIANT_CALLS(
         combined_taps_inputs
     )

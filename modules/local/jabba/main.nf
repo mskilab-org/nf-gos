@@ -3,8 +3,8 @@ process JABBA {
     label 'process_high'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/jabba:0.0.2':
-        'mskilab/jabba:0.0.2' }"
+        'docker://mskilab/jabba:0.0.9':
+        'mskilab/jabba:0.0.9' }"
 
     input:
     tuple val(meta), path(junction), path(cov_rds), val(j_supp), val(het_pileups_wgs), val(purity), val(ploidy), val(cbs_seg_rds), val(cbs_nseg_rds)
@@ -94,52 +94,49 @@ process JABBA {
     set +x
 
 
-    export cmd="Rscript \$jba $junction $cov_rds    \\
-    $j_supp                                         \\
-    $het_pileups_wgs                                \\
-    --purity				$purity                 \\
-    --ploidy				$ploidy                 \\
-    $cbs_seg_rds                                    \\
-    $cbs_nseg_rds                                   \\
-    --blacklist.junctions   $blacklist_junctions    \\
-    $geno_switch                                    \\
-    --indel					$indel                  \\
-    --tfield				$tfield                 \\
-    --iterate				$iter                   \\
-    --rescue.window			$rescue_window          \\
-    --rescue.all			$rescue_all             \\
-    --nudgebalanced			$nudgebalanced          \\
-    --edgenudge				$edgenudge              \\
-    $strict_switch                                  \\
-    $allin_switch                                   \\
-    --field					$field                  \\
-    --maxna					$maxna                  \\
-    --blacklist.coverage	$blacklist_coverage     \\
-    --ppmethod				$pp_method              \\
-    --cnsignif				$cnsignif               \\
-    --slack					$slack                  \\
-    $linear_switch                                  \\
-    --tilim					$tilim                  \\
-    --epgap					$epgap                  \\
-    --name                  ${meta.patient}         \\
-    --cores                 $task.cpus              \\
-    --fix.thres				$fix_thres              \\
-    --lp					$lp                     \\
-    --ism					$ism                    \\
-    --filter_loose			$filter_loose           \\
-    --gurobi				$gurobi                 \\
-    --mem                   $trelim_mem             \\
-    $verbose_switch                                 \\
-    "
-
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         JaBbA: ${VERSION}
     END_VERSIONS
 
-    { echo "Running:" && echo "\$(echo \$cmd)" && echo && eval \$cmd; }
+    Rscript \$jba $junction $cov_rds \\
+    $j_supp \\
+    $het_pileups_wgs \\
+    --purity $purity \\
+    --ploidy $ploidy \\
+    $cbs_seg_rds \\
+    $cbs_nseg_rds \\
+    --blacklist.junctions $blacklist_junctions \\
+    $geno_switch \\
+    --indel $indel \\
+    --tfield $tfield \\
+    --iterate $iter \\
+    --rescue.window $rescue_window \\
+    --rescue.all $rescue_all \\
+    --nudgebalanced $nudgebalanced \\
+    --edgenudge $edgenudge \\
+    $strict_switch \\
+    $allin_switch \\
+    --field $field \\
+    --maxna $maxna \\
+    --blacklist.coverage $blacklist_coverage \\
+    --ppmethod $pp_method \\
+    --cnsignif $cnsignif \\
+    --slack $slack \\
+    $linear_switch \\
+    --tilim $tilim \\
+    --epgap $epgap \\
+    --name ${meta.patient} \\
+    --cores $task.cpus \\
+    --fix.thres $fix_thres \\
+    --lp $lp \\
+    --ism $ism \\
+    --filter_loose $filter_loose \\
+    --gurobi $gurobi \\
+    --mem $trelim_mem \\
+    $verbose_switch
     cmdsig=\$?
-    if [ "\$cmdsig" = 0 ]; then
+    if [[ "\$cmdsig" = 0 ]]; then
         echo "Finish!"
     else
         echo "Broke!"
@@ -175,8 +172,8 @@ process COERCE_SEQNAMES {
     label 'process_low'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/jabba:0.0.1':
-        'mskilab/jabba:0.0.1' }"
+        'docker://mskilab/jabba:0.0.8':
+        'mskilab/jabba:0.0.8' }"
 
     input:
     tuple val(meta), path(file)
@@ -188,27 +185,47 @@ process COERCE_SEQNAMES {
     """
     #!/usr/bin/env Rscript
 
+    change_bndalt_style = function(x, style = "NCBI") {  
+        mat = stringr::str_split_fixed(x, "(?<=\\\\[)|(?<=\\\\])", n = 3)
+        coordmat = stringr::str_split_fixed(mat[,2], "(?=:)", 2)
+        # GenomeInfoDb::seqlevelsStyle(coordmat[,1]) = style
+        coordmat[,1] = gUtils:::remap_seqlevels(coordmat[,1], style)
+        out = paste(
+            mat[,1],
+            coordmat[,1],
+            coordmat[,2],
+            mat[,3], sep = ""
+        )
+        return(out)
+    }
+
+
     fn <- "${file}"
     outputfn <- "coerced_chr_${file.name}"
 
     if(grepl('.rds', "${file.name}")){
         library(GenomicRanges)
         data <- readRDS(fn)
-        seqlevels(data, pruning.mode = "coarse") <- gsub("chr","",seqlevels(data))
+        # seqlevels(data, pruning.mode = "coarse") <- gsub("chr","",seqlevels(data))
+        data <- gUtils::change_seqlevels_style(data, style = "NCBI")
         saveRDS(data, file = outputfn)
     } else if (grepl('.vcf|.vcf.gz|.vcf.bgz', "${file.name}")) {
         library(VariantAnnotation)
         data <- readVcf(fn)
         ##seqlevelsStyle(data) <- 'NCBI'
-        seqlevels(data) <- sub("^chr", "", seqlevels(data))
+        # seqlevels(data) <- sub("^chr", "", seqlevels(data))
+        data = gUtils::change_seqlevels_style(data, style = "NCBI")
         header = header(data)
-        rownames(header@header\$contig) = sub("^chr", "", rownames(header@header\$contig))
+        # rownames(header@header\$contig) = sub("^chr", "", rownames(header@header\$contig))
         header(data) <- header
-        data@fixed\$ALT <- lapply(data@fixed\$ALT, function(x) gsub("chr", "", x))
+        data@fixed\$ALT <- lapply(data@fixed\$ALT, function(x) change_bndalt_style(x))
         writeVcf(data, file = outputfn)
     } else {
         data <- read.table(fn, header=T)
-        data[[1]] <- gsub("chr","",data[[1]])
+        # data[[1]] <- gsub("chr","",data[[1]])
+        sn = as.character(data[[1]])
+        sn = gUtils:::remap_seqlevels(sn, "NCBI")
+        data[[1]] = sn
         write.table(data, file = outputfn, sep = "\\t", row.names = F, quote = F)
     }
     """
@@ -219,8 +236,8 @@ process RETIER_WHITELIST_JUNCTIONS___OLD {
     label 'process_low'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/jabba:0.0.1':
-        'mskilab/jabba:0.0.1' }"
+        'docker://mskilab/jabba:0.0.3':
+        'mskilab/jabba:0.0.3' }"
 
     input:
     tuple val(meta), path(junctions)
@@ -234,7 +251,7 @@ process RETIER_WHITELIST_JUNCTIONS___OLD {
     """
     #!/usr/bin/env Rscript
 
-	options(error = function() {traceback(2); quit(save = "no", status = 1)})
+    options(error = function() {traceback(2); quit(save = "no", status = 1)})
 
     library(gUtils)
     library(dplyr)
@@ -249,33 +266,33 @@ process RETIER_WHITELIST_JUNCTIONS___OLD {
     jpath_tiered = glue::glue('{tools::file_path_sans_ext(jpath)}___tiered.rds')
 
     # Read the VCF file
-	is_character = is.character(jpath)
-	is_len_one = NROW(jpath) == 1
-	is_na = is_len_one && (is.na(jpath) || jpath %in% c("NA", base::nullfile()))
-	is_possible_path = is_character && is_len_one && !is_na
-  	is_existent_path = is_possible_path && file.exists(jpath)
-  	is_rds = is_possible_path && grepl(".rds\$", jpath)
-	is_vcf = is_possible_path && grepl(".vcf(.bgz|.gz){0,}\$", jpath)
+    is_character = is.character(jpath)
+    is_len_one = NROW(jpath) == 1
+    is_na = is_len_one && (is.na(jpath) || jpath %in% c("NA", base::nullfile()))
+    is_possible_path = is_character && is_len_one && !is_na
+      is_existent_path = is_possible_path && file.exists(jpath)
+      is_rds = is_possible_path && grepl(".rds\$", jpath)
+    is_vcf = is_possible_path && grepl(".vcf(.bgz|.gz){0,}\$", jpath)
 
-	if (is_existent_path && is_rds) {
-		ra.all = readRDS(jpath)
-	} else if (is_existent_path && is_vcf) {
-		ra.all = gGnome:::read.juncs(jpath)
-	} else if (!is_existent_path) {
-		stop("jpath does not exist or is invalid path: ", jpath)
-	}
+    if (is_existent_path && is_rds) {
+        ra.all = readRDS(jpath)
+    } else if (is_existent_path && is_vcf) {
+        ra.all = gGnome:::read.juncs(jpath)
+    } else if (!is_existent_path) {
+        stop("jpath does not exist or is invalid path: ", jpath)
+    }
 
-	is_properly_formatted_grangeslist = (
-	    inherits(ra.all, "GRangesList")
-		&& (
-			all(S4Vectors::elementNROWS(ra.all) == 2)
-			|| (NROW(ra.all) == 0)
-		)
-	)
+    is_properly_formatted_grangeslist = (
+        inherits(ra.all, "GRangesList")
+        && (
+            all(S4Vectors::elementNROWS(ra.all) == 2)
+            || (NROW(ra.all) == 0)
+        )
+    )
 
-	if (!is_properly_formatted_grangeslist) {
-		stop("Improperly formatted junctions")
-	}
+    if (!is_properly_formatted_grangeslist) {
+        stop("Improperly formatted junctions")
+    }
 
     # Important part is below
     mcols_ra.all = mcols(ra.all)
@@ -331,7 +348,7 @@ process RETIER_WHITELIST_JUNCTIONS___DEV_COPY {
     """
     #!/usr/bin/env Rscript
 
-	options(error = function() {traceback(2); quit(save = "no", status = 1)})
+    options(error = function() {traceback(2); quit(save = "no", status = 1)})
 
     library(gUtils)
     library(dplyr)
@@ -353,33 +370,33 @@ process RETIER_WHITELIST_JUNCTIONS___DEV_COPY {
     jpath_tiered = glue::glue('{tools::file_path_sans_ext(jpath)}___tiered.rds')
 
     # Read the VCF file
-	is_character = is.character(jpath)
-	is_len_one = NROW(jpath) == 1
-	is_na = is_len_one && (is.na(jpath) || jpath %in% c("NA", base::nullfile()))
-	is_possible_path = is_character && is_len_one && !is_na
-  	is_existent_path = is_possible_path && file.exists(jpath)
-  	is_rds = is_possible_path && grepl(".rds\$", jpath)
-	is_vcf = is_possible_path && grepl(".vcf(.bgz|.gz){0,}\$", jpath)
+    is_character = is.character(jpath)
+    is_len_one = NROW(jpath) == 1
+    is_na = is_len_one && (is.na(jpath) || jpath %in% c("NA", base::nullfile()))
+    is_possible_path = is_character && is_len_one && !is_na
+      is_existent_path = is_possible_path && file.exists(jpath)
+      is_rds = is_possible_path && grepl(".rds\$", jpath)
+    is_vcf = is_possible_path && grepl(".vcf(.bgz|.gz){0,}\$", jpath)
 
-	if (is_existent_path && is_rds) {
-		ra.all = readRDS(jpath)
-	} else if (is_existent_path && is_vcf) {
-		ra.all = gGnome:::read.juncs(jpath)
-	} else if (!is_existent_path) {
-		stop("jpath does not exist or is invalid path: ", jpath)
-	}
+    if (is_existent_path && is_rds) {
+        ra.all = readRDS(jpath)
+    } else if (is_existent_path && is_vcf) {
+        ra.all = gGnome:::read.juncs(jpath)
+    } else if (!is_existent_path) {
+        stop("jpath does not exist or is invalid path: ", jpath)
+    }
 
-	is_properly_formatted_grangeslist = (
-	    inherits(ra.all, "GRangesList")
-		&& (
-			all(S4Vectors::elementNROWS(ra.all) == 2)
-			|| (NROW(ra.all) == 0)
-		)
-	)
+    is_properly_formatted_grangeslist = (
+        inherits(ra.all, "GRangesList")
+        && (
+            all(S4Vectors::elementNROWS(ra.all) == 2)
+            || (NROW(ra.all) == 0)
+        )
+    )
 
-	if (!is_properly_formatted_grangeslist) {
-		stop("Improperly formatted junctions")
-	}
+    if (!is_properly_formatted_grangeslist) {
+        stop("Improperly formatted junctions")
+    }
 
     # Important part is below
     mcols_ra.all = mcols(ra.all)
@@ -398,7 +415,7 @@ process RETIER_WHITELIST_JUNCTIONS___DEV_COPY {
     } else {
       cat("No whitelisted junctions overlapped with provided junctions.\n")
     }
-	mcols(ra.all) = mcols_ra.all
+    mcols(ra.all) = mcols_ra.all
 
 
     # Define the path to the raw junctions file
@@ -497,7 +514,7 @@ process RETIER_WHITELIST_JUNCTIONS {
     """
     #!/usr/bin/env Rscript
 
-	options(error = function() {traceback(2); quit(save = "no", status = 1)})
+    options(error = function() {traceback(2); quit(save = "no", status = 1)})
 
     library(gUtils)
     library(dplyr)
@@ -521,33 +538,33 @@ process RETIER_WHITELIST_JUNCTIONS {
     jpath_tiered = glue::glue('{tools::file_path_sans_ext(jpath)}___tiered.rds')
 
     # Read the VCF file
-	is_character = is.character(jpath)
-	is_len_one = NROW(jpath) == 1
-	is_na = is_len_one && (is.na(jpath) || jpath %in% c("NA", base::nullfile()))
-	is_possible_path = is_character && is_len_one && !is_na
-  	is_existent_path = is_possible_path && file.exists(jpath)
-  	is_rds = is_possible_path && grepl(".rds\$", jpath)
-	is_vcf = is_possible_path && grepl(".vcf(.bgz|.gz){0,}\$", jpath)
+    is_character = is.character(jpath)
+    is_len_one = NROW(jpath) == 1
+    is_na = is_len_one && (is.na(jpath) || jpath %in% c("NA", base::nullfile()))
+    is_possible_path = is_character && is_len_one && !is_na
+      is_existent_path = is_possible_path && file.exists(jpath)
+      is_rds = is_possible_path && grepl(".rds\$", jpath)
+    is_vcf = is_possible_path && grepl(".vcf(.bgz|.gz){0,}\$", jpath)
 
-	if (is_existent_path && is_rds) {
-		ra.all = readRDS(jpath)
-	} else if (is_existent_path && is_vcf) {
-		ra.all = gGnome:::read.juncs(jpath)
-	} else if (!is_existent_path) {
-		stop("jpath does not exist or is invalid path: ", jpath)
-	}
+    if (is_existent_path && is_rds) {
+        ra.all = readRDS(jpath)
+    } else if (is_existent_path && is_vcf) {
+        ra.all = gGnome:::read.juncs(jpath)
+    } else if (!is_existent_path) {
+        stop("jpath does not exist or is invalid path: ", jpath)
+    }
 
-	is_properly_formatted_grangeslist = (
-	    inherits(ra.all, "GRangesList")
-		&& (
-			all(S4Vectors::elementNROWS(ra.all) == 2)
-			|| (NROW(ra.all) == 0)
-		)
-	)
+    is_properly_formatted_grangeslist = (
+        inherits(ra.all, "GRangesList")
+        && (
+            all(S4Vectors::elementNROWS(ra.all) == 2)
+            || (NROW(ra.all) == 0)
+        )
+    )
 
-	if (!is_properly_formatted_grangeslist) {
-		stop("Improperly formatted junctions")
-	}
+    if (!is_properly_formatted_grangeslist) {
+        stop("Improperly formatted junctions")
+    }
 
     # Important part is below
     mcols_ra.all = mcols(ra.all)

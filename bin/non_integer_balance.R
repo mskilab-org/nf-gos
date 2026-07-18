@@ -155,9 +155,9 @@ if ((opt$overwrite) | (!file.exists(binstats.gg.fn))) {
 
     message("Starting binstats")
     if (ncn.x == 0) { # handle no sex chr case by disabling loess
-        binstats.gg = gGnome::binstats(jab, bins = cov, field = opt$field, lp = TRUE, loess=FALSE)
+        binstats.gg = gGnome::binstats(jab, bins = JaBbA:::seqlevels_to_ncbi(cov), field = opt$field, lp = TRUE, loess=FALSE)
     } else {
-        binstats.gg = gGnome::binstats(jab, bins = cov, field = opt$field, lp = TRUE)
+        binstats.gg = gGnome::binstats(jab, bins = JaBbA:::seqlevels_to_ncbi(cov), field = opt$field, lp = TRUE)
     }
 
     ## save binstats

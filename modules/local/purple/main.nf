@@ -67,13 +67,102 @@ process PURPLE {
     def target_region_msi_indels_arg = target_region_msi_indels ? "-target_regions_msi_indels ${target_region_msi_indels}" : ''
 
     """
+    local_amber="${amber}"
+    local_cobalt="${cobalt}"
+
+    if [ -d "${amber}" ]; then
+        has_different_prefix=false
+        for f in "${amber}"/*; do
+            if [ -f "\$f" ]; then
+                filename=\$(basename "\$f")
+                if [[ "\$filename" == *.* ]]; then
+                    prefix="\${filename%%.*}"
+                    suffix="\${filename#*.}"
+                    if [[ "\$suffix" == amber.* ]] && [ "\$prefix" != "${meta.tumor_id}" ]; then
+                        has_different_prefix=true
+                        break
+                    fi
+                fi
+            fi
+        done
+
+        if [ "\$has_different_prefix" = true ]; then
+            mkdir -p amber_links
+            for f in "${amber}"/*; do
+                if [ -f "\$f" ]; then
+                    filename=\$(basename "\$f")
+                    link_source="\$f"
+                    case "\$link_source" in
+                        /*) ;;
+                        *) link_source="\$(pwd)/\$link_source" ;;
+                    esac
+                    if [[ "\$filename" == *.* ]]; then
+                        prefix="\${filename%%.*}"
+                        suffix="\${filename#*.}"
+                        if [[ "\$suffix" == amber.* ]] && [ "\$prefix" != "${meta.tumor_id}" ]; then
+                            ln -sfn "\$link_source" "amber_links/${meta.tumor_id}.\$suffix"
+                        else
+                            ln -sfn "\$link_source" "amber_links/\$filename"
+                        fi
+                    else
+                        ln -sfn "\$link_source" "amber_links/\$filename"
+                    fi
+                fi
+            done
+            local_amber="amber_links"
+        fi
+    fi
+
+    if [ -d "${cobalt}" ]; then
+        has_different_prefix=false
+        for f in "${cobalt}"/*; do
+            if [ -f "\$f" ]; then
+                filename=\$(basename "\$f")
+                if [[ "\$filename" == *.* ]]; then
+                    prefix="\${filename%%.*}"
+                    suffix="\${filename#*.}"
+                    if [[ "\$suffix" == cobalt.* ]] && [ "\$prefix" != "${meta.tumor_id}" ]; then
+                        has_different_prefix=true
+                        break
+                    fi
+                fi
+            fi
+        done
+
+        if [ "\$has_different_prefix" = true ]; then
+            mkdir -p cobalt_links
+            for f in "${cobalt}"/*; do
+                if [ -f "\$f" ]; then
+                    filename=\$(basename "\$f")
+                    link_source="\$f"
+                    case "\$link_source" in
+                        /*) ;;
+                        *) link_source="\$(pwd)/\$link_source" ;;
+                    esac
+                    if [[ "\$filename" == *.* ]]; then
+                        prefix="\${filename%%.*}"
+                        suffix="\${filename#*.}"
+                        if [[ "\$suffix" == cobalt.* ]] && [ "\$prefix" != "${meta.tumor_id}" ]; then
+                            ln -sfn "\$link_source" "cobalt_links/${meta.tumor_id}.\$suffix"
+                        else
+                            ln -sfn "\$link_source" "cobalt_links/\$filename"
+                        fi
+                    else
+                        ln -sfn "\$link_source" "cobalt_links/\$filename"
+                    fi
+                fi
+            done
+            local_cobalt="cobalt_links"
+        fi
+    fi
+
     purple \\
         -Xmx${Math.round(task.memory.bytes * 0.95)} \\
         ${args} \\
         -tumor ${meta.tumor_id} \\
         ${reference_arg} \\
-        -amber ${amber} \\
-        -cobalt ${cobalt} \\
+        -amber \$local_amber \\
+        -cobalt \$local_cobalt \\
         ${sv_tumor_vcf_arg} \\
         ${smlv_tumor_vcf_arg} \\
         ${smlv_normal_vcf_arg} \\

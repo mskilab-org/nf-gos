@@ -303,7 +303,7 @@ END_VERSIONS
 
 }
 
-process MUTECT2_TAPS {
+process MUTECT2_TAPS___DEPRECATED {
     tag "$meta.id"
 
     // conda '/opt/conda/envs/my-existing-env'
@@ -624,6 +624,514 @@ END_VERSIONS
 
 }
 
+process MUTECT2_TAPS___DEPRECATED_2 {
+    tag "$meta.id"
+
+    // conda '/opt/conda/envs/my-existing-env'
+    beforeScript """
+        set -a
+        . /gpfs/home/hadik01/load_miniforge
+        conda activate rna --stack
+        conda activate vcftools --stack
+        set +a
+    """
+
+    input:
+    tuple val(meta), path(bam), path(bai)
+    path(fasta)
+    path(fai)
+    path(dict)
+    path(gnomAD_snv_db)
+    path(gnomAD_snv_db_tbi)
+    path(sage_germline_pon)
+    path(sage_germline_pon_tbi)
+    path(skeletal_bed)
+
+    output:
+    tuple val(meta), path("*.mutect2.final.vcf.gz"), path("*.mutect2.final.vcf.gz.tbi"), path("**"), emit: mutect2_paths
+
+    when:
+    task.ext.when == null || task.ext.when
+
+    script:
+    def args = task.ext.args ?: ''
+    def prefix = task.ext.prefix ?: "${meta.id}"
+    def threads = task.cpus ?: 32
+    def min_f1r2_f2r1_alt_count = task.ext.min_f1r2_f2r1_alt_count ?: 3
+    """
+    require_cmd() {
+    local cmd="\$1"
+    if ! command -v "\$cmd" >/dev/null 2>&1; then
+        echo "Required command not found on PATH: \$cmd" >&2
+        exit 1
+    fi
+    }
+
+    index_vcf() {
+    local vcf_path="\$1"
+    tabix -f -p vcf "\$vcf_path"
+    }
+
+    tag_mutect_bidirectional_support() {
+    local input_vcf="\$1"
+    local output_vcf="\$2"
+    local workdir="\$3"
+    local min_alt_count="\$4"
+
+    mkdir -p "\$workdir"
+
+    bcftools view -h "\$input_vcf" > "\${workdir}/header.txt"
+    bcftools view -H "\$input_vcf" > "\${workdir}/body.txt"
+
+    awk -v min_alt_count="\$min_alt_count" '
+    BEGIN {
+        has_bidir_info = 0
+        q = sprintf("%c", 34)
+    }
+
+    /^##INFO=<ID=BIDIR_ALT_SUPPORT,/ { has_bidir_info = 1 }
+    /^#CHROM/ {
+        if (!has_bidir_info) {
+        print "##INFO=<ID=BIDIR_ALT_SUPPORT,Number=0,Type=Flag,Description=" q "ALT allele has at least " min_alt_count " support in both F1R2 and F2R1 for the first ALT allele" q ">"
+        print "##INFO=<ID=F1R2_ALT_COUNT,Number=1,Type=Integer,Description=" q "ALT count for the first ALT allele extracted from FORMAT/F1R2" q ">"
+        print "##INFO=<ID=F2R1_ALT_COUNT,Number=1,Type=Integer,Description=" q "ALT count for the first ALT allele extracted from FORMAT/F2R1" q ">"
+        }
+        print
+        next
+    }
+    { print }
+    ' "\${workdir}/header.txt" > "\${workdir}/header.with_tags.txt"
+
+    awk -v min_alt_count="\$min_alt_count" '
+    BEGIN {
+        FS = OFS = "\t"
+    }
+
+    function get_format_index(format_string, target,    n, fields, i) {
+        n = split(format_string, fields, ":")
+        for (i = 1; i <= n; i++) {
+        if (fields[i] == target) {
+            return i
+        }
+        }
+        return 0
+    }
+
+    function get_first_alt_count(sample_string, idx,    n, sample_fields, allele_counts, allele_n) {
+        if (idx == 0) {
+        return "."
+        }
+
+        n = split(sample_string, sample_fields, ":")
+        if (idx > n) {
+        return "."
+        }
+
+        allele_n = split(sample_fields[idx], allele_counts, ",")
+        if (allele_n < 2) {
+        return "."
+        }
+
+        return allele_counts[2]
+    }
+
+    {
+        f1r2_idx = get_format_index(\$9, "F1R2")
+        f2r1_idx = get_format_index(\$9, "F2R1")
+
+        f1r2_alt = get_first_alt_count(\$10, f1r2_idx)
+        f2r1_alt = get_first_alt_count(\$10, f2r1_idx)
+
+        new_info = \$8
+        if (new_info == "." || new_info == "") {
+        new_info = ""
+        } else {
+        new_info = new_info ";"
+        }
+
+        new_info = new_info "F1R2_ALT_COUNT=" f1r2_alt ";F2R1_ALT_COUNT=" f2r1_alt
+
+        if (f1r2_alt != "." && f2r1_alt != "." && (f1r2_alt + 0) >= min_alt_count && (f2r1_alt + 0) >= min_alt_count) {
+        new_info = new_info ";BIDIR_ALT_SUPPORT"
+        }
+
+        \$8 = new_info
+        print
+    }
+    ' "\${workdir}/body.txt" > "\${workdir}/body.with_tags.txt"
+
+    cat "\${workdir}/header.with_tags.txt" "\${workdir}/body.with_tags.txt" | bgzip > "\$output_vcf"
+    index_vcf "\$output_vcf"
+    }
+
+
+    filter_ct_ga_without_bidir() {
+    local input_vcf="\$1"
+    local output_vcf="\$2"
+    local workdir="\$3"
+
+    mkdir -p "\$workdir"
+
+    bcftools view -h "\$input_vcf" > "\${workdir}/header.txt"
+    bcftools view -H "\$input_vcf" > "\${workdir}/body.txt"
+
+    awk '
+    BEGIN {
+        FS = OFS = "\t"
+    }
+
+    function is_target_conversion(ref, alt) {
+        return length(ref) == 1 && length(alt) == 1 && ((ref == "C" && alt == "T") || (ref == "G" && alt == "A"))
+    }
+
+    function has_bidir_flag(info) {
+        return info ~ /(^|;)BIDIR_ALT_SUPPORT(;|\$)/
+    }
+
+    {
+        if (is_target_conversion(\$4, \$5) && !has_bidir_flag(\$8)) {
+        next
+        }
+        print
+    }
+    ' "\${workdir}/body.txt" > "\${workdir}/body.filtered.txt"
+
+    cat "\${workdir}/header.txt" "\${workdir}/body.filtered.txt" | bgzip > "\$output_vcf"
+    index_vcf "\$output_vcf"
+    }
+
+    for cmd in gatk bcftools awk bgzip tabix mktemp; do
+    require_cmd "\$cmd"
+    done
+
+    mutect2_raw_vcf="${prefix}.mutect2.raw.vcf.gz"
+    mutect2_filtered_vcf="${prefix}.mutect2.filtered.annotated.vcf.gz"
+    mutect2_no_filter_flags_vcf="${prefix}.mutect2.filtered.annotated.no_mutect_filter_flags.vcf.gz"
+    mutect2_no_pon_vcf="${prefix}.mutect2.filtered.annotated.no_pon.vcf.gz"
+    mutect2_bidir_vcf="${prefix}.mutect2.filtered.annotated.no_pon.bidir_alt_support.vcf.gz"
+    mutect2_final_vcf="${prefix}.mutect2.final.vcf.gz"
+
+    tmp_root="\$(mktemp -d "\${TMPDIR:-/tmp}/mutect2-taps.XXXXXX")"
+    cleanup() {
+    rm -rf "\$tmp_root"
+    }
+    trap cleanup EXIT
+
+    echo "Step 1/7: Running Mutect2..."
+    gatk Mutect2 \
+    -R "${fasta}" \
+    -I "${bam}" \
+    -tumor "${meta.id}" \
+    -L "${skeletal_bed}" \
+    --panel-of-normals "${sage_germline_pon}" \
+    -O "\$mutect2_raw_vcf"
+    index_vcf "\$mutect2_raw_vcf"
+
+    echo "Step 2/7: Running FilterMutectCalls..."
+    gatk FilterMutectCalls \
+    -R "${fasta}" \
+    -V "\$mutect2_raw_vcf" \
+    --stats "\${mutect2_raw_vcf}.stats" \
+    -O "\$mutect2_filtered_vcf"
+    index_vcf "\$mutect2_filtered_vcf"
+
+    echo "Step 3/6: Removing Mutect2 calls with selected FILTER flags and FORMAT/AD ALT count < 3..."
+    bcftools view \
+    -e 'FILTER~"weak_evidence" || FILTER~"panel_of_normals" || FILTER~"germline" || FILTER~"base_qual" || FILTER~"haplotype" || FORMAT/AD[0:1] = "." || FORMAT/AD[0:1] < 3' \
+    -Oz \
+    -o "\$mutect2_no_filter_flags_vcf" \
+    "\$mutect2_filtered_vcf"
+    index_vcf "\$mutect2_no_filter_flags_vcf"
+
+    echo "Step 4/6: Removing Mutect2 calls found in the panel of normals..."
+    bcftools isec \
+    -C \
+    -c none \
+    -w1 \
+    -Oz \
+    -o "\$mutect2_no_pon_vcf" \
+    "\$mutect2_no_filter_flags_vcf" \
+    "${sage_germline_pon}"
+    index_vcf "\$mutect2_no_pon_vcf"
+
+    echo "Step 5/6: Tagging Mutect2 calls with bidirectional ALT support..."
+    tag_mutect_bidirectional_support \
+    "\$mutect2_no_pon_vcf" \
+    "\$mutect2_bidir_vcf" \
+    "\${tmp_root}/tag_mutect" \
+    "${min_f1r2_f2r1_alt_count}"
+
+    echo "Step 6/6: Filtering Mutect2 C>T and G>A SNVs that lack bidirectional ALT support..."
+    filter_ct_ga_without_bidir \
+    "\$mutect2_bidir_vcf" \
+    "\$mutect2_final_vcf" \
+    "\${tmp_root}/filter_mutect"
+
+    echo "Done."
+    echo "Mutect2 raw VCF: \${mutect2_raw_vcf}"
+    echo "Mutect2 filtered VCF: \${mutect2_filtered_vcf}"
+    echo "Mutect2 FILTER-flag-cleaned VCF: \${mutect2_no_filter_flags_vcf}"
+    echo "Mutect2 no-PoN VCF: \${mutect2_no_pon_vcf}"
+    echo "Mutect2 bidirectional-tagged VCF: \${mutect2_bidir_vcf}"
+    echo "Mutect2 final VCF: \${mutect2_final_vcf}"
+    """
+
+}
+
+process MUTECT2_TAPS {
+    tag "$meta.id"
+
+    // conda '/opt/conda/envs/my-existing-env'
+    beforeScript """
+        set -a
+        . /gpfs/home/hadik01/load_miniforge
+        conda activate rna --stack
+        conda activate vcftools --stack
+        set +a
+    """
+
+    input:
+    tuple val(meta), path(bam), path(bai)
+    path(fasta)
+    path(fai)
+    path(dict)
+    path(gnomAD_snv_db)
+    path(gnomAD_snv_db_tbi)
+    path(sage_germline_pon)
+    path(sage_germline_pon_tbi)
+    path(skeletal_bed)
+
+    output:
+    tuple val(meta), path("*.mutect2.final.vcf.gz"), path("*.mutect2.final.vcf.gz.tbi"), path("**"), emit: mutect2_paths
+
+    when:
+    task.ext.when == null || task.ext.when
+
+    script:
+    def args = task.ext.args ?: ''
+    def prefix = task.ext.prefix ?: "${meta.id}"
+    def threads = task.cpus ?: 32
+    def min_f1r2_f2r1_alt_count = task.ext.min_f1r2_f2r1_alt_count ?: 3
+    """
+    require_cmd() {
+    local cmd="\$1"
+    if ! command -v "\$cmd" >/dev/null 2>&1; then
+        echo "Required command not found on PATH: \$cmd" >&2
+        exit 1
+    fi
+    }
+
+    index_vcf() {
+    local vcf_path="\$1"
+    tabix -f -p vcf "\$vcf_path"
+    }
+
+    tag_mutect_bidirectional_support() {
+    local input_vcf="\$1"
+    local output_vcf="\$2"
+    local workdir="\$3"
+    local min_alt_count="\$4"
+
+    mkdir -p "\$workdir"
+
+    bcftools view -h "\$input_vcf" > "\${workdir}/header.txt"
+    bcftools view -H "\$input_vcf" > "\${workdir}/body.txt"
+
+    awk -v min_alt_count="\$min_alt_count" '
+    BEGIN {
+        has_bidir_info = 0
+        q = sprintf("%c", 34)
+    }
+
+    /^##INFO=<ID=BIDIR_ALT_SUPPORT,/ { has_bidir_info = 1 }
+    /^#CHROM/ {
+        if (!has_bidir_info) {
+        print "##INFO=<ID=BIDIR_ALT_SUPPORT,Number=0,Type=Flag,Description=" q "ALT allele has at least " min_alt_count " support in both F1R2 and F2R1 for the first ALT allele" q ">"
+        print "##INFO=<ID=F1R2_ALT_COUNT,Number=1,Type=Integer,Description=" q "ALT count for the first ALT allele extracted from FORMAT/F1R2" q ">"
+        print "##INFO=<ID=F2R1_ALT_COUNT,Number=1,Type=Integer,Description=" q "ALT count for the first ALT allele extracted from FORMAT/F2R1" q ">"
+        }
+        print
+        next
+    }
+    { print }
+    ' "\${workdir}/header.txt" > "\${workdir}/header.with_tags.txt"
+
+    awk -v min_alt_count="\$min_alt_count" '
+    BEGIN {
+        FS = OFS = "\t"
+    }
+
+    function get_format_index(format_string, target,    n, fields, i) {
+        n = split(format_string, fields, ":")
+        for (i = 1; i <= n; i++) {
+        if (fields[i] == target) {
+            return i
+        }
+        }
+        return 0
+    }
+
+    function get_first_alt_count(sample_string, idx,    n, sample_fields, allele_counts, allele_n) {
+        if (idx == 0) {
+        return "."
+        }
+
+        n = split(sample_string, sample_fields, ":")
+        if (idx > n) {
+        return "."
+        }
+
+        allele_n = split(sample_fields[idx], allele_counts, ",")
+        if (allele_n < 2) {
+        return "."
+        }
+
+        return allele_counts[2]
+    }
+
+    {
+        f1r2_idx = get_format_index(\$9, "F1R2")
+        f2r1_idx = get_format_index(\$9, "F2R1")
+
+        f1r2_alt = get_first_alt_count(\$10, f1r2_idx)
+        f2r1_alt = get_first_alt_count(\$10, f2r1_idx)
+
+        new_info = \$8
+        if (new_info == "." || new_info == "") {
+        new_info = ""
+        } else {
+        new_info = new_info ";"
+        }
+
+        new_info = new_info "F1R2_ALT_COUNT=" f1r2_alt ";F2R1_ALT_COUNT=" f2r1_alt
+
+        if (f1r2_alt != "." && f2r1_alt != "." && (f1r2_alt + 0) >= min_alt_count && (f2r1_alt + 0) >= min_alt_count) {
+        new_info = new_info ";BIDIR_ALT_SUPPORT"
+        }
+
+        \$8 = new_info
+        print
+    }
+    ' "\${workdir}/body.txt" > "\${workdir}/body.with_tags.txt"
+
+    cat "\${workdir}/header.with_tags.txt" "\${workdir}/body.with_tags.txt" | bgzip > "\$output_vcf"
+    index_vcf "\$output_vcf"
+    }
+
+
+    filter_ct_ga_without_bidir() {
+    local input_vcf="\$1"
+    local output_vcf="\$2"
+    local workdir="\$3"
+
+    mkdir -p "\$workdir"
+
+    bcftools view -h "\$input_vcf" > "\${workdir}/header.txt"
+    bcftools view -H "\$input_vcf" > "\${workdir}/body.txt"
+
+    awk '
+    BEGIN {
+        FS = OFS = "\t"
+    }
+
+    function is_target_conversion(ref, alt) {
+        return length(ref) == 1 && length(alt) == 1 && ((ref == "C" && alt == "T") || (ref == "G" && alt == "A"))
+    }
+
+    function has_bidir_flag(info) {
+        return info ~ /(^|;)BIDIR_ALT_SUPPORT(;|\$)/
+    }
+
+    {
+        if (is_target_conversion(\$4, \$5) && !has_bidir_flag(\$8)) {
+        next
+        }
+        print
+    }
+    ' "\${workdir}/body.txt" > "\${workdir}/body.filtered.txt"
+
+    cat "\${workdir}/header.txt" "\${workdir}/body.filtered.txt" | bgzip > "\$output_vcf"
+    index_vcf "\$output_vcf"
+    }
+
+    for cmd in gatk bcftools awk bgzip tabix mktemp; do
+    require_cmd "\$cmd"
+    done
+
+    mutect2_raw_vcf="${prefix}.mutect2.raw.vcf.gz"
+    mutect2_filtered_vcf="${prefix}.mutect2.filtered.annotated.vcf.gz"
+    mutect2_no_filter_flags_vcf="${prefix}.mutect2.filtered.annotated.no_mutect_filter_flags.vcf.gz"
+    mutect2_no_pon_vcf="${prefix}.mutect2.filtered.annotated.no_pon.vcf.gz"
+    mutect2_bidir_vcf="${prefix}.mutect2.filtered.annotated.no_pon.bidir_alt_support.vcf.gz"
+    mutect2_final_vcf="${prefix}.mutect2.final.vcf.gz"
+
+    tmp_root="\$(mktemp -d "\${TMPDIR:-/tmp}/mutect2-taps.XXXXXX")"
+    cleanup() {
+    rm -rf "\$tmp_root"
+    }
+    trap cleanup EXIT
+
+    echo "Step 1/6: Running Mutect2..."
+    gatk Mutect2 \
+    -R "${fasta}" \
+    -I "${bam}" \
+    -tumor "${meta.id}" \
+    -L "${skeletal_bed}" \
+    --panel-of-normals "${sage_germline_pon}" \
+    -O "\$mutect2_raw_vcf"
+    index_vcf "\$mutect2_raw_vcf"
+
+    echo "Step 2/6: Running FilterMutectCalls..."i
+    gatk FilterMutectCalls \
+    -R "${fasta}" \
+    -V "\$mutect2_raw_vcf" \
+    --stats "\${mutect2_raw_vcf}.stats" \
+    -O "\$mutect2_filtered_vcf"
+    index_vcf "\$mutect2_filtered_vcf"
+
+    echo "Step 3/6: Removing Mutect2 calls with selected FILTER flags and FORMAT/AD ALT count < 3..."
+    bcftools view \
+    -i '( FILTER="PASS" || FILTER="weak_evidence" || FILTER="haplotype" || FILTER="clustered_events" ) && ( FORMAT/AD[0:1] >= 3 )' \
+    -Oz \
+    -o "\$mutect2_no_filter_flags_vcf" \
+    "\$mutect2_filtered_vcf"
+    index_vcf "\$mutect2_no_filter_flags_vcf"
+
+    echo "Step 4/6: Removing Mutect2 calls found in the panel of normals..."
+    bcftools isec \
+    -C \
+    -c none \
+    -w1 \
+    -Oz \
+    -o "\$mutect2_no_pon_vcf" \
+    "\$mutect2_no_filter_flags_vcf" \
+    "${sage_germline_pon}"
+    index_vcf "\$mutect2_no_pon_vcf"
+
+    echo "Step 5/6: Tagging Mutect2 calls with bidirectional ALT support..."
+    tag_mutect_bidirectional_support \
+    "\$mutect2_no_pon_vcf" \
+    "\$mutect2_bidir_vcf" \
+    "\${tmp_root}/tag_mutect" \
+    "${min_f1r2_f2r1_alt_count}"
+
+    echo "Step 6/6: Filtering Mutect2 C>T and G>A SNVs that lack bidirectional ALT support..."
+    filter_ct_ga_without_bidir \
+    "\$mutect2_bidir_vcf" \
+    "\$mutect2_final_vcf" \
+    "\${tmp_root}/filter_mutect"
+
+    echo "Done."
+    echo "Mutect2 raw VCF: \${mutect2_raw_vcf}"
+    echo "Mutect2 filtered VCF: \${mutect2_filtered_vcf}"
+    echo "Mutect2 FILTER-flag-cleaned VCF: \${mutect2_no_filter_flags_vcf}"
+    echo "Mutect2 no-PoN VCF: \${mutect2_no_pon_vcf}"
+    echo "Mutect2 bidirectional-tagged VCF: \${mutect2_bidir_vcf}"
+    echo "Mutect2 final VCF: \${mutect2_final_vcf}"
+    """
+
+}
+
 process COMBINE_TAPS_VARIANT_CALLS {
     tag "$meta.id"
 
@@ -903,6 +1411,86 @@ END_VERSIONS
 }
 
 process TUMOR_ONLY_FILTER {
+    tag "$meta.id"
+    label 'process_low'
+
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'docker://mskilab/utils:0.0.2':
+        'mskilab/utils:0.0.2' }"
+
+    input:
+    tuple val(meta), path(vcf), path(vcf_tbi)
+    path(dbsnp)
+    path(dbsnp_tbi)
+    path(gnomAD_snv_db)
+    path(gnomAD_snv_db_tbi)
+    path(sage_germ_pon)
+    path(sage_germ_pon_tbi)
+    path(mills_gold_indel)
+    path(mills_gold_indel_tbi)
+
+    output:
+    tuple val(meta), path("*.tumoronly.vcf.gz"), path("*.tumoronly.vcf.gz.tbi"), emit: tumor_only_filtered_vcf
+    path "versions.yml", emit: versions, optional:true
+
+    when:
+    task.ext.when == null || task.ext.when
+    script:
+    def args        = task.ext.args ?: ''
+    def prefix      = task.ext.prefix ?: "${meta.id}"
+    def output      = "${meta.id}.tumoronly.vcf.gz"
+    def VERSION    = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
+
+    """
+    mkdir -p filter_tumoronly/
+
+    if [[ -e ${vcf} ]]; then
+        echo "Now filtering by SAGE Germline PON ..."
+        bcftools isec -C -O z -o ${meta.id}.noPON.vcf.gz -p ./ ${vcf} \\
+        ${sage_germ_pon} && mv 0000.vcf.gz filter_tumoronly/${meta.id}.noPON.vcf.gz && \\
+        mv 0000.vcf.gz.tbi filter_tumoronly/${meta.id}.noPON.vcf.gz.tbi
+    else
+        echo "Cannot perform SNV filtering by SAGE Germline PON. Exiting..."
+        exit 1;
+    fi
+
+    if [[ -e filter_tumoronly/${meta.id}.noPON.vcf.gz ]]; then
+        echo "Now filtering by Mills and Gold Standard Indels ..."
+        bcftools isec -C -O z -o ${meta.id}.noPON.noMGIndel.vcf.gz -p ./ \\
+        filter_tumoronly/${meta.id}.noPON.vcf.gz ${mills_gold_indel} && \\
+        mv 0000.vcf.gz filter_tumoronly/${meta.id}.noPON.noMGIndel.vcf.gz && \\
+        mv 0000.vcf.gz.tbi filter_tumoronly/${meta.id}.noPON.noMGIndel.vcf.gz.tbi
+
+        cp filter_tumoronly/${meta.id}.noPON.noMGIndel.vcf.gz ./${meta.id}.tumoronly.vcf.gz && \\
+        cp filter_tumoronly/${meta.id}.noPON.noMGIndel.vcf.gz.tbi ./${meta.id}.tumoronly.vcf.gz.tbi
+
+        rm -rf filter_tumoronly/
+    else
+        echo "Cannot perform SNV filtering by Mills and Gold Standard Indels. Exiting..."
+        exit 1;
+    fi
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        bcftools: \$(bcftools -v | head -n 1 | sed 's/^bcftools //')
+END_VERSIONS
+
+    """
+
+    stub:
+    prefix = task.ext.prefix ?: "${meta.id}"
+    def VERSION = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
+    """
+    touch ${meta.id}.tumoronly.vcf.gz
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        sage: ${VERSION}
+END_VERSIONS
+    """
+}
+
+process TUMOR_ONLY_FILTER___DEPRECATED {
     tag "$meta.id"
     label 'process_low'
 

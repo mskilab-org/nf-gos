@@ -57,19 +57,35 @@ class WorkflowMain {
     }
 
     //
-    // Promote every key from params.genomes[params.genome] onto the top-level params map.
-    // Existing values on params are preserved, so explicit user overrides (CLI or config)
-    // beat the genome preset. Keys present on params but set to null are treated as unset
-    // and get filled from the genome block.
+    // Return a map of every key from params.genomes[params.genome] that is not already
+    // set (or is null) on the top-level params map.  Intended to be used with
+    // params.putAll() at the Nextflow script top-level so genome attributes are visible
+    // before any include / workflow declarations are parsed:
     //
-    public static void loadGenomeParams(params) {
+    //   params.putAll( WorkflowMain.genomeParams(params) )
+    //
+    // Existing non-null values on params are preserved, so explicit user overrides
+    // (CLI flags or config entries) always beat the genome preset.
+    //
+    public static Map genomeParams(params) {
+        Map resolved = [:]
         if (!(params.genomes && params.genome && params.genomes.containsKey(params.genome))) {
-            return
+            return resolved
         }
         params.genomes[ params.genome ].each { key, value ->
             if (!params.containsKey(key) || params[key] == null) {
-                params[key] = value
+                resolved[key] = value
             }
         }
+        return resolved
+    }
+
+    //
+    // Promote every key from params.genomes[params.genome] onto the top-level params map.
+    // Kept for backwards-compatibility (used inside a workflow block where putAll is not
+    // needed, but the in-place mutation still works at that scope).
+    //
+    public static void loadGenomeParams(params) {
+        params.putAll( genomeParams(params) )
     }
 }

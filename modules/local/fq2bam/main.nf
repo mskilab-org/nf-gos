@@ -1,7 +1,7 @@
 process PARABRICKS_FQ2BAM {
     tag "$meta.id"
 
-    container "nvcr.io/nvidia/clara/clara-parabricks:4.5.0-1"
+    container "nvcr.io/nvidia/clara/clara-parabricks:4.7.0-1"
     containerOptions "${ workflow.containerEngine == "singularity" ? "--nv --bind ${NEXTFLOW_C_DIR}/memcap.so:/memcap.so": ( workflow.containerEngine == "docker" ? '--gpus all': null ) }"
 
     input:
@@ -103,7 +103,7 @@ process PARABRICKS_FQ2BAM {
         --bwa-normalized-queue-capacity $bwa_queue_capacity `# this is for fq2bamfast` \\
         --monitor-usage \\
         --verbose \\
-        `# --tmp-dir \$tdir` \\
+        --tmp-dir \$tdir \\
         $low_memory_command \\
         $args
 

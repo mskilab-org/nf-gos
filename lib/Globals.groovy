@@ -6,6 +6,13 @@ class Globals {
 
   static List rowsAsMaps = []
 
+  // Channel<Map> — samplesheet rows (lane-aware), potentially with overwritten_subsequent
+  // output columns cleared when params.overwrite_subsequent is true.
+  static inputs = null
+
+  // Channel<Map> — same as inputs but with lane meta stripped.
+  static inputs_unlaned = null
+
   static Map tool_input_output_map = [
         "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
         "itdseek": [ inputs: ['bam'], outputs: ['itdseek_vcf', 'itdseek_rds'] ],
@@ -51,7 +58,7 @@ class Globals {
         // 	],
         // 	outputs: ['jabba_rds', 'jabba_gg']
         // ],
-        "jabba": [ inputs: [ 'vcf', 'hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
+        "jabba": [ inputs: [ 'vcf', 'hets', 'dryclean_cov', 'purity', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
         "non_integer_balance": [ inputs: ['jabba_gg'], outputs: ['ni_balanced_gg'] ],
         "lp_phased_balance": [ inputs: ['ni_balanced_gg'], outputs: ['lp_balanced_gg'] ],
         "events": [ inputs: ['ni_balanced_gg'], outputs: ['events'] ],
@@ -65,6 +72,7 @@ class Globals {
         "onenesstwoness": [ inputs: ['events', 'hrdetect'], outputs: ['onenesstwoness'] ],
         "rastair": [ inputs: ['bam'], outputs: ['rastair_vcf'] ],
         "mutect2_taps": [ inputs: ['bam'], outputs: ['mutect2_taps_vcf'] ],
+        "combine_taps_variant_calls": [ inputs: ['mutect2_taps_vcf', 'rastair_vcf'], outputs: ['snv_somatic_vcf'] ],
         "ichorcna": [ inputs: ['bam'], outputs: ['purity', 'ploidy'] ]
     ]
 
