@@ -56,14 +56,7 @@ workflow GRIDSS_SOMATIC_FILTER_STEP {
     // pon_gridss_ref_genome_version = WorkflowNfcasereports.create_value_channel(params.pon_gridss_ref_genome_version)
     // fasta = WorkflowNfcasereports.create_file_channel(params.fasta)
     // fasta_fai = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
-    (
-        pon_gridss_bedpe_svs, 
-        pon_gridss_bed_breakends, 
-        pon_gridss_known_hotspots_bedpe, 
-        fasta, 
-        fasta_fai,
-        pon_gridss_ref_genome_version
-    ) = WorkflowNfcasereports.create_channels(
+    ( pon_gridss_bedpe_svs, pon_gridss_bed_breakends, pon_gridss_known_hotspots_bedpe, fasta, fasta_fai, pon_gridss_ref_genome_version ) = WorkflowNfcasereports.create_channels(
         params: params,
         spec: [
             "file": ['pon_gridss_bedpe_svs', 'pon_gridss_bed_breakends', 'pon_gridss_known_hotspots_bedpe', 'fasta', 'fasta_fai'],

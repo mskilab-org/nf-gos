@@ -812,11 +812,7 @@ workflow NFTAPS {
     // vep_cache_version = WorkflowNfcasereports.create_value_channel(params.vep_cache_version)
     // vep_genome = WorkflowNfcasereports.create_value_channel(params.vep_genome)
     // vep_species = WorkflowNfcasereports.create_value_channel(params.vep_species)
-    (
-        vep_cache_version,
-        vep_genome,
-        vep_species
-    ) = WorkflowNfcasereports.create_channels(
+    (vep_cache_version, vep_genome, vep_species) = WorkflowNfcasereports.create_channels(
         params, [
             "value": [
                 "vep_cache_version", "vep_genome", "vep_species"
