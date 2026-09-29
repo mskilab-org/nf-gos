@@ -71,7 +71,7 @@ process EXTRACT_PURITYPLOIDY {
     tuple val(meta), path(ascat_rds)
 
     output:
-    env purity_val, emit: purity_val
+    tuple val(meta), env(purity_val), emit: purity_val
     tuple val(meta), env(ploidy_val), emit: ploidy_val
 
     script:

@@ -167,7 +167,7 @@ process GRIDSS_PREPROCESS {
 
 
 process GRIDSS_ASSEMBLE_SCATTER {
-    tag "$meta.id"
+    tag "$meta.id $jobindex"
     label 'process_medium'
 
     conda "bioconda::gridss=2.13.2"

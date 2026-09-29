@@ -116,11 +116,6 @@ include { PREPARE_INTERVALS } from '../subworkflows/local/prepare_intervals/main
 // BAM Picard QC
 // include { BAM_QC } from '../subworkflows/local/bam_qc/main'
 
-include { 
-    SETUP; 
-    TOOLS
-} from './prepare.nf'
-
 //GRIDSS
 include { 
     BAM_SVCALLING_GRIDSS; 
@@ -142,8 +137,9 @@ include {
     FRAGCOUNTER_STEP;
     DRYCLEAN_STEP;
     AMBER_STEP;
-    COBALT_STEP;
-    PURPLE_STEP;
+    ICHORCNA_STEP;
+    // COBALT_STEP;
+    // PURPLE_STEP;
     CBS_STEP;
     VARIANT_CALLING_STEP;
     VARIANT_ANNOTATION_STEP;
@@ -157,13 +153,19 @@ include {
     ONCOKB_STEP;
     SIGNATURES_STEP;
     HRDETECT_STEP;
-    ONENESS_TWONESS_STEP
+    ONENESS_TWONESS_STEP;
+    TAPS_VARIANT_CALLING_STEP
 } from '../subworkflows/local/steps.nf'
 
 include {
     SV_CHIMERA_FILTER as SV_CHIMERA_FILTER_RAWVCF;
     SV_CHIMERA_FILTER as SV_CHIMERA_FILTER_VCF
 } from '../modules/local/process.nf'
+
+include { 
+    SETUP; 
+    TOOLS
+} from './prepare.nf'
 
 
 // workflow SETUP {
@@ -398,6 +400,9 @@ include {
 //         it + [meta: Utils.remove_lanes_from_meta(it.meta)]
 //     }
 
+//     Globals.inputs = inputs
+//     Globals.inputs_unlaned = inputs_unlaned
+
 //     emit:
 //     inputs
 //     inputs_unlaned
@@ -411,10 +416,97 @@ include {
     
 //     // see lib/Globals.groovy
 //     sampleList = Globals.rowsAsMaps
+//     inputs = Globals.inputs
+//     inputs_unlaned = Globals.inputs_unlaned
+
+//     // ── Parse tool-control params early ───────────────────────────────────
+//     // Parsed here (before available_inputs / missing_outputs) so that
+//     // --overwrite_subsequent can use run_tools as DAG seeds to clear
+//     // sampleList before the main tool-selection scan.
+//     skip_tools = params.skip_tools ? params.skip_tools.split(',').collect { it.trim() } : []
+//     log.info "Skipping tools: ${skip_tools}"
+//     run_tools = params.only_tools ? params.only_tools.split(',').collect { it -> it.trim() } : []
+//     force_tools = params.force_tools ? params.force_tools.split(',').collect { it -> it.trim() } : []
+//     run_tools = (run_tools + force_tools).unique()
+//     is_run_tools_populated = ! run_tools.isEmpty()
+//     if (is_run_tools_populated) {
+//         log.info "Running tools: ${run_tools}" 
+//     }
+    
+//     is_overlapping = run_tools.any { it ->
+//         skip_tools.contains(it)
+//     }
+//     if (is_overlapping) {
+//         log.info "Overlapping tool sets specified in skip and only tools parameters.. defaulting to running the tool specified"
+//     }
+//     if (! ( force_tools.isEmpty() )) {
+//         log.info "Forcing tools: ${force_tools}" 
+//     }
+
+//     // ── overwrite_subsequent ──────────────────────────────────────────────
+//     // When --overwrite_subsequent is set, blank out every output column
+//     // produced by any explicitly requested tool (run_tools = only_tools ∪
+//     // force_tools) **and every downstream tool in the DAG** across all
+//     // samplesheet representations.  Clearing happens BEFORE available_inputs
+//     // and missing_outputs are computed so the tool-selection loop naturally
+//     // picks up downstream tools whose outputs are now absent.
+//     //
+//     // The tool_input_output_map encodes a DAG: tool A's outputs may be tool
+//     // B's inputs, whose outputs may in turn be tool C's inputs, etc.
+//     // A fixpoint forward-propagation walks the DAG to collect the full
+//     // transitive closure of fields that must be cleared, and (in parallel)
+//     // the set of tools downstream of the seeds — these are the
+//     // `subsequent_tools` used by is_scenario3 in the selection loop below.
+//     //
+//     // Always defined so the tool-selection loop can reference it
+//     // unconditionally; only populated when overwrite_subsequent triggers.
+//     subsequent_tools = new LinkedHashSet()
+
+//     if (params.overwrite_subsequent && is_run_tools_populated) {
+//         // Step 1 – seed with direct outputs of the requested tools.
+//         // .flatten() handles nested output lists (e.g. collect_multiple_metrics).
+//         def fields_to_clear = new HashSet()
+//         run_tools.each { tool ->
+//             def io = tool_input_output_map[tool]
+//             if (io) { fields_to_clear.addAll(io.outputs.flatten()) }
+//         }
+
+//         // Step 2 – propagate downstream through the DAG until fixpoint.
+//         // A tool is "subsequent" iff any of its inputs is in fields_to_clear;
+//         // we record it AND add its outputs to the set, then iterate.
+//         def changed = true
+//         while (changed) {
+//             changed = false
+//             tool_input_output_map.each { tool, io ->
+//                 def tool_outputs = io.outputs.flatten() as Set
+//                 if (io.inputs.any { fields_to_clear.contains(it) }
+//                         && !fields_to_clear.containsAll(tool_outputs)) {
+//                     fields_to_clear.addAll(tool_outputs)
+//                     subsequent_tools.add(tool)
+//                     changed = true
+//                 }
+//             }
+//         }
+
+//         log.info "overwrite_subsequent: clearing output columns ${fields_to_clear} from samplesheet rows"
+//         log.info "overwrite_subsequent: subsequent tools to re-run: ${subsequent_tools}"
+
+//         // Step 3 – build the overlay once, apply to all representations.
+//         def cleared = fields_to_clear.collectEntries { field -> [(field): []] }
+
+//         sampleList = sampleList.collect { row -> row + cleared }
+//         Globals.rowsAsMaps = sampleList
+
+//         inputs         = inputs.map         { row -> row + cleared }
+//         inputs_unlaned = inputs_unlaned.map { row -> row + cleared }
+//     }
+
 //     available_inputs = new HashSet()
 //     present_outputs = new HashSet()
     
 
+//     // Step 1 – seed available_inputs from the samplesheet: anything with a
+//     // non-empty value in at least one row is provided.
 //     sampleList.each { input_map ->
 //         input_map.each { key, value ->
 //             def is_value_present = value && !(value instanceof Collection && value.empty)
@@ -424,7 +516,35 @@ include {
 //         }
 //     }
 
-//     println "Provided inputs: ${available_inputs}"
+//     log.info "Provided inputs (samplesheet only): ${available_inputs}"
+
+//     // Step 2 – DAG forward-propagation (fixpoint).
+//     // A tool's outputs are also "available" if (a) the tool is eligible to
+//     // run under the same is_scenarioN logic used by the main selection
+//     // loop below AND (b) all of its inputs are already in available_inputs.
+//     // This makes the inputsPresent check in the main loop independent of
+//     // tool_input_output_map iteration order: as long as the tool's
+//     // dependencies can transitively be produced from the samplesheet by
+//     // selectable tools, the inputs count as "are or will be present".
+//     def changed = true
+//     while (changed) {
+//         changed = false
+//         tool_input_output_map.each { tool, io ->
+//             def is_eligible_s1 = ! is_run_tools_populated && !skip_tools.contains(tool)
+//             def is_eligible_s2 = run_tools.contains(tool)
+//             def is_eligible_s3 = params.overwrite_subsequent && subsequent_tools.contains(tool)
+//             if (!(is_eligible_s1 || is_eligible_s2 || is_eligible_s3)) return
+
+//             def tool_outputs = io.outputs.flatten() as Set
+//             if (io.inputs.every { available_inputs.contains(it) }
+//                     && !available_inputs.containsAll(tool_outputs)) {
+//                 available_inputs.addAll(tool_outputs)
+//                 changed = true
+//             }
+//         }
+//     }
+
+//     log.info "Available inputs (samplesheet + transitively producible via DAG): ${available_inputs}"
 
 //     schemaFile = file("$projectDir/gos-assets/nf-gos/assets/schema_input.json")
 //     schema = new groovy.json.JsonSlurper().parse(schemaFile)
@@ -432,40 +552,31 @@ include {
 
 //     props = schema.items.properties
 //     requiredFields = props.findAll { !it.value.containsKey('meta') }.keySet()
-//     println "requiredFields: $requiredFields"
+//     log.info "requiredFields: $requiredFields"
 
-//     missing_outputs = requiredFields.findAll { field ->
-//         // Check if this field is missing (null or empty collection) in any sample
-//         sampleList.any { sample ->
-//             def value = sample[field]
-//             // !value || (value instanceof Collection && value.empty) || value.toString() == ""
-//             def truthy_val = (
-//                 (!value) ||
-//                 (value == null) ||
-//                 (value instanceof Collection && value.empty) ||
-//                 (value.toString().trim() == "") ||
-//                 (value instanceof String && value.replaceAll(/["']/, "").trim() == "")
-//             )
-//             truthy_val
-//         }
+//     // Direct per-field missingness probe — does not depend on the schema or on
+//     // missing_outputs being populated. Utils.robustly_test_if_empty handles null
+//     // (missing map key), empty collections, blank strings, and missing/empty
+//     // files/paths uniformly.
+//     is_field_missing_in_any_sample = { field ->
+//         sampleList.any { sample -> Utils.robustly_test_if_empty(sample[field]) }
 //     }
-//     println "Outputs MISSING from at least one sample: $missing_outputs"
+
+//     // Union schema-declared output fields with fields declared as outputs anywhere in
+//     // tool_input_output_map. This lets us mark a tool as "needed" based on its declared
+//     // outputs even when those outputs are not yet enumerated in schema_input.json —
+//     // avoiding the need to update the schema every time a tool is added or renamed.
+//     // .flatten() handles both flat lists (most tools) and nested lists
+//     // (e.g. collect_multiple_metrics: [['qc_alignment_summary'], ['qc_insert_size']]).
+//     all_tool_output_fields = tool_input_output_map.values()
+//         .collectMany { io -> io.outputs.flatten() as List } as Set
+//     candidate_output_fields = ((requiredFields as Set) + all_tool_output_fields) as Set
+
+//     missing_outputs = candidate_output_fields.findAll(is_field_missing_in_any_sample)
+//     log.info "Outputs MISSING from at least one sample: $missing_outputs"
 
 //     // Iteratively select tools based on available inputs
-//     skip_tools = params.skip_tools ? params.skip_tools.split(',').collect { it.trim() } : []
-//     println "Skipping tools: ${skip_tools}"
-//     run_tools = params.only_tools ? params.only_tools.split(',').collect { it -> it.trim() } : []
-//     is_run_tools_populated = ! run_tools.isEmpty()
-//     if (is_run_tools_populated) {
-//         println "Running tools: ${run_tools}" 
-//     }
-    
-//     is_overlapping = run_tools.any { it ->
-//         skip_tools.contains(it)
-//     }
-//     if (is_overlapping) {
-//         println "Overlapping tool sets specified in skip and only tools parameters.. defaulting to running the tool specified"
-//     }
+//     // (skip_tools / run_tools / force_tools were parsed above.)
 //     // TODO: if GRIDSS - skip if vcf is found, but not if vcf_raw is present.
 //     selected_tools = []
 //     tools_qc = ["collect_wgs_metrics", "collect_multiple_metrics", "estimate_library_complexity"]
@@ -475,11 +586,20 @@ include {
 //     tool_input_output_map.each { tool, io ->
 //         def is_scenario1 = ! is_run_tools_populated && !selected_tools.contains(tool) && !skip_tools.contains(tool)
 //         def is_scenario2 = ! is_scenario1 && run_tools.contains(tool)
-//         if (is_scenario1 || is_scenario2) {
+//         // is_scenario3 = overwrite_subsequent is set and the tool is downstream
+//         // (in the tool_input_output_map DAG) of any tool in run_tools.
+//         // Enables re-running of cascading downstream tools even when run_tools
+//         // is populated (which would otherwise short-circuit is_scenario1).
+//         def is_scenario3 = params.overwrite_subsequent && subsequent_tools.contains(tool)
+//         if (is_scenario1 || is_scenario2 || is_scenario3) {
 
 //             def inputsRequired = io.inputs
 //             def inputsPresent = inputsRequired.every { available_inputs.contains(it) }
-//             def outputsNeeded = io.outputs.any { missing_outputs.contains(it) }
+            
+//             // Probe each output field directly against sample rows rather than looking it
+//             // up in missing_outputs — this way fields that are not (yet) in the schema
+//             // still count as "needed" if absent from any sample.
+//             def outputsNeeded = io.outputs.flatten().any(is_field_missing_in_any_sample)
 
 //             // special cases
 //             def is_sage_tumor_only = tool == "sage" && params.tumor_only
@@ -494,31 +614,33 @@ include {
 
 //             // Treat special cases
 //             if (is_sage_tumor_only) {
-//                 outputsNeeded = ["snv_somatic_vcf", "snv_somatic_vcf_tumoronly_filtered"].any {
-//                     missing_outputs.contains(it)
-//                 }
+//                 outputsNeeded = ["snv_somatic_vcf", "snv_somatic_vcf_tumoronly_filtered"].any(is_field_missing_in_any_sample)
 //             }
 
 //             if (is_sage_heme) {
-//                 outputsNeeded = ["snv_somatic_vcf", "snv_somatic_vcf_tumoronly_filtered", "snv_somatic_vcf_rescue_ch_heme"].any {
-//                     missing_outputs.contains(it)
-//                 }
+//                 outputsNeeded = ["snv_somatic_vcf", "snv_somatic_vcf_tumoronly_filtered", "snv_somatic_vcf_rescue_ch_heme"].any(is_field_missing_in_any_sample)
 //             }
 
 //             if (is_current_tool_qc_multiple_metrics) {
-//                 def is_any_alignment_summary_absent = io.outputs[0].any {
-//                     missing_outputs.contains(it)
-//                 }
-//                 def is_any_insert_size_absent = io.outputs[1].any {
-//                     missing_outputs.contains(it)
-//                 }
+//                 def is_any_alignment_summary_absent = io.outputs[0].any(is_field_missing_in_any_sample)
+//                 def is_any_insert_size_absent = io.outputs[1].any(is_field_missing_in_any_sample)
 //                 outputsNeeded = is_any_alignment_summary_absent || is_any_insert_size_absent
 //             }
 
+//             if (force_tools && force_tools.contains(tool)) {
+//                 log.info "Tool ${tool} is being forced to run by user request, so it will be added to the selected tools list even if its outputs are not needed or its inputs are not present."
+//                 outputsNeeded = true
+                
+//             }
+            
 //             if (inputsPresent && outputsNeeded) {
 //                 selected_tools.add(tool)
-//                 available_inputs.addAll(io.outputs)
+//                 // available_inputs is no longer mutated here — it was
+//                 // pre-computed via fixpoint propagation above so
+//                 // inputsPresent is order-independent.
 //             }
+
+//             log.info "tool: ${tool} \n inputsPresent: ${inputsPresent} \n outputsNeeded: ${outputsNeeded}"
 
 
 
@@ -606,6 +728,11 @@ include {
 
 //     println "Tools that will be run based on your inputs: ${tools_used}"
 
+//     // Publish (potentially overwritten) channels to Globals so they are
+//     // accessible from workflow NFTAPS via TOOLS.out.
+//     Globals.inputs         = inputs
+//     Globals.inputs_unlaned = inputs_unlaned
+
 //     if (!params.dbsnp && !params.known_indels) {
 //         if (!params.skip_tools || (params.skip_tools && !params.skip_tools.contains('baserecalibrator'))) {
 //             log.warn "Base quality score recalibration requires at least one resource file. Please provide at least one of `--dbsnp` or `--known_indels`\nYou can skip this step in the workflow by adding `--skip_tools baserecalibrator` to the command."
@@ -618,12 +745,14 @@ include {
 //     emit:
 //     tools_used
 //     selected_tools_map
+//     inputs           // Channel<Map> — samplesheet rows (lane-aware), output columns cleared if overwrite_subsequent
+//     inputs_unlaned   // Channel<Map> — same but lane meta stripped
 
 
 // }
 
 
-workflow NFGOS {
+workflow NFTAPS {
 
     main:
     // Print help message if needed
@@ -642,8 +771,6 @@ workflow NFGOS {
     WorkflowMain.initialise(workflow, params, log)
 
     SETUP()
-    inputs = SETUP.out.inputs
-    inputs_unlaned = SETUP.out.inputs_unlaned
     rowsAsMaps = Globals.rowsAsMaps // Written inside SETUP()
     TOOLS()
     // See lib/Globals.groovy
@@ -662,30 +789,30 @@ workflow NFGOS {
     // selected_tools_map = TOOLS.out.selected_tools_map
 
     dbsnp = WorkflowNfcasereports.create_file_channel(params.dbsnp)
+    Globals.global_params.dbsnp = dbsnp
     fasta = WorkflowNfcasereports.create_file_channel(params.fasta)
+    Globals.global_params.fasta = fasta
     fasta_fai = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
     germline_resource = WorkflowNfcasereports.create_file_channel(params.germline_resource)
+    Globals.global_params.germline_resource = germline_resource
     known_indels = WorkflowNfcasereports.create_file_channel(params.known_indels)
+    Globals.global_params.known_indels = known_indels
     known_snps = WorkflowNfcasereports.create_file_channel(params.known_snps)
+    Globals.global_params.known_snps = known_snps
     pon = WorkflowNfcasereports.create_file_channel(params.pon)
+    Globals.global_params.pon = pon
     junction_pon_dir = WorkflowNfcasereports.create_file_channel(params.junction_pon_dir)
 
     // Initialize value channels based on params, defined in the params.genomes[params.genome] scope
 
     // snpeff_genome = WorkflowNfcasereports.create_value_channel(params.snpeff_genome)
     // snpeff_db = WorkflowNfcasereports.create_value_channel(params.snpeff_db)
-    // snpeff_db_full = params.snpeff_db && params.snpeff_genome   ? Channel.value("${params.snpeff_genome}.${params.snpeff_db}") : Channel.empty()
+    (snpeff_genome, snpeff_db) = WorkflowNfcasereports.create_channels(params, ["value": ["snpeff_genome", "snpeff_db"]])
+    snpeff_db_full = params.snpeff_db && params.snpeff_genome ? Channel.value("${params.snpeff_genome}.${params.snpeff_db}") : Channel.empty()
     // vep_cache_version = WorkflowNfcasereports.create_value_channel(params.vep_cache_version)
     // vep_genome = WorkflowNfcasereports.create_value_channel(params.vep_genome)
     // vep_species = WorkflowNfcasereports.create_value_channel(params.vep_species)
-    
-    (snpeff_genome, snpeff_db) = WorkflowNfcasereports.create_channels(params, ["value": ["snpeff_genome", "snpeff_db"]])
-    snpeff_db_full = params.snpeff_db && params.snpeff_genome ? Channel.value("${params.snpeff_genome}.${params.snpeff_db}") : Channel.empty()
-    (
-        vep_cache_version,
-        vep_genome,
-        vep_species
-    ) = WorkflowNfcasereports.create_channels(
+    (vep_cache_version, vep_genome, vep_species) = WorkflowNfcasereports.create_channels(
         params, [
             "value": [
                 "vep_cache_version", "vep_genome", "vep_species"
@@ -740,10 +867,12 @@ workflow NFGOS {
 
     // Gather built indices or get them from the params
     // Built from the fasta file:
-    dict = params.dict ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect()
-                                    : PREPARE_GENOME.out.dict
+    dict = params.dict ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect() : PREPARE_GENOME.out.dict
+    Globals.global_params.dict = dict
     fasta_fai = WorkflowNfcasereports.create_file_channel(params.fasta_fai, PREPARE_GENOME.out.fasta_fai)
+    Globals.global_params.fasta_fai = fasta_fai
     bwa = WorkflowNfcasereports.create_file_channel(params.bwa)
+    Globals.global_params.bwa = bwa
 
     // Gather index for mapping given the chosen aligner
     index_alignment = bwa
@@ -752,19 +881,28 @@ workflow NFGOS {
     msisensorpro_scan = PREPARE_GENOME.out.msisensorpro_scan
 
     dbsnp_tbi =  WorkflowNfcasereports.create_index_channel(params.dbsnp, params.dbsnp_tbi, PREPARE_GENOME.out.dbsnp_tbi)
+    Globals.global_params.dbsnp_tbi = dbsnp_tbi
     //do not change to Channel.value([]), the check for its existence then fails for Getpileupsumamries
     germline_resource_tbi = params.germline_resource ? params.germline_resource_tbi ? Channel.fromPath(params.germline_resource_tbi).collect() : PREPARE_GENOME.out.germline_resource_tbi : []
+    Globals.global_params.germline_resource_tbi = germline_resource_tbi
     known_indels_tbi = WorkflowNfcasereports.create_index_channel(params.known_indels, params.known_indels_tbi, PREPARE_GENOME.out.known_indels_tbi)
+    Globals.global_params.known_indels_tbi = known_indels_tbi
     known_snps_tbi = WorkflowNfcasereports.create_index_channel(params.known_snps, params.known_snps_tbi, PREPARE_GENOME.out.known_snps_tbi)
+    Globals.global_params.known_snps_tbi = known_snps_tbi
     pon_tbi = WorkflowNfcasereports.create_index_channel(params.pon, params.pon_tbi, PREPARE_GENOME.out.pon_tbi)
+    Globals.global_params.pon_tbi = pon_tbi
 
     // known_sites is made by grouping both the dbsnp and the known snps/indels resources
     // Which can either or both be optional
     known_sites_indels = dbsnp.concat(known_indels).collect()
+    Globals.global_params.known_sites_indels = known_sites_indels
     known_sites_indels_tbi = dbsnp_tbi.concat(known_indels_tbi).collect()
+    Globals.global_params.known_sites_indels_tbi = known_sites_indels_tbi
 
     known_sites_snps = dbsnp.concat(known_snps).collect()
+    Globals.global_params.known_sites_snps = known_sites_snps
     known_sites_snps_tbi = dbsnp_tbi.concat(known_snps_tbi).collect()
+    Globals.global_params.known_sites_snps_tbi = known_sites_snps_tbi
 
     // Build intervals if needed
     PREPARE_INTERVALS(fasta_fai, params.intervals, params.no_intervals)
@@ -934,8 +1072,7 @@ workflow NFGOS {
         //     }
         
         GRIDSS_SOMATIC_FILTER_STEP(
-            vcf_raw_from_gridss_gridss,
-            inputs_unlaned
+            vcf_raw_from_gridss_gridss
         )
 
         versions = versions.mix(GRIDSS_SOMATIC_FILTER_STEP.out.versions)
@@ -966,21 +1103,21 @@ workflow NFGOS {
         tools_used
     )
 
-    amber_dir_for_merge = AMBER_STEP.out.amber_dir
-        .map { it -> [ it[0].patient, it[1] ] } // meta.patient, amber_dir
+    // amber_dir_for_merge = AMBER_STEP.out.amber_dir
+    //     .map { it -> [ it[0].patient, it[1] ] } // meta.patient, amber_dir
 
     hets_sites_for_merge = AMBER_STEP.out.sites_from_het_pileups_wgs
         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, hets
         .dump(tag: "hets_sites_for_merge", pretty: true)
     
-    COBALT_STEP(
-        inputs_unlaned,
-        alignment_bams_final,
-        tools_used
-    )
+    // COBALT_STEP(
+    //     inputs_unlaned,
+    //     alignment_bams_final,
+    //     tools_used
+    // )
 
-    cobalt_dir_for_merge = COBALT_STEP.out.cobalt_dir
-            .map { it -> [ it[0].patient, it[1] ] } // meta.patient, cobalt_dir
+    // cobalt_dir_for_merge = COBALT_STEP.out.cobalt_dir
+    //         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, cobalt_dir
 
     FRAGCOUNTER_STEP(
         inputs_unlaned,
@@ -1029,20 +1166,20 @@ workflow NFGOS {
         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, cbs_nseg
         .dump(tag: "cbs_nseg_for_merge", pretty: true)
 
-    VARIANT_CALLING_STEP(
+    TAPS_VARIANT_CALLING_STEP(
         inputs_unlaned,
         alignment_bams_final,
-        dbsnp_tbi,
-        known_indels_tbi,
         tools_used
     )
 
 
-    filtered_somatic_vcf_for_merge = VARIANT_CALLING_STEP.out.filtered_somatic_vcf
+    filtered_somatic_vcf_for_merge = TAPS_VARIANT_CALLING_STEP.out.tumor_only_filtered_vcf
         .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, filtered somatic snv vcf, tbi
     
-    germline_vcf_for_merge = VARIANT_CALLING_STEP.out.germline_vcf
-                .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, germline snv vcf, tbi
+    germline_vcf_for_merge = Channel.empty()
+    
+    // germline_vcf_for_merge = TAPS_VARIANT_CALLING_STEP.out.germline_vcf
+    //             .map { it -> [ it[0].patient, it[1], it[2] ] } // meta.patient, germline snv vcf, tbi
 
     VARIANT_ANNOTATION_STEP(
         inputs_unlaned,
@@ -1071,22 +1208,28 @@ workflow NFGOS {
     )
 
 
-    PURPLE_STEP(
+    // PURPLE_STEP(
+    //     inputs_unlaned,
+    //     germline_vcf_for_merge,
+    //     filtered_somatic_vcf_for_merge,
+    //     cobalt_dir_for_merge,
+    //     amber_dir_for_merge,
+    //     vcf_from_sv_calling_for_merge,
+    //     tools_used
+    // )
+
+    ICHORCNA_STEP(
         inputs_unlaned,
-        germline_vcf_for_merge,
-        filtered_somatic_vcf_for_merge,
-        cobalt_dir_for_merge,
-        amber_dir_for_merge,
-        vcf_from_sv_calling_for_merge,
+        alignment_bams_final,
         tools_used
     )
     
-    purity_for_merge = PURPLE_STEP.out.purity // [ meta, purity ]
+    purity_for_merge = ICHORCNA_STEP.out.purity // [ meta, purity ]
         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, purity
-        .dump(tag: "PURPLE_STEP.out purity", pretty: true)
-    ploidy_for_merge = PURPLE_STEP.out.ploidy
+        .dump(tag: "ICHORCNA_STEP.out purity", pretty: true)
+    ploidy_for_merge = ICHORCNA_STEP.out.ploidy
         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, ploidy
-        .dump(tag: "PURPLE_STEP.out ploidy", pretty: true)
+        .dump(tag: "ICHORCNA_STEP.out ploidy", pretty: true)
 
     JABBA_STEP(
         inputs_unlaned,

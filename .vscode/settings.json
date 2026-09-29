@@ -1,3 +1,10 @@
 {
-    "nextflow.java.home": "/gpfs/share/apps/jdk/17u028"
+    "nextflow.java.home": "/gpfs/share/apps/jdk/17u028",
+    "python-envs.pythonProjects": [
+        {
+            "path": ".",
+            "envManager": "ms-python.python:conda",
+            "packageManager": "ms-python.python:conda"
+        }
+    ]
 }

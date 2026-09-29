@@ -20,7 +20,8 @@ workflow VCF_SNPEFF {
     snpeff_report		    = Channel.empty()
     snpeff_summary_html	= Channel.empty()
     snpeff_genes_txt		= Channel.empty()
-    fasta = Channel.fromPath(params.fasta).collect()
+    fasta = WorkflowNfcasereports.create_channels(params, ["file": ["fasta"]])[0]
+    // fasta = Channel.fromPath(params.fasta).collect()
 
     SNPEFF_SNPEFF(
         input,

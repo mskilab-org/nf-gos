@@ -1,5 +1,7 @@
+options(error={expression({traceback(2); quit('no', 1)})})
+
 library(optparse)
-withAutoprint({
+
 message("Loading input arguments")
 if (!exists('opt'))
 {
@@ -31,7 +33,6 @@ if (!exists('opt'))
     print(opt)
 
     print(.libPaths())
-    options(error={expression({traceback(2); quit('no', 1)})})
 
     message("Establishing record files")
     ## keep record of run
@@ -501,13 +502,12 @@ res = signature.tools.lib::HRDetect_pipeline(SNV_vcf_files = snv.tmp,
 
 saveRDS(res, './hrdetect_results.rds')
 
-if (NROW(res$hrdetect_output) > 0)
+if (NROW(res$hrdetect_output) > 0) {
     fwrite(res$hrdetect_output, './hrdetect_output.txt')
-else {
+} else {
     message("HRDetect score was not calculated!!")
     message("Inputs may not be available")
     ## fwrite(data.table(), './hrdetect_output.txt')
 }
 
 quit("no", 0)
-}, echo = FALSE)

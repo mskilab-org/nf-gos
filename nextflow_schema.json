@@ -221,6 +221,13 @@
                     "description": "Maximum offset between optical duplicates.",
                     "help_text": "The maximum offset between optical duplicates in pixels. Corresponds to the Picard flag `--OPTICAL_DUPLICATE_PIXEL_DISTANCE`."
                 },
+                "chimera_filter_max_qnames": {
+                    "type": "integer",
+                    "default": 400000000,
+                    "minimum": 1,
+                    "fa_icon": "fas fa-wrench",
+                    "description": "Maximum distinct query names CHIMERA_FILTER may mark for dropping before aborting as a memory guard."
+                },
                 "save_mapped": {
                     "type": "boolean",
                     "fa_icon": "fas fa-download",

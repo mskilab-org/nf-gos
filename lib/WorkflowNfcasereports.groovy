@@ -34,11 +34,197 @@ class WorkflowNfcasereports {
         return parameter ? Channel.fromPath(parameter).collect() : else_part
     }
 
+    public static List create_file_channels(Map params, List keys, else_part = Channel.empty()) {
+        boolean must_exist = params.get('param_must_exist', false) as boolean
+
+        List missing = keys.findAll { key ->
+            !params.containsKey(key) || params[key] == null ||
+            (params[key] instanceof CharSequence && !params[key].toString().trim())
+        }
+
+        if (missing && must_exist) {
+            throw new IllegalArgumentException(
+                "Required parameters missing because params.param_must_exist=true:\n" +
+                missing.collect { "  --${it}" }.join('\n')
+            )
+        }
+
+        return keys.collect { key ->
+            boolean has_value =
+                params.containsKey(key) &&
+                params[key] != null &&
+                params[key].toString().trim()
+
+            if (!has_value) return else_part
+
+            return Channel
+                .fromPath(params[key], checkIfExists: must_exist)
+                .collect()
+        }
+    }
+
+    public static create_file_channels(Map params, String key, else_part = Channel.empty()) {
+        return create_file_channels(params, [key], else_part)[0]
+    }
+
     public static create_value_channel(parameter) {
         if (parameter instanceof Boolean) {
             return Channel.value(parameter)
         }
         return parameter ? Channel.value(parameter) : Channel.empty()
+    }
+
+    public static List create_value_channels(Map params, List keys, else_part = Channel.empty()) {
+        boolean must_exist = params.get('param_must_exist', false) as boolean
+
+        List missing = keys.findAll { key ->
+            !params.containsKey(key) || params[key] == null ||
+            (params[key] instanceof CharSequence && !params[key].toString().trim())
+        }
+
+        if (missing && must_exist) {
+            throw new IllegalArgumentException(
+                "Required parameters missing because params.param_must_exist=true:\n" +
+                missing.collect { "  --${it}" }.join('\n')
+            )
+        }
+
+        return keys.collect { key ->
+            def value = params.containsKey(key) ? params[key] : null
+
+            boolean has_value =
+                value != null &&
+                !(value instanceof CharSequence && !value.toString().trim())
+
+            if (!has_value) return else_part
+
+            return Channel.value(value)
+        }
+    }
+
+    public static create_value_channels(Map params, String key, else_part = Channel.empty()) {
+        return create_value_channels(params, [key], else_part)[0]
+    }
+
+    /**
+     * Generalized channel factory that creates file or value channels from a single spec map.
+     *
+     * Two spec forms are accepted:
+     *
+     *   Form 1 – type → keys  (order follows map entry order, then key list order within each entry)
+     *     [ "file": ["key1", "key2", "key3"], "value": ["key4", "key5"] ]
+     *     [ "value": ["key4", "key5"], "file": ["key1", "key2", "key3"] ]
+     *
+     *   Form 2 – key → type  (order follows map entry order)
+     *     [ "key1": "file", "key2": "file", "key3": "file", "key4": "value", "key5": "value" ]
+     *
+     * Returns a List of channels in the exact order implied by the spec.
+     *
+     * ignore_must_exist selectively suppresses the params.param_must_exist global flag:
+     *   - null (default)         : all keys respect params.param_must_exist normally
+     *   - true                   : params.param_must_exist is ignored for every key in this call;
+     *                              missing/null params produce else_part instead of an error
+     *   - ["key1", "key3", ...]  : params.param_must_exist is ignored only for the listed keys;
+     *                              all other keys still respect the global flag
+     */
+    public static List create_channels(Map params, Map spec, else_part = Channel.empty(), ignore_must_exist = null) {
+        boolean global_must_exist = params.get('param_must_exist', false) as boolean
+
+        // Returns true when the given key should bypass the must-exist check.
+        def is_ignored = { String key ->
+            if (ignore_must_exist == null)           return false
+            if (ignore_must_exist instanceof Boolean) return (ignore_must_exist as boolean)
+            if (ignore_must_exist instanceof List)    return ignore_must_exist.contains(key)
+            return false
+        }
+
+        // Detect form by inspecting the first value in the spec map.
+        // Form 1 values are Lists; Form 2 values are Strings ("file" or "value").
+        def first_value = spec.values().iterator().next()
+        boolean is_form1 = (first_value instanceof List)
+
+        // Build an ordered list of [key, type] pairs that preserves the caller's intended order.
+        List<List> ordered = []
+        if (is_form1) {
+            // Form 1: iterate spec entries; each value is a list of keys for that type.
+            spec.each { type, keys ->
+                keys.each { key -> ordered << [key, type as String] }
+            }
+        } else {
+            // Form 2: each entry is already a key → type mapping.
+            spec.each { key, type -> ordered << [key as String, type as String] }
+        }
+
+        // Validate that every type token is recognised.
+        ordered.each { key, type ->
+            if (type != 'file' && type != 'value') {
+                throw new IllegalArgumentException(
+                    "Unknown channel type '${type}' for key '${key}'. Must be 'file' or 'value'."
+                )
+            }
+        }
+
+        // Collect entries that are absent/blank AND not ignored by ignore_must_exist.
+        List missing = ordered.findAll { key, type ->
+            boolean absent =
+                !params.containsKey(key) || params[key] == null ||
+                (params[key] instanceof CharSequence && !params[key].toString().trim())
+            absent && global_must_exist && !is_ignored(key)
+        }
+
+        if (missing) {
+            throw new IllegalArgumentException(
+                "Required parameters missing because params.param_must_exist=true:\n" +
+                missing.collect { key, type -> "  --${key} (${type} channel)" }.join('\n')
+            )
+        }
+
+        // Build and return the channel list in spec order.
+        return ordered.collect { key, type ->
+            def raw = params.containsKey(key) ? params[key] : null
+            boolean has_value =
+                raw != null &&
+                !(raw instanceof CharSequence && !raw.toString().trim())
+
+            if (!has_value) return else_part
+
+            // Enforce file existence only when must_exist is active and the key is not ignored.
+            boolean enforce_exists = global_must_exist && !is_ignored(key)
+            if (type == 'file') {
+                return Channel.fromPath(raw, checkIfExists: enforce_exists).collect()
+            } else {
+                return Channel.value(raw)
+            }
+        }
+    }
+
+    /**
+     * Named-argument overload for create_channels. Delegates to the positional version.
+     *
+     * Required keys:
+     *   params           : the workflow params map
+     *   spec             : the channel-type spec map (Form 1 or Form 2)
+     *
+     * Optional keys:
+     *   else_part        : channel returned for absent/blank params (default: Channel.empty())
+     *   ignore_must_exist: true | ["key1", ...] — see positional overload for semantics
+     *
+     * Example:
+     *   WorkflowNfcasereports.create_channels(
+     *       params: params,
+     *       spec: ["file": ["key1", "key2"], "value": ["key3"]],
+     *       ignore_must_exist: true
+     *   )
+     */
+    public static List create_channels(Map kwargs) {
+        if (!kwargs.containsKey('params')) throw new IllegalArgumentException("create_channels: required named argument 'params' is missing.")
+        if (!kwargs.containsKey('spec'))   throw new IllegalArgumentException("create_channels: required named argument 'spec' is missing.")
+        return create_channels(
+            kwargs.params           as Map,
+            kwargs.spec             as Map,
+            kwargs.get('else_part', Channel.empty()),
+            kwargs.get('ignore_must_exist', null)
+        )
     }
 
     public static create_index_channel(param, param_tbi, prepare_genome_out) {

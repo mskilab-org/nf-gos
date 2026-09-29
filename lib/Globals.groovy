@@ -1,10 +1,17 @@
 package mylib
 class Globals {
   static Map selected_tools_map = [:]
-  
+
   static List tools_used = []
 
   static List rowsAsMaps = []
+
+  // Channel<Map> — samplesheet rows (lane-aware), potentially with overwritten_subsequent
+  // output columns cleared when params.overwrite_subsequent is true.
+  static inputs = null
+
+  // Channel<Map> — same as inputs but with lane meta stripped.
+  static inputs_unlaned = null
 
   static Map tool_input_output_map = [
         "aligner": [ inputs: ['fastq_1', 'fastq_2'], outputs: ['bam'] ],
@@ -51,7 +58,7 @@ class Globals {
         // 	],
         // 	outputs: ['jabba_rds', 'jabba_gg']
         // ],
-        "jabba": [ inputs: [ 'vcf', 'hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
+        "jabba": [ inputs: [ 'vcf', 'hets', 'dryclean_cov', 'purity', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
         "non_integer_balance": [ inputs: ['jabba_gg'], outputs: ['ni_balanced_gg'] ],
         "lp_phased_balance": [ inputs: ['ni_balanced_gg'], outputs: ['lp_balanced_gg'] ],
         "events": [ inputs: ['ni_balanced_gg'], outputs: ['events'] ],
@@ -59,9 +66,15 @@ class Globals {
         "snpeff": [ inputs: ['snv_somatic_vcf'], outputs: ['variant_somatic_ann', 'variant_somatic_bcf'] ],
         "echtvar": [ inputs: ['variant_somatic_bcf'], outputs: ['echtvar_variant_somatic_bcf'] ],
         "snv_multiplicity": [ inputs: ['jabba_gg', 'variant_somatic_ann'], outputs: ['snv_multiplicity'] ],
-        "oncokb": [ inputs: ['variant_somatic_ann', 'snv_multiplicity', 'jabba_gg', 'fusions'], outputs: ['oncokb_maf', 'oncokb_fusions', 'oncokb_cna'] ],
+        "oncokb": [ inputs: ['variant_somatic_ann', 'jabba_gg', 'fusions'], outputs: ['oncokb_maf', 'oncokb_fusions', 'oncokb_cna'] ],
         "signatures": [ inputs: ['variant_somatic_ann'], outputs: ['sbs_signatures', 'indel_signatures', 'signatures_matrix'] ],
         "hrdetect": [ inputs: ['hets', 'vcf', 'jabba_gg', 'variant_somatic_ann'], outputs: ['hrdetect'] ],
-        "onenesstwoness": [ inputs: ['events', 'hrdetect'], outputs: ['onenesstwoness'] ]
+        "onenesstwoness": [ inputs: ['events', 'hrdetect'], outputs: ['onenesstwoness'] ],
+        "rastair": [ inputs: ['bam'], outputs: ['rastair_vcf'] ],
+        "mutect2_taps": [ inputs: ['bam'], outputs: ['mutect2_taps_vcf'] ],
+        "combine_taps_variant_calls": [ inputs: ['mutect2_taps_vcf', 'rastair_vcf'], outputs: ['snv_somatic_vcf'] ],
+        "ichorcna": [ inputs: ['bam'], outputs: ['purity', 'ploidy'] ]
     ]
+
+    static Map global_params = [:]
 }

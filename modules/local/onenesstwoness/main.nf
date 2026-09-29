@@ -4,8 +4,8 @@ process ONENESS_TWONESS {
     label 'process_low'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/hrdetect:0.0.5':
-        'mskilab/hrdetect:0.0.5' }"
+        'docker://mskilab/hrdetect:0.0.6':
+        'mskilab/hrdetect:0.0.6' }"
 
     input:
     tuple val(meta), path(events_output), path(hrdetect_results)

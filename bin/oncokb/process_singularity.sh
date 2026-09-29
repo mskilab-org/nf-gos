@@ -178,9 +178,14 @@ fi
 if [ -e ${FUSIONS} ] && [ ! $(wc -c <${FUSIONS}) == 0 ]; then
 
         
+        touch ./input_fusions.tsv ./partial_tandem_duplication.maf ./intragenic_del.tsv
+        touch ./merged_oncokb_intragenic_del.tsv ./merged_oncokb_partial_tandem_duplication.tsv 
+
+
         Rscript ${HOME}/scripts/parse_fusions_for_oncokb.R --libdir ${LIBDIR} --fusions ${FUSIONS} --path ./input_fusions.tsv
         
         set -x
+        
         python ${HOME}/git/oncokb-annotator/FusionAnnotator.py \
             -i ./input_fusions.tsv \
             -o ./oncokb_fusions.tsv \

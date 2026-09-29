@@ -503,7 +503,12 @@ workflow BAM_QC {
     }
 
 	is_run_qc_duplicates = params.is_run_qc_duplicates ?: false // if parameter doesn't exist, set to false
-	do_qc_duplicates = (tools_used.contains("all") || tools_used.contains("estimate_library_complexity")) && is_run_qc_duplicates && ! params.aligner == "fq2bam"
+	do_qc_duplicates = ( 
+        tools_used.contains("all") 
+        || (
+            tools_used.contains("estimate_library_complexity") && is_run_qc_duplicates &&  ! ( params.aligner == "fq2bam" )
+        )
+    )
     if (do_qc_duplicates) {
         estimate_library_complexity_inputs = inputs
             .filter { it.qc_dup_rate.isEmpty() }
@@ -1140,7 +1145,7 @@ workflow SV_CALLING_STEP {
     
     vcf_raw_from_gridss_gridss = gridss_raw_existing_outputs
 
-    bam_sv_inputs = inputs_unlaned.filter { it.vcf_raw.isEmpty() }.map { it -> [it.meta.sample] }.unique()
+    bam_sv_inputs = inputs_unlaned.filter { it -> Utils.robustly_test_if_empty(it.vcf) && Utils.robustly_test_if_empty(it.vcf_raw) }.map { it -> [it.meta.sample] }.unique()
 
 
     // SV Calling
@@ -1520,7 +1525,8 @@ workflow VARIANT_CALLING_STEP {
     main:
     versions = Channel.empty()
 
-    dict = params.dict ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect() : Channel.empty()
+    dict = WorkflowNfcasereports.create_channels(params, ["file": ["dict"]])[0].map{ it -> [ [id:'dict'], it ] }
+    // dict = params.dict ? Channel.fromPath(params.dict).map{ it -> [ [id:'dict'], it ] }.collect() : Channel.empty()
 
     snv_somatic_existing_outputs = inputs_unlaned
         .map { it -> [it.meta, it.snv_somatic_vcf_raw, it.snv_somatic_vcf_raw_tbi] }
@@ -1701,6 +1707,194 @@ workflow VARIANT_CALLING_STEP {
 
 }
 
+
+include { 
+    RASTAIR ; 
+    MUTECT2_TAPS ;
+    COMBINE_TAPS_VARIANT_CALLS ;
+    TUMOR_ONLY_FILTER as TUMOR_ONLY_FILTER_TAPS
+} from '../../modules/local/process.nf'
+
+workflow TAPS_VARIANT_CALLING_STEP {
+    take:
+    inputs_unlaned
+    alignment_bams_final
+    tools_used
+
+    main:
+    // dbsnp = WorkflowNfcasereports.create_file_channel(params.dbsnp)
+    dbsnp = Globals.global_params.dbsnp
+    dbsnp_tbi = Globals.global_params.dbsnp_tbi
+    dict = Globals.global_params.dict.map { _id, dictPath -> dictPath }
+    known_indels = Globals.global_params.known_indels
+    known_indels_tbi = Globals.global_params.known_indels_tbi
+    fasta = Globals.global_params.fasta
+    fasta_fai = Globals.global_params.fasta_fai
+    gnomAD_snv_db = WorkflowNfcasereports.create_file_channel(params.gnomAD_snv_db)
+    gnomAD_snv_db_tbi = WorkflowNfcasereports.create_file_channel(params.gnomAD_snv_db_tbi)
+    sage_germline_pon = WorkflowNfcasereports.create_file_channel(params.sage_germline_pon)
+    sage_germline_pon_tbi = WorkflowNfcasereports.create_file_channel(params.sage_germline_pon_tbi)
+    taps_skeletal_bed = WorkflowNfcasereports.create_file_channel(params.taps_skeletal_bed)
+    
+
+
+
+    inputs_unlaned_split = inputs_unlaned.branch { it ->
+        tumor: it.meta.status.toString() == "1"
+        normal: it.meta.status.toString() == "0"
+    }
+
+    rastair_existing_outputs = inputs_unlaned_split.tumor
+        .map { it -> [it.meta, it.rastair_vcf, it.rastair_vcf_tbi] }
+        .filter { it -> !Utils.robustly_test_if_empty(it[1]) && !Utils.robustly_test_if_empty(it[2]) }
+        .unique()
+
+    mutect2_taps_existing_outputs = inputs_unlaned_split.tumor
+        .map { it -> [it.meta, it.mutect2_taps_vcf, it.mutect2_taps_vcf_tbi] }
+        .filter { it -> !Utils.robustly_test_if_empty(it[1]) && !Utils.robustly_test_if_empty(it[2]) }
+        .unique()
+
+    combined_taps_calls_existing = inputs_unlaned_split.tumor
+        .map { it -> [it.meta, it.rastair_mutect2_vcf, it.rastair_mutect2_vcf_tbi] }
+        .filter { it -> !Utils.robustly_test_if_empty(it[1]) && !Utils.robustly_test_if_empty(it[2]) }
+        .unique()
+
+    // Set is_heme based on is_retier_whitelist_junctions
+    // params.is_heme = params.is_retier_whitelist_junctions
+    is_paired = ! params.tumor_only
+    is_tumor_only = ! is_paired
+
+
+    // Filter out bams for which SNV calling has already been done
+    bam_taps_inputs_sample = inputs_unlaned_split.tumor
+        .filter { it ->
+            def is_rastair_or_mutect2_empty = Utils.robustly_test_if_empty(it.rastair_vcf) || Utils.robustly_test_if_empty(it.mutect2_taps_vcf)
+            return is_rastair_or_mutect2_empty
+        }
+        .map { it -> [it.meta.sample] }.unique()
+
+    bam_taps_inputs = alignment_bams_final
+        .map { it -> [it[1].sample, it[1], it[2], it[3]] } // meta.sample, meta, bam, bai
+        .join(bam_taps_inputs_sample)
+        .map { it -> [it[1], it[2], it[3]] } // meta, bam, bai
+
+    combined_taps_inputs_patients = inputs_unlaned_split.tumor
+        .filter { it ->
+            def is_combined_taps_empty = Utils.robustly_test_if_empty(it.rastair_mutect2_vcf)
+            return is_combined_taps_empty
+        }
+        .map { it -> [it.meta.patient] }.unique()
+
+    do_rastair = tools_used.contains("all") || tools_used.contains("rastair")
+    if (do_rastair) {
+        RASTAIR(
+            bam_taps_inputs,
+            fasta,
+            fasta_fai,
+            gnomAD_snv_db,
+            gnomAD_snv_db_tbi,
+            sage_germline_pon,
+            sage_germline_pon_tbi
+        )
+
+        // versions = versions.mix(RASTAIR.out.versions)
+
+        rastair_existing_outputs = Channel.empty()
+            .mix(RASTAIR.out.rastair_paths.map{ it -> it[0..-2] }) // meta, rastair vcf, rastair tbi, list of paths (excluded)
+            .mix(rastair_existing_outputs)
+
+    }
+
+    do_mutect2_taps = tools_used.contains("all") || tools_used.contains("mutect2_taps")
+    if (do_mutect2_taps) {
+        MUTECT2_TAPS(
+            bam_taps_inputs,
+            fasta,
+            fasta_fai,
+            dict,
+            gnomAD_snv_db,
+            gnomAD_snv_db_tbi,
+            sage_germline_pon,
+            sage_germline_pon_tbi,
+            taps_skeletal_bed
+        )
+
+        // versions = versions.mix(MUTECT2_TAPS.out.versions)
+
+        mutect2_taps_existing_outputs = Channel.empty()
+            .mix(MUTECT2_TAPS.out.mutect2_paths.map{ it -> it[0..-2] }) // meta, mutect2_taps vcf, mutect2_taps tbi, list of paths (excluded)
+            .mix(mutect2_taps_existing_outputs)
+
+    }
+
+    // Join rastair and mutect2_taps outputs on meta.patient
+    // Shape: [patient, mutect2_meta, mutect2_vcf, mutect2_tbi, rastair_vcf, rastair_tbi]
+    combined_taps_inputs = mutect2_taps_existing_outputs
+        .map { meta, vcf, tbi -> [meta.patient, meta, vcf, tbi] }
+        .join(
+            rastair_existing_outputs.map { meta, vcf, tbi -> [meta.patient, vcf, tbi] }
+        )
+        .join(combined_taps_inputs_patients)
+        .unique{ it -> it[0] } // unique by patient to avoid duplicated patients in case more than one tumor per patient
+        .map{ it -> it[1..-1] } // remove patient from the beginning, now shape is [mutect2_meta, mutect2_vcf, mutect2_tbi, rastair_vcf, rastair_tbi]
+    
+    // if (tools_used.contains("combine_taps_variant_calls"))
+    COMBINE_TAPS_VARIANT_CALLS(
+        combined_taps_inputs
+    )
+
+    somatic_vcf = combined_taps_calls_existing.mix(
+        COMBINE_TAPS_VARIANT_CALLS.out.combined_paths.map{ it -> it[0..-2] } // meta, combined vcf, combined tbi, list of paths (excluded)
+    )
+
+    filtered_somatic_vcf_input_patients = inputs_unlaned_split.tumor
+        .filter{ it ->
+            def is_combined_taps_tumor_only_filtered = Utils.robustly_test_if_empty(it.rastair_mutect2_vcf_tumor_only)
+            return is_combined_taps_tumor_only_filtered
+        }
+        .map { it -> [it.meta.patient] }.unique()
+
+    filtered_somatic_vcf_existing_outputs = inputs_unlaned_split.tumor
+        .filter{ it ->
+            def is_combined_taps_tumor_only_present = !Utils.robustly_test_if_empty(it.rastair_mutect2_vcf_tumor_only) && !Utils.robustly_test_if_empty(it.rastair_mutect2_vcf_tumor_only_tbi)
+            return is_combined_taps_tumor_only_present
+        }
+        .map{ it -> [it.meta, it.rastair_mutect2_vcf_tumor_only, it.rastair_mutect2_vcf_tumor_only_tbi] }
+
+    tumor_only_filter_input = somatic_vcf
+        .map{ it ->
+            [it[0].patient] + it.toList()
+        }
+        .join(
+            filtered_somatic_vcf_input_patients
+        )
+        .map { it -> it[1..-1] }
+
+    TUMOR_ONLY_FILTER_TAPS(
+        tumor_only_filter_input,
+        dbsnp,
+        dbsnp_tbi,
+        gnomAD_snv_db,
+        gnomAD_snv_db_tbi,
+        sage_germline_pon,
+        sage_germline_pon_tbi,
+        known_indels,
+        known_indels_tbi
+    )
+
+    tumor_only_filtered_vcf = filtered_somatic_vcf_existing_outputs
+        .mix(
+            TUMOR_ONLY_FILTER_TAPS.out.tumor_only_filtered_vcf // meta, tumor_only_filtered vcf, tumor_only_filtered tbi, list of paths (excluded)
+        )
+        .unique{ it ->
+            it[0].patient
+        }
+
+    emit:
+    tumor_only_filtered_vcf
+
+}
+
 // SNPEFF
 include { 
     VCF_SNPEFF as VCF_SNPEFF_SOMATIC; 
@@ -1856,6 +2050,158 @@ workflow ECHTVAR_STEP {
 
 }   
 
+
+include { 
+    ICHORCNA  ;
+    EXTRACT_PURITYPLOIDY_ICHORCNA
+} from '../../modules/local/process.nf'
+workflow ICHORCNA_STEP {
+    take:
+    inputs_unlaned
+    alignment_bams_final
+    tools_used
+
+    main:
+    fasta = Globals.global_params.fasta
+    fasta_fai = Globals.global_params.fasta_fai
+    assembly = WorkflowNfcasereports.create_value_channel(params.ichorcna_assembly)
+
+    versions = Channel.empty()
+    inputs_unlaned_branch = inputs_unlaned.branch{ it -> 
+        tumor: it.meta.status.toString() == "1"
+        normal: it.meta.status.toString() == "0"
+    }
+    
+    existing_outputs_ploidy = inputs_unlaned_branch.tumor
+        .map { it -> 
+            [it.meta, it.ploidy] 
+        }
+        .filter { it -> 
+            ! Utils.robustly_test_if_empty(it[1])
+            // !(it[1] instanceof List && it[1].isEmpty())
+        }.unique()
+    existing_outputs_purity = inputs_unlaned_branch.tumor
+        .map { it -> 
+            [it.meta, it.purity] 
+        }
+        .filter { it -> 
+            ! Utils.robustly_test_if_empty(it[1])
+            // !(it[1] instanceof List && it[1].isEmpty())
+        }
+        .unique()
+    existing_outputs = inputs_unlaned_branch.tumor
+        .map { it -> 
+            [it.meta, it.ichorcna_params] 
+        }
+        .filter { it -> 
+            Utils.robustly_test_if_empty(it[1])
+        }
+        .unique()
+    // Emit
+    purity = existing_outputs_purity
+    ploidy = existing_outputs_ploidy
+
+    // need a channel with patient and meta for merging with rest
+    purity_ploidy_meta_inputs = inputs_unlaned_branch.tumor
+        .filter { it -> 
+            Utils.robustly_test_if_empty(it.ploidy) || 
+                Utils.robustly_test_if_empty(it.purity)
+            // (it.ploidy instanceof List && it.ploidy.isEmpty())
+            // || (it.purity instanceof List && it.purity.isEmpty())
+        }
+        .map { it -> [it.meta.patient, it.meta - it.meta.subMap(['tumor_id', 'normal_id'])] }
+        .unique()
+        .dump(tag: "ichorcna inputs for merge", pretty: true)
+    purity_ploidy_meta_inputs_branch = purity_ploidy_meta_inputs
+        .branch{ it ->
+            normal: it[1].status.toString() == "0"
+            tumor:  it[1].status.toString() == "1"
+        }
+    
+     purity_ploidy_meta_inputs_merged = purity_ploidy_meta_inputs_branch.tumor
+            .map { patient, meta ->
+                [ patient ] + [ meta + [tumor_id: meta.sample] ] // [ patient, [meta] ]
+            }
+            .join(
+                purity_ploidy_meta_inputs_branch.normal
+                    .map { patient, meta ->
+                        [ patient ] + [ meta + [normal_id: meta.sample] ] // [ patient, [meta] ]
+                    }
+                ,
+                remainder: true
+            )
+            .map { it -> // [ patient, [meta_tumor], [meta_normal] ]
+                def (patient, tumor, normal) = (it + [null, null])[0..2]
+                def meta_tumor = tumor ?: [null]
+                def meta_normal = normal ?: [null]
+                def meta_out = meta_tumor
+                meta_out = meta_out + [id: meta_tumor.sample ]
+                if (normal) {
+                    meta_out = meta_out + [ normal_id: meta_normal.normal_id ]
+                } else {
+                    meta_out = meta_out - meta_out.subMap("normal_id") // Ensure removal of normal_id if no normal
+                }
+                [ patient , meta_out ]
+            }
+            .dump(tag: "meta ichorcna merged", pretty: true)
+    
+    alignment_bams_final_branch = alignment_bams_final.branch { it ->
+        normal: it[1].status.toString() == "0"
+        tumor:  it[1].status.toString() == "1"
+    }
+    alignment_bams_final_tumor = alignment_bams_final_branch.tumor
+
+
+    purity_ploidy_inputs = purity_ploidy_meta_inputs_merged
+        .join(
+            alignment_bams_final_tumor
+            .map { _meta_sample, meta, bam, bai ->
+                [ meta.patient, bam, bai]
+            }
+        ) // meta.patient, meta, bam, bai
+        .map { it -> it.toList()[1..-1] } // remove patient from the beginning, now shape is [meta, bam, bai]
+        .dump(tag: "ichorcna inputs after join with bams", pretty: true)
+
+    if (tools_used.contains("all") || tools_used.contains("ichorcna")) {
+
+        ICHORCNA(
+            purity_ploidy_inputs,
+            assembly,
+            fasta,
+            fasta_fai
+        )
+
+        ichorcna_outputs = ICHORCNA.out.output_paths.map{ it -> it.toList()[0..-2] } // meta, params output path, list of paths (excluded)
+
+        EXTRACT_PURITYPLOIDY_ICHORCNA(
+            ichorcna_outputs
+        )
+
+        existing_outputs = existing_outputs.mix(ichorcna_outputs).unique({ it -> it[0].patient })
+
+        existing_outputs_purity = Channel.empty()
+            .mix(EXTRACT_PURITYPLOIDY_ICHORCNA.out.purity_val)
+            .mix(existing_outputs_purity)
+            .unique{ it -> it[0].patient}
+
+        existing_outputs_ploidy = Channel.empty()
+            .mix(EXTRACT_PURITYPLOIDY_ICHORCNA.out.ploidy_val)
+            .mix(existing_outputs_ploidy)
+            .unique{ it -> it[0].patient}
+
+    }
+
+    purity = existing_outputs_purity
+    ploidy = existing_outputs_ploidy
+    ichorcna_out = existing_outputs
+
+    emit:
+    purity
+    ploidy
+    ichorcna_out
+
+}
+
 // COBALT
 include { BAM_COBALT } from './bam_cobalt/main'
 workflow COBALT_STEP {
@@ -1984,6 +2330,13 @@ workflow PURPLE_STEP {
     purple_out = purple_existing_outputs
 
     // need a channel with patient and meta for merging with rest
+    // NOTE: pairing must be built from ALL samples (both tumor and normal),
+    // otherwise the normal branch is always empty and -reference never gets set.
+    purple_inputs_all_for_pairing = inputs_unlaned
+        .map { it -> [it.meta.patient, it.meta - it.meta.subMap(['tumor_id', 'normal_id'])] }
+        .unique()
+        .dump(tag: "purple_inputs_all_for_pairing", pretty: true)
+
     purple_inputs_for_merge = inputs_unlaned
         .filter { it -> 
             (it.ploidy instanceof List && it.ploidy.isEmpty())
@@ -2003,7 +2356,7 @@ workflow PURPLE_STEP {
     //         [ patient, meta + [tumor_id: meta.sample, id: meta.sample] ]
     //     }
     
-    meta_purple_branched = purple_inputs_for_merge
+    meta_purple_branched = purple_inputs_all_for_pairing
         .branch{
             normal: it[1].status.toString() == "0"
             tumor:  it[1].status.toString() == "1"
@@ -2034,9 +2387,12 @@ workflow PURPLE_STEP {
                 }
                 [ patient , meta_out ]
             }
+            .join(purple_inputs_for_merge.map { it -> [it[0]] }.unique())
+            .map { patient, meta_out -> [patient, meta_out] }
             .dump(tag: "meta_purple merged", pretty: true)
 
-    purple_inputs_cobalt_dir = meta_purple_branched.tumor
+
+    purple_inputs_cobalt_dir = purple_inputs_for_merge
         .join(cobalt_dir_for_merge)
         .map { it -> [ it[0], it[2] ] } // patient, cobalt_dir
 

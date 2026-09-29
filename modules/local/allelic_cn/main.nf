@@ -5,11 +5,11 @@ process NON_INTEGER_BALANCE {
 
     // container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
     //     '/gpfs/commons/groups/imielinski_lab/home/sdider/Projects/nf-jabba/tests/test_runs/work/singularity/jabba_cplex_latest.sif':
-    //     'mskilab/jabba:0.0.1' }"
+    //     'mskilab/jabba:0.0.3' }"
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/jabba:0.0.1':
-        'mskilab/jabba:0.0.1' }"
+        'docker://mskilab/jabba:0.0.8':
+        'mskilab/jabba:0.0.8' }"
 
     input:
     tuple val(meta), path(jabba_gg), path(decomposed_cov), path(het_pileups_wgs)
@@ -111,11 +111,11 @@ process LP_PHASED_BALANCE {
 
     // container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
     //     '/gpfs/commons/groups/imielinski_lab/home/sdider/Projects/nf-jabba/tests/test_runs/work/singularity/jabba_cplex_latest.sif':
-    //     'mskilab/jabba:0.0.1' }"
+    //     'mskilab/jabba:0.0.3' }"
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/jabba:0.0.1':
-        'mskilab/jabba:0.0.1' }"
+        'docker://mskilab/jabba:0.0.8':
+        'mskilab/jabba:0.0.8' }"
 
     input:
     tuple val(meta), path(hets_gg, stageAs: "non_integer_balanced.gg.rds"), path(hets) // output from non_integer_balance, sites.txt from hetpileups
@@ -151,7 +151,7 @@ process LP_PHASED_BALANCE {
     export RSCRIPT_PATH=\$(echo "\${NEXTFLOW_PROJECT_DIR}/bin/lp_phased_balance.R")
 
     # Remove 'chr' from chromosome names in sites.txt (for hg38)
-    awk 'BEGIN{OFS=" "} {gsub(/^chr/,"",\$1); print}' sites.txt > sites.tmp && mv sites.tmp sites.txt
+    # awk 'BEGIN{FS="\t"; OFS="\t"} {gsub(/^chr/,"",\$1); print}' sites.txt > sites.tmp && mv sites.tmp sites.txt
 
     Rscript \$RSCRIPT_PATH \\
         --id $id \\
