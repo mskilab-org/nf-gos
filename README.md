@@ -6,6 +6,14 @@
 [![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?labelColor=000000&logo=docker)](https://www.docker.com/)
 [![run with singularity](https://img.shields.io/badge/run%20with-singularity-1d355c.svg?labelColor=000000)](https://sylabs.io/docs/)
 
+This repo has submodules!
+To clone:
+`git clone --recursive https://github.com/mskilab-org/nf-gos.git`
+
+If you have already cloned the repo, run this:
+`git submodule update --init --recursive`
+
+
 ## Introduction
 
 **mskilab-org/nf-gos** is a bioinformatics pipeline from [`mskilab-org`](https://www.mskilab.org/) for running [`JaBbA`](https://github.com/mskilab-org/JaBbA/), our algorithm for MIP based joint inference of copy number and rearrangement state in cancer whole genome sequence data. This pipeline runs all the pre-requisite tools (among others) and generates the necessary inputs for running JaBbA and loading into [gOS](https://github.com/mskilab-org/gOS), our clinical front-end. It is designed to take paired tumor-normal samples or tumor-only samples as input.
