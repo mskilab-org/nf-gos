@@ -28,3 +28,11 @@ stats-pid*
 \#*
 *\#*
 \#**\#
+
+.nextflow*
+.codex*
+*.code-workspace
+execution_timeline*
+execution_trace*
+execution_report*
+pipeline_dag*

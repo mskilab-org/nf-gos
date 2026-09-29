@@ -2330,6 +2330,13 @@ workflow PURPLE_STEP {
     purple_out = purple_existing_outputs
 
     // need a channel with patient and meta for merging with rest
+    // NOTE: pairing must be built from ALL samples (both tumor and normal),
+    // otherwise the normal branch is always empty and -reference never gets set.
+    purple_inputs_all_for_pairing = inputs_unlaned
+        .map { it -> [it.meta.patient, it.meta - it.meta.subMap(['tumor_id', 'normal_id'])] }
+        .unique()
+        .dump(tag: "purple_inputs_all_for_pairing", pretty: true)
+
     purple_inputs_for_merge = inputs_unlaned
         .filter { it -> it.meta.status.toString() == "1" }
         .filter { it -> 
@@ -2350,7 +2357,7 @@ workflow PURPLE_STEP {
     //         [ patient, meta + [tumor_id: meta.sample, id: meta.sample] ]
     //     }
     
-    meta_purple_branched = purple_inputs_for_merge
+    meta_purple_branched = purple_inputs_all_for_pairing
         .branch{
             normal: it[1].status.toString() == "0"
             tumor:  it[1].status.toString() == "1"
@@ -2381,7 +2388,10 @@ workflow PURPLE_STEP {
                 }
                 [ patient , meta_out ]
             }
+            .join(purple_inputs_for_merge.map { it -> [it[0]] }.unique())
+            .map { patient, meta_out -> [patient, meta_out] }
             .dump(tag: "meta_purple merged", pretty: true)
+
 
     purple_inputs_cobalt_dir = purple_inputs_for_merge
         .join(cobalt_dir_for_merge)

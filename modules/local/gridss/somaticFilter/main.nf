@@ -29,6 +29,7 @@ process GRIPSS_SOMATIC_FILTER {
     def prefix        = task.ext.prefix ?: "${meta.id}"
     def VERSION       = '2.3.4' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
     def jvmheap_mem = (task.memory.toGiga() * 0.9).toInteger() // 
+    def reference_arg = meta.containsKey('normal_id') ? "-reference ${meta.normal_id}" : ''
     """
 
     java -Xmx${jvmheap_mem}g -jar \${NEXTFLOW_BIN_DIR}/jar/gripss_v2.3.4.jar \\
@@ -41,7 +42,8 @@ process GRIPSS_SOMATIC_FILTER {
          -ref_genome ${fasta} \\
          -ref_genome_version ${pon_gridss_ref_genome_version} \\
          -output_dir ./ \\
-         -sample ${meta.sample}
+         -sample ${meta.tumor_id ?: meta.sample} \\
+         ${reference_arg}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

@@ -18,13 +18,54 @@ process SV_CHIMERA_FILTER {
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     def out_vcf = vcf.getName().replaceFirst(/\.vcf(\.gz|\.bgz)?$/, '.ffpe_filtered.vcf.gz')
+    def normal_id = meta.normal_id ?: ''
     """
-    bcftools view -Oz -i "(FORMAT/SR[1] + FORMAT/RP[1]) > 6 && (INFO/AS) >= 1 && (FORMAT/QUAL[1]) >= 150" ${vcf} > ${out_vcf}
+    # GRIDSS is invoked with --labels <normal>,<tumor> for paired runs, so the
+    # tumor is FORMAT index 1. Tumor-only runs use --labels <sample> and carry a
+    # single sample, where index 1 is out of bounds: bcftools then fails with
+    # "The sample index is too large" and emits an EMPTY vcf. The index is
+    # therefore derived from the VCF itself rather than assumed.
+    n_samples=\$(bcftools query -l ${vcf} | wc -l)
+    if [ "\${n_samples}" -gt 1 ]; then
+        tumor_idx=1
+    else
+        tumor_idx=0
+    fi
+    echo "samples=\${n_samples} tumor FORMAT index=\${tumor_idx}"
+
+    # Advisory support-based tag. Records are retained, not removed: these
+    # artifacts are reproducible and confidently mapped (87% of recurrent
+    # artifact junctions have >=3 independent fragments, 94% are MAPQ>=20), so
+    # depth/quality thresholds cannot separate them from real SVs and must not
+    # be used to delete calls.
+    bcftools filter \\
+        --soft-filter FFPE_SUPPORT \\
+        --mode + \\
+        -e "(FORMAT/SR[\${tumor_idx}] + FORMAT/RP[\${tumor_idx}]) <= 6 || (INFO/AS) < 1 || (FORMAT/QUAL[\${tumor_idx}]) < 150" \\
+        -Oz -o support_tagged.vcf.gz \\
+        ${vcf}
+
+    bcftools index --tbi support_tagged.vcf.gz
+
+    # Advisory geometry-based tag (FFPE_GEOM_CHIMERA). This is the
+    # mechanistically grounded discriminator: FFPE end-repair hairpins are
+    # short-range inverted junctions, whereas real foldbacks span kb to Mb.
+    normal_arg=""
+    if [ -n "${normal_id}" ] && [ "\${n_samples}" -gt 1 ]; then
+        normal_arg="--normal-id ${normal_id}"
+    fi
+
+    python \${NEXTFLOW_BIN_DIR}/sv_ffpe_geometry_tag.py \\
+        support_tagged.vcf.gz \\
+        ${out_vcf} \\
+        \${normal_arg} \\
+        ${args}
 
     bcftools index --tbi ${out_vcf}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
+            bcftools: \$(echo \$(bcftools --version 2>&1) | sed -n 's/^bcftools //p' | head -1)
             samtools: \$(echo \$(samtools --version 2>&1) | sed 's/^Please.* //' )
     END_VERSIONS
     """
@@ -32,11 +73,13 @@ process SV_CHIMERA_FILTER {
     stub:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
+    def out_vcf = vcf.getName().replaceFirst(/\.vcf(\.gz|\.bgz)?$/, '.ffpe_filtered.vcf.gz')
     """
-    touch ${prefix}.ffpe_filtered.bam
-    touch ${prefix}.ffpe_filtered.bam.bai
+    touch ${out_vcf}
+    touch ${out_vcf}.tbi
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
+            bcftools: \$(echo \$(bcftools --version 2>&1) | sed -n 's/^bcftools //p' | head -1)
             samtools: \$(echo \$(samtools version 2>&1) | sed 's/^Please.* //' )
     END_VERSIONS
     """
