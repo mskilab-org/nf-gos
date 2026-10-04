@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 """
-Annotate GRIDSS breakend records with FFPE hairpin-chimera geometry and apply an
-advisory FILTER tag.
+Annotate GRIDSS or ESVEE breakend records with FFPE hairpin-chimera geometry
+and apply an advisory FILTER tag.
 
 WHY THIS EXISTS SEPARATELY FROM THE SUPPORT-BASED FILTER
 --------------------------------------------------------
@@ -30,9 +30,9 @@ Real foldback inversions place their arms kilobases to megabases apart. A
 threshold in the empty valley therefore separates the two classes instead of
 trading sensitivity for specificity.
 
-GRIDSS encodes junction geometry only in the ALT breakend string, for example
-"CTTCTTTC[1:54783[". bcftools filter expressions cannot parse that, which is
-why this is a script rather than an expression.
+GRIDSS and ESVEE encode junction geometry in the ALT breakend string, for
+example "CTTCTTTC[1:54783[". bcftools filter expressions cannot parse that,
+which is why this is a script rather than an expression.
 
 WHAT IS ADDED
 -------------
@@ -65,7 +65,7 @@ import pysam
 
 DEFAULT_MAX_ARMDIST = 500
 
-# GRIDSS/VCF breakend ALT forms:
+# VCF breakend ALT forms (shared by GRIDSS and ESVEE):
 #   t[chr:pos[   t]chr:pos]   [chr:pos[t   ]chr:pos]t
 BND_RE = re.compile(r"[\[\]]([^\[\]:]+):(\d+)[\[\]]")
 
@@ -106,9 +106,9 @@ def is_inverted(alt, bracket):
     return not leading_bracket
 
 
-def normal_supports(record, normal_index):
+def normal_supports(record, normal_index, support_fields):
     """
-    True when the matched normal shows any split-read or read-pair support.
+    True when the matched normal shows variant-fragment support.
 
     Returns False when there is no normal sample, so that tumor-only runs are
     still eligible for tagging on geometry alone.
@@ -117,7 +117,7 @@ def normal_supports(record, normal_index):
         return False
 
     sample = record.samples[normal_index]
-    for key in ("SR", "RP", "ASSR", "ASRP"):
+    for key in support_fields:
         value = sample.get(key)
         if value is None:
             continue
@@ -172,7 +172,7 @@ def resolve_normal_index(header, normal_id):
 def main(argv=None):
     parser = argparse.ArgumentParser(
         description="Add advisory FFPE hairpin-chimera geometry annotations to "
-        "a GRIDSS breakend VCF.",
+        "a GRIDSS or ESVEE breakend VCF.",
     )
     parser.add_argument("in_vcf", help="Input VCF/BCF (may be bgzipped).")
     parser.add_argument("out_vcf", help="Output bgzipped VCF.")
@@ -189,7 +189,16 @@ def main(argv=None):
         help="Sample name of the matched normal. When given, junctions with "
         "normal support are not tagged.",
     )
+    parser.add_argument(
+        "--caller",
+        choices=("gridss", "esvee"),
+        default="gridss",
+        help="Caller-specific matched-normal support fields (default: %(default)s).",
+    )
     args = parser.parse_args(argv)
+    # ESVEE VF counts all supporting variant fragments; SF/DF are its split
+    # and discordant components, not GRIDSS SR/RP/assembly-support fields.
+    support_fields = ("VF",) if args.caller == "esvee" else ("SR", "RP", "ASSR", "ASRP")
 
     with pysam.VariantFile(args.in_vcf) as vcf_in:
         header = vcf_in.header.copy()
@@ -232,7 +241,7 @@ def main(argv=None):
                     armdist >= 0
                     and armdist < args.max_armdist
                     and inverted
-                    and not normal_supports(new_record, normal_index)
+                    and not normal_supports(new_record, normal_index, support_fields)
                 ):
                     new_record.filter.add("FFPE_GEOM_CHIMERA")
                     tagged += 1

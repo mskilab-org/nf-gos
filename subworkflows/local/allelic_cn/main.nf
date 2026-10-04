@@ -9,6 +9,8 @@ workflow COV_GGRAPH_NON_INTEGER_BALANCE {
     bwa_non_integer_balance
 
     main:
+    optimized_non_integer_balance = WorkflowNfcasereports.create_file_channel("${projectDir}/bin/non_integer_balance_optimized.R")
+    non_integer_balance_script = WorkflowNfcasereports.create_file_channel("${projectDir}/bin/non_integer_balance.R")
     mask_non_integer_balance            = WorkflowNfcasereports.create_file_channel(params.mask_non_integer_balance)
     field_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.field_non_integer_balance)
     hets_thresh_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.hets_thresh_non_integer_balance)
@@ -21,6 +23,7 @@ workflow COV_GGRAPH_NON_INTEGER_BALANCE {
     build_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.build_non_integer_balance)
     epgap_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.epgap_non_integer_balance)
     tilim_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.tilim_non_integer_balance)
+    mipemphasis_non_integer_balance = WorkflowNfcasereports.create_value_channel(params.mipemphasis_non_integer_balance)
     gurobi_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.gurobi_non_integer_balance)
     pad_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.pad_non_integer_balance)
     fasta_non_integer_balance       = WorkflowNfcasereports.create_file_channel(params.fasta)
@@ -31,6 +34,8 @@ workflow COV_GGRAPH_NON_INTEGER_BALANCE {
     non_integer_balance_hets_gg = Channel.empty()
 
     NON_INTEGER_BALANCE(
+        optimized_non_integer_balance,
+        non_integer_balance_script,
         inputs_non_integer_balance,
         field_non_integer_balance,
         hets_thresh_non_integer_balance,
@@ -44,6 +49,7 @@ workflow COV_GGRAPH_NON_INTEGER_BALANCE {
         build_non_integer_balance,
         epgap_non_integer_balance,
         tilim_non_integer_balance,
+        mipemphasis_non_integer_balance,
         gurobi_non_integer_balance,
         fasta_non_integer_balance,
         fasta_fai_non_integer_balance,

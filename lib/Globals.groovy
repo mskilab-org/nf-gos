@@ -44,6 +44,7 @@ class Globals {
         // "junctionfilter": [ inputs: ['vcf_raw'], outputs: ['vcf'] ],
         // "retiered_filtered_junctions": [ inputs: ['vcf'], outputs: ['sv_retier'] ], // ?
         "gridss": [ inputs: ['bam'], outputs: ['vcf'] ],
+        "esvee": [ inputs: ['bam'], outputs: ['vcf'] ],
         "amber": [ inputs: ['bam'], outputs: ['hets', 'amber_dir'] ],
         "fragcounter": [ inputs: ['bam'], outputs: ['frag_cov'] ],
         "dryclean": [ inputs: ['frag_cov'], outputs: ['dryclean_cov'] ],

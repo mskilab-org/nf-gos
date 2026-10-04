@@ -158,6 +158,11 @@ include {
     SV_CHIMERA_FILTER as SV_CHIMERA_FILTER_VCF
 } from '../modules/local/process.nf'
 
+include {
+    SV_CHIMERA_FILTER_ESVEE as SV_CHIMERA_FILTER_ESVEE_RAWVCF;
+    SV_CHIMERA_FILTER_ESVEE as SV_CHIMERA_FILTER_ESVEE_VCF
+} from '../modules/local/esvee/chimera_filter.nf'
+
 
 workflow SETUP {
 
@@ -789,10 +794,17 @@ workflow NFGOS {
 
     do_filter_ffpe_chimera = params.filter_ffpe_chimera ?: false
     if (do_filter_ffpe_chimera) {
-        SV_CHIMERA_FILTER_VCF(vcf_from_gridss_gridss)
-        SV_CHIMERA_FILTER_RAWVCF(vcf_raw_from_gridss_gridss)
-        vcf_from_gridss_gridss = SV_CHIMERA_FILTER_VCF.out.vcftbi
-        vcf_raw_from_gridss_gridss = SV_CHIMERA_FILTER_RAWVCF.out.vcftbi
+        if (params.sv_caller == 'esvee') {
+            SV_CHIMERA_FILTER_ESVEE_VCF(vcf_from_gridss_gridss)
+            SV_CHIMERA_FILTER_ESVEE_RAWVCF(vcf_raw_from_gridss_gridss)
+            vcf_from_gridss_gridss = SV_CHIMERA_FILTER_ESVEE_VCF.out.vcftbi
+            vcf_raw_from_gridss_gridss = SV_CHIMERA_FILTER_ESVEE_RAWVCF.out.vcftbi
+        } else {
+            SV_CHIMERA_FILTER_VCF(vcf_from_gridss_gridss)
+            SV_CHIMERA_FILTER_RAWVCF(vcf_raw_from_gridss_gridss)
+            vcf_from_gridss_gridss = SV_CHIMERA_FILTER_VCF.out.vcftbi
+            vcf_raw_from_gridss_gridss = SV_CHIMERA_FILTER_RAWVCF.out.vcftbi
+        }
     }
 
     /* FIXME: Junction Filtering step

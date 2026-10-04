@@ -24,7 +24,7 @@ If you have already cloned the repo, run this:
 4. Mark Duplicates (using [`GATK MarkDuplicates`](https://gatk.broadinstitute.org/hc/en-us/articles/360037052812-MarkDuplicates-Picard))
 5. Base recalibration (using [`GATK BaseRecalibrator`](https://gatk.broadinstitute.org/hc/en-us/articles/360036898312-BaseRecalibrator))
 6. Apply BQSR (using [`GATK ApplyBQSR`](https://gatk.broadinstitute.org/hc/en-us/articles/360037055712-ApplyBQSR))
-7. Perform structural variant calling (using [`GRIDSS`](https://github.com/PapenfussLab/gridss))
+7. Perform structural variant calling using [`GRIDSS`](https://github.com/PapenfussLab/gridss) followed by GRIPSS (default), or [HMF Esvee](https://github.com/hartwigmedical/hmftools/tree/master/esvee) with `--sv_caller esvee`.
 8. Perform pileups (using [`AMBER`](https://github.com/hartwigmedical/hmftools/blob/master/amber/README.md))
 9. Generate raw coverages and correct for GC & Mappability bias (using [`fragCounter`](https://github.com/mskilab-org/fragCounter))
 10. Remove biological and technical noise from coverage data. (using [`Dryclean`](https://github.com/mskilab-org/dryclean))
@@ -43,6 +43,40 @@ If you have already cloned the repo, run this:
 > If you are new to Nextflow and nf-core, please refer to [this page](https://nf-co.re/docs/usage/installation) on how
 > to set-up Nextflow. Make sure to [test your setup](https://nf-co.re/docs/usage/introduction#how-to-run-a-pipeline)
 > with `-profile test` before running the workflow on actual data.
+
+### SV FFPE chimera tagging
+
+Enable with `--sv_filter_ffpe_chimera true`. With `--sv_caller esvee`, the
+pipeline selects `SV_CHIMERA_FILTER_ESVEE_VCF` and
+`SV_CHIMERA_FILTER_ESVEE_RAWVCF` for Esvee's somatic and unfiltered VCFs,
+respectively. GRIDSS retains its existing processes and thresholds.
+
+Both paths append advisory FILTER tags without removing records or existing
+filters, and emit the same `(meta, vcf, tbi)` channel contract. Outputs retain
+the input basename with `.ffpe_filtered.vcf.gz` and `.tbi` suffixes, published
+under `<outdir>/<patient>/sv_chimera_filter/tumor/`. Supplied chimera-filtered
+outputs continue to bypass processing.
+
+- **ESVEE `FFPE_SUPPORT`:** tumor `FORMAT/VF <= 6` or site `QUAL < 30`.
+  VF counts variant fragments. The QUAL cutoff is Esvee 2.0.1's native WGS
+  minimum, not a calibrated equivalent of GRIDSS's `FORMAT/QUAL < 150`.
+  Esvee has no equivalent of GRIDSS's `INFO/AS` assembly-support count, so that
+  condition is not transferred. See the [Esvee 2.0.1 algorithm and VCF fields](https://github.com/hartwigmedical/hmftools/blob/esvee-v2.0.1/esvee/README.md).
+- **`FFPE_GEOM_CHIMERA`:** same-chromosome inverted breakends less than 500 bp
+  apart, without matched-normal support. ESVEE normal evidence uses `FORMAT/VF`;
+  GRIDSS continues to use `SR`, `RP`, `ASSR`, and `ASRP`. Single breakends,
+  interchromosomal junctions, and long-range foldbacks are not geometry-tagged.
+- ESVEE tumor identity comes from `meta.tumor_id`, then samplesheet `meta.sample`,
+  matched exactly against VCF sample names. Only a single-sample VCF permits
+  missing tumor metadata; ambiguous or mismatched identities fail explicitly.
+  Matched-normal evidence is used when `meta.normal_id` is available.
+
+The geometry boundary remains an advisory, single-sample-derived heuristic,
+not a validated classifier. Geometry options such as `--max-armdist` can be
+passed through the selected process's `ext.args`.
+
+Geometry regression tests require `pysam`:
+`python -m unittest discover -s tests -p 'test_sv_ffpe_geometry_tag.py'`.
 
 ### Setting up the ***samplesheet.csv*** file for input:
 
@@ -142,8 +176,8 @@ outputs.
 | ploidy              | Ploidies for each sample.                                                                                                                     |
 | seg                 | Full path to the CBS segmented file.                                                                                                          |
 | nseg                | Full path to the CBS segmented file for normal samples.                                                                                       |
-| vcf                 | Full path to the GRIDSS VCF file.                                                                                                             |
-| vcf_tbi             | Full path to the GRIDSS VCF index file.                                                                                                       |
+| vcf                 | Full path to the structural-variant VCF from GRIDSS/GRIPSS (default) or Esvee (`--sv_caller esvee`).                                        |
+| vcf_tbi             | Full path to the structural-variant VCF index.                                                                                                |
 | jabba_rds           | Full path to the JaBbA RDS (`jabba.simple.rds`) file.                                                                                         |
 | jabba_gg            | Full path to the JaBbA gGraph (`jabba.gg.rds`) file.                                                                                          |
 | ni_balanced_gg      | Full path to the non-integer balanced gGraph (`non_integer.balanced.gg.rds`) file.                                                            |

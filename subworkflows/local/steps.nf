@@ -1078,6 +1078,9 @@ include {
 // include { GRIDSS_ASSEMBLE_GATHER   } from '../../modules/local/gridss/gridss/main.nf'
 // include { GRIDSS_CALL   } from '../../modules/local/gridss/gridss/main.nf'
 
+// Esvee
+include { ESVEE } from '../../modules/local/esvee/main.nf'
+
 workflow SV_CALLING_STEP {
     take:
     inputs_unlaned
@@ -1088,6 +1091,7 @@ workflow SV_CALLING_STEP {
     main:
     fasta                               = WorkflowNfcasereports.create_file_channel(params.fasta)
     fasta_fai                           = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
+    fasta_dict                          = WorkflowNfcasereports.create_file_channel(params.dict)
     blacklist_gridss                    = WorkflowNfcasereports.create_file_channel(params.blacklist_gridss)
 
 
@@ -1097,6 +1101,7 @@ workflow SV_CALLING_STEP {
     // assembly_bam           = Channel.empty()
     vcf_from_gridss_gridss = Channel.empty()
     vcf_raw_from_gridss_gridss = Channel.empty()
+    esvee_germline_vcf = Channel.empty()
 
 
     parallelize_gridss = params.parallelize_gridss ?: true
@@ -1150,7 +1155,71 @@ workflow SV_CALLING_STEP {
 
     // SV Calling
     // ##############################
-    if (tools_used.contains("all") || tools_used.contains("gridss") || params.is_run_junction_filter) {
+    def is_esvee = params.sv_caller == 'esvee'
+    def is_sv_caller_gated = tools_used.contains("all") || tools_used.contains("gridss") || tools_used.contains("esvee") || params.is_run_junction_filter
+
+    if (is_sv_caller_gated && is_esvee) {
+        ( esvee_pon_sgl, esvee_pon_sv, esvee_known_hotspots, esvee_repeat_mask, fasta_img, esvee_ref_genome_version ) = WorkflowNfcasereports.create_channels(
+            params: params,
+            spec: [
+                "file": ['esvee_pon_sgl', 'esvee_pon_sv', 'esvee_known_hotspots', 'esvee_repeat_mask', 'fasta_img'],
+                "value": ['ref_genome_version']
+            ],
+            ignore_must_exist: null
+        )
+
+        bam_sv_calling = alignment_bams_final
+            .combine(bam_sv_inputs, by: 0)
+            .map { it -> [ it[1], it[2], it[3] ] }
+            .dump(tag: "BAM SV calling input (esvee)", pretty: true)
+
+        bam_sv_calling_status = bam_sv_calling.branch {
+            normal: it[0].status.toString() == "0"
+            tumor: it[0].status.toString() == "1"
+        }
+
+        if (params.tumor_only) {
+            esvee_input = bam_sv_calling_status.tumor
+                .map { meta, bam, bai ->
+                    [ meta + [ id: meta.sample, tumor_id: meta.sample ], bam, bai, [], [] ]
+                }
+        } else {
+            esvee_normal_for_crossing = bam_sv_calling_status.normal
+                .map { meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
+            esvee_tumor_for_crossing = bam_sv_calling_status.tumor
+                .map { meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
+
+            esvee_input = esvee_tumor_for_crossing
+                .cross(esvee_normal_for_crossing) { v -> v[0] }
+                .map { tumor, normal ->
+                    def meta = tumor[1] + [
+                        id: "${tumor[1].sample}_vs_${normal[1].sample}".toString(),
+                        tumor_id: tumor[1].sample,
+                        normal_id: normal[1].sample
+                    ]
+                    [ meta, tumor[2], tumor[3], normal[2], normal[3] ]
+                }
+        }
+
+        esvee_input = esvee_input.dump(tag: "esvee input", pretty: true)
+
+        ESVEE(
+            esvee_input,
+            fasta,
+            fasta_fai,
+            fasta_dict,
+            fasta_img,
+            esvee_pon_sgl,
+            esvee_pon_sv,
+            esvee_known_hotspots,
+            esvee_repeat_mask,
+            esvee_ref_genome_version
+        )
+
+        vcf_from_gridss_gridss = ESVEE.out.somatic_vcf.mix(gridss_existing_outputs)
+        vcf_raw_from_gridss_gridss = ESVEE.out.unfiltered_vcf.mix(gridss_raw_existing_outputs)
+        esvee_germline_vcf = ESVEE.out.germline_vcf
+    } else if (is_sv_caller_gated) {
 
         // Filter out bams for which SV calling has already been done
         // FIXME: vcf to vcf_raw
@@ -1508,6 +1577,7 @@ workflow SV_CALLING_STEP {
     emit:
     vcf_from_gridss_gridss
     vcf_raw_from_gridss_gridss
+    esvee_germline_vcf
 
 }
 
