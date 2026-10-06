@@ -2842,13 +2842,20 @@ workflow NON_INTEGER_BALANCE_STEP {
     index_alignment = bwa
 
     // Existing
-    non_integer_balance_existing_outputs = inputs_unlaned.map { it -> [it.meta, it.ni_balanced_gg] }.filter { !it[1].isEmpty() }
+    non_integer_balance_existing_outputs = inputs_unlaned
+        .filter { it.meta.status.toString() == "1" && !it.ni_balanced_gg.isEmpty() }
+        .map { it -> [it.meta, it.ni_balanced_gg] }
+        .unique { it[0].patient }
 
     // Emit
     non_integer_balance_balanced_gg = non_integer_balance_existing_outputs
 
     // Inputs
-    non_integer_balance_inputs = inputs_unlaned.filter { it.ni_balanced_gg.isEmpty() }.map { it -> [it.meta.patient, it.meta + [id: it.meta.sample]] }
+    // One tumor per patient key, matching JaBbA and LP-phased balance.
+    non_integer_balance_inputs = inputs_unlaned
+        .filter { it.meta.status.toString() == "1" && it.ni_balanced_gg.isEmpty() }
+        .map { it -> [it.meta.patient, it.meta + [id: it.meta.sample]] }
+        .unique { it[0] }
 
     non_integer_balance_inputs_jabba_gg = jabba_gg_for_merge
         .join(non_integer_balance_inputs)
