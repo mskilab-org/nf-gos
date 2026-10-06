@@ -8,8 +8,8 @@ process NON_INTEGER_BALANCE {
     //     'mskilab/jabba:0.0.3' }"
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/jabba:0.0.8':
-        'mskilab/jabba:0.0.8' }"
+        'docker://mskilab/jabba:0.0.10':
+        'mskilab/jabba:0.0.10' }"
 
     input:
     path non_integer_balance_optimized
@@ -117,8 +117,8 @@ process LP_PHASED_BALANCE {
     //     'mskilab/jabba:0.0.3' }"
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/jabba:0.0.8':
-        'mskilab/jabba:0.0.8' }"
+        'docker://mskilab/jabba:0.0.10':
+        'mskilab/jabba:0.0.10' }"
 
     input:
     tuple val(meta), path(hets_gg, stageAs: "non_integer_balanced.gg.rds"), path(hets) // output from non_integer_balance, sites.txt from hetpileups
