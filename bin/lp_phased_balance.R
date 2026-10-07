@@ -25,6 +25,9 @@ if (!exists('opt'))
         make_option("--reward", type = "numeric", default = 10, help = "penalty on CNLOH"),
         make_option("--nodefileind", type = "numeric", default = 1, help = "node file indicator (1 to keep in memory, 3 to write to disk)"),
         make_option("--tilim", type = "numeric", default = TRUE, help = "time limit for optimization"),
+        make_option("--mipemphasis", type = "numeric", default = 0, help = "CPLEX MIP emphasis: 0 balanced, 1 feasibility, 2 optimality, 3 best bound, 4 hidden feasibility"),
+        make_option("--threads", type = "numeric", default = 16, help = "CPLEX thread count (0 = CPLEX default, i.e. every core on the host)"),
+        make_option("--mipstart", type = "logical", default = FALSE, help = "warm start the MIP from the CN on the input graph"),
         make_option(c("-o", "--outdir"), type = "character", default = './', help = "Directory to dump output into")
     )
     parseobj = OptionParser(option_list=option_list)
@@ -692,7 +695,8 @@ grab.hets.from.maf = function(agt.fname, min.frac = 0.2) {
 #' @param verbose (integer)scalar specifying whether to do verbose output, value 2 will spit out MIP (1)
 #' @param tilim (numeric) time limit on MIP in seconds (10)
 #' @param epgap (numeric) relative optimality gap threshhold between 0 and 1 (default 1e-3)
-
+#' @param mipemphasis (numeric) CPLEX MIP emphasis: 0 balanced, 1 feasibility, 2 optimality, 3 best bound, 4 hidden feasibility (default 0)
+#' @param mipstart (logical) warm start the MIP from the CN already on the input graph's nodes and edges. Ignored when use.gurobi is TRUE. (default FALSE)
 #' @param trelim (numeric) max size of uncompressed tree in MB (default 32e3)
 #' @param nodefileind (numeric) one of 0 (no node file) 1 (in memory compressed) 2 (on disk uncompressed) 3 (on disk compressed) default 1
 #' @param debug (logical) returns list with names gg and sol. sol contains full RCPLEX solution. (default FALSE)
@@ -726,6 +730,8 @@ balance = function(gg,
                    trelim = 32e3,
                    nodefileind = 1,
                    epgap = 1e-3,
+                   mipemphasis = 0,
+                   mipstart = FALSE,
                    max.span = 1e6, ## max span in bp
                    debug = FALSE,
                    use.gurobi = FALSE,
@@ -1305,7 +1311,21 @@ balance = function(gg,
     vars[type %in% c('node', 'edge') & ub > M, ub := M]
     ## vars[type %in% c('node', 'edge'), lb := ifelse(is.na(lb), 0, pmax(lb, 0, na.rm = TRUE)]
     ## vars[type %in% c('node', 'edge'), ub := ifelse(is.na(ub), M, pmin(ub, M, na.rm = TRUE))]
-    vars[type %in% c('loose.in', 'loose.out'), ":="(lb = 0, ub = Inf)]
+    vars[type %in% c('loose.in', 'loose.out'), ":="(lb = 0, ub = M)]
+
+    ## every binary indicator must be explicitly bounded to [0, 1]. the indicator
+    ## rows are built by copying node/edge/loose-end rows and overwriting vtype to
+    ## 'B', so they inherit those rows' lb/ub -- which leaves ~95k of them at
+    ## (-Inf, Inf) or (0, Inf). CPLEX then treats them as unbounded general
+    ## integers: probing, the clique table and the big-M indicator rows all stop
+    ## working, and the LP relaxation is far weaker than it should be.
+    vars[vtype == 'B', ":="(lb = 0, ub = 1)]
+
+    ## continuous residual variables are otherwise free, which leaves the
+    ## relaxation unbounded in those directions. leave rows already pinned to zero
+    ## (fixed marginals, handled above) alone.
+    vars[type %in% c('nresidual', 'eresidual', 'mresidual', 'emresidual') &
+         !(lb == 0 & ub == 0), ":="(lb = -M, ub = M)]
 
     ## reward shouldn't have to be positive
     ## vars[type %in% c('edge'), reward := pmax(reward, 0, na.rm = TRUE)]
@@ -2264,6 +2284,43 @@ balance = function(gg,
 
     control = list(trace = ifelse(verbose>=2, 1, 0), tilim = tilim, epgap = epgap, round = 1, trelim = trelim, nodefileind = nodefileind, method = 4)
 
+    ## mipemphasis must be an integer: check.Rcplex.control passes it straight to
+    ## the C layer, which calls INTEGER() on it and errors on a double.
+    if (!is.null(mipemphasis) && !is.na(mipemphasis) && mipemphasis != 0) {
+        control$mipemphasis = as.integer(mipemphasis)
+    }
+
+    ## Warm start from the CN already carried by the input graph.
+    ##
+    ## The gap on hard instances is driven by incumbent quality, not by the bound:
+    ## cold-started CPLEX produces a first incumbent many orders of magnitude above
+    ## the optimum (observed 1.47e9 against a root relaxation of 154) and then spends
+    ## the whole time limit crawling down. The input graph is already an approximate
+    ## allelic solution, so handing it over as a MIP start gives CPLEX something to
+    ## repair instead of something to discover.
+    ##
+    ## setstarts() in the C layer builds varindices as 0..length(values)-1, so the
+    ## start must be a prefix of the variable vector. `vars` is not ordered with
+    ## node/edge rows first, so supply a value for every variable: graph CN where we
+    ## have it, otherwise the nearest finite bound. The start need not be feasible --
+    ## CPLEX repairs it at effortlevel CPX_MIPSTART_AUTO -- but it must respect the
+    ## column bounds or CPLEX discards it outright.
+    ## run_gurobi has no MIP start support and would pass this through as an
+    ## unrecognised control entry, so only build it for CPLEX.
+    if (mipstart && !use.gurobi) {
+        start.x = rep(NA_real_, nrow(vars))
+        ne = vars$type %in% c('node', 'edge')
+        start.x[ne] = vars$cn[ne]
+        start.x[is.na(start.x)] = 0
+        start.x = pmin(pmax(start.x, ifelse(is.finite(lb), lb, 0)),
+                       ifelse(is.finite(ub), ub, M))
+        control$mipstart = as.numeric(start.x)
+        if (verbose) {
+            message('Supplying MIP start: ', sum(ne & !is.na(vars$cn)),
+                    ' of ', nrow(vars), ' variables seeded from graph CN')
+        }
+    }
+
     ## call our wrapper for CPLEX
     if (use.gurobi) {
 
@@ -2644,13 +2701,69 @@ if (opt$marginal) {
     marginal.gr$fix = 0
 }
 
+## M is the big-M used for every node/edge/residual bound and for the loose-end and
+## edge indicator constraints. It must exceed the largest CN the fit could need, but
+## a needlessly large M cripples the LP relaxation: CPLEX gets a far weaker bound,
+## produces poor incumbents and the branch-and-cut tree explodes. Derive it from the
+## observed total CN instead of fixing it at 1000.
+M = max(2 * max(binstats.gg$nodes$dt$cn.total, na.rm = TRUE), 50)
+message("Using M = ", M, " (max observed cn.total = ",
+        max(binstats.gg$nodes$dt$cn.total, na.rm = TRUE), ")")
+
 ## M needs to be at least as big as the biggest node...
-binstats.gg$nodes[cn >= 999]$mark(cn = NA) ## NA anything bigger than M
+binstats.gg$nodes[cn >= (M - 1)]$mark(cn = NA) ## NA anything bigger than M
 binstats.gg$edges$mark(cn = NA) ## no edge CN
 
 ## stash binstats gg
 message("Stashing binstats.gg")
 saveRDS(binstats.gg, paste0(opt$outdir, "/", "binstats.gg.rds"))
+
+## CPLEX thread count cannot be set through the Rcplex2 control list: setparams()
+## in the C layer has no CPX_PARAM_THREADS branch, so a `threads` entry is rejected
+## with "Unknown CPLEX parameter". CPLEX also ignores taskset affinity, cgroup
+## limits and OMP_NUM_THREADS, and otherwise sizes its pool from the host core
+## count. The only route is a CPLEX parameter file pointed to by
+## ILOG_CPLEX_PARAMETER_FILE, which CPLEX reads at CPXopenCPLEX.
+##
+## Default 16 rather than unbounded: on a 192-core host CPLEX opened 32 threads and
+## spent 2620s of 3640s wall in branch-and-cut synchronization, and an unbounded
+## pool makes runtime depend on whatever else shares the node. 16 is a deliberately
+## conservative cap, not a tuned optimum -- a thread sweep on this sample was
+## inconclusive because the arms contended for the same cores.
+if (!is.null(opt$threads) && !is.na(opt$threads) && opt$threads > 0) {
+    param.file = normalizePath(paste0(opt$outdir, "/cplex.prm"), mustWork = FALSE)
+
+    ## Prefer the version of the library Rcplex2 is actually linked against, taken
+    ## from the solver's own banner. The `cplex` CLI on PATH is not necessarily the
+    ## same build as the linked runtime (observed: CLI 12.8.0.0, runtime 22.1.2.0),
+    ## and writing a header that disagrees with the runtime makes CPLEX reject the
+    ## whole file. CPLEX only checks the header's major version, so fall back to the
+    ## modern parameter spelling, which has been correct since 12.7.
+    cplex.version = tryCatch({
+        cmd = Sys.glob(file.path(Sys.getenv("CPLEX_DIR"), "cplex", "bin", "*", "cplex"))[1]
+        v = grep("Welcome to IBM", system2(cmd, '-c "quit"', stdout = TRUE), value = TRUE)
+        sub("([a-z)(A-Z ]+)([0-9.]+)$", "\\2", v)[1]
+    }, error = function(e) NA_character_)
+
+    if (!length(cplex.version) || is.na(cplex.version) || !nzchar(cplex.version)) {
+        cplex.version = "22.1.0.0"
+        message("could not probe CPLEX version; assuming ", cplex.version)
+    }
+
+    vnums = as.integer(unlist(strsplit(cplex.version, "\\.")))
+    ## CPX_PARAM_THREADS was renamed CPXPARAM_Threads in CPLEX 12.7
+    key = if (!is.na(vnums[1]) && vnums[1] <= 12 && !is.na(vnums[2]) && vnums[2] <= 6) {
+        "CPX_PARAM_THREADS"
+    } else {
+        "CPXPARAM_Threads"
+    }
+    writeLines(c(paste("CPLEX Parameter File Version", cplex.version),
+                 paste(key, as.integer(opt$threads), sep = "\t")),
+               param.file)
+    Sys.setenv(ILOG_CPLEX_PARAMETER_FILE = param.file)
+    message("Limiting CPLEX to ", as.integer(opt$threads), " threads via ", param.file,
+            " (", key, ")")
+}
 
 message("Starting balance")
 
@@ -2660,10 +2773,12 @@ res = balance(binstats.gg,
               marginal = marginal.gr,
               ism = opt$ism, ## false for now? because should be TRUE just by virtue of parent graph TRU
               lp = TRUE,
-              M = 1000, ## importantly needs to be big enough or else this will be infeasible
+              M = M, ## derived above from observed cn.total
               verbose = 2,
               tilim = opt$tilim,
               epgap = opt$epgap,
+              mipemphasis = opt$mipemphasis,
+              mipstart = opt$mipstart,
               cnloh = opt$cnloh,
               force.major = opt$major,
               force.alt = opt$allin,

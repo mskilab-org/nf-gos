@@ -162,6 +162,11 @@ include {
     SV_CHIMERA_FILTER as SV_CHIMERA_FILTER_VCF
 } from '../modules/local/process.nf'
 
+include {
+    SV_CHIMERA_FILTER_ESVEE as SV_CHIMERA_FILTER_ESVEE_RAWVCF;
+    SV_CHIMERA_FILTER_ESVEE as SV_CHIMERA_FILTER_ESVEE_VCF
+} from '../modules/local/esvee/chimera_filter.nf'
+
 include { 
     SETUP; 
     TOOLS
@@ -994,18 +999,24 @@ workflow NFTAPS {
         chimera_raw_existing_outputs = chimera_raw_outputs.filter { it -> !it[1].isEmpty() && !it[2].isEmpty() }
         chimera_raw_inputs = chimera_raw_outputs.filter { it -> it[1].isEmpty() || it[2].isEmpty() }.map {it -> [ it[0].patient ] }.unique()
 
-        SV_CHIMERA_FILTER_VCF(
-            vcf_from_gridss_gridss.map { it -> [ it[0].patient, it[0], it[1], it[2] ] } // meta.patient, meta, vcf, tbi
+        chimera_vcf_input = vcf_from_gridss_gridss.map { it -> [ it[0].patient, it[0], it[1], it[2] ] } // meta.patient, meta, vcf, tbi
             .join(chimera_inputs)
             .map { _patient, meta, vcf, tbi -> [ meta, vcf, tbi ] }
-        )
-        SV_CHIMERA_FILTER_RAWVCF(
-            vcf_raw_from_gridss_gridss.map { it -> [ it[0].patient, it[0], it[1], it[2] ] } // meta.patient, meta, vcf, tbi
+        chimera_raw_vcf_input = vcf_raw_from_gridss_gridss.map { it -> [ it[0].patient, it[0], it[1], it[2] ] } // meta.patient, meta, vcf, tbi
             .join(chimera_raw_inputs)
             .map { _patient, meta, vcf, tbi -> [ meta, vcf, tbi ] }
-        )
-        vcf_from_gridss_gridss = SV_CHIMERA_FILTER_VCF.out.vcftbi.mix(chimera_existing_outputs)
-        vcf_raw_from_gridss_gridss = SV_CHIMERA_FILTER_RAWVCF.out.vcftbi.mix(chimera_raw_existing_outputs)
+
+        if (params.sv_caller == 'esvee') {
+            SV_CHIMERA_FILTER_ESVEE_VCF(chimera_vcf_input)
+            SV_CHIMERA_FILTER_ESVEE_RAWVCF(chimera_raw_vcf_input)
+            vcf_from_gridss_gridss = SV_CHIMERA_FILTER_ESVEE_VCF.out.vcftbi.mix(chimera_existing_outputs)
+            vcf_raw_from_gridss_gridss = SV_CHIMERA_FILTER_ESVEE_RAWVCF.out.vcftbi.mix(chimera_raw_existing_outputs)
+        } else {
+            SV_CHIMERA_FILTER_VCF(chimera_vcf_input)
+            SV_CHIMERA_FILTER_RAWVCF(chimera_raw_vcf_input)
+            vcf_from_gridss_gridss = SV_CHIMERA_FILTER_VCF.out.vcftbi.mix(chimera_existing_outputs)
+            vcf_raw_from_gridss_gridss = SV_CHIMERA_FILTER_RAWVCF.out.vcftbi.mix(chimera_raw_existing_outputs)
+        }
     }
 
     /* FIXME: Junction Filtering step
@@ -1090,10 +1101,19 @@ workflow NFTAPS {
                 [ it[0].patient, it[1], it[2] ]  // meta.patient, vcf, tbi
             }
             .dump(tag: "sv output for paired run starting from 'vcf' column", pretty: true)
-        // unfiltered_som_sv_for_merge = inputs_unlaned.map{ it ->
-        //     [ it.meta.patient, [] ]
-        // }
-        unfiltered_som_sv_for_merge = vcf_raw_from_gridss_gridss.map { it -> [ it[0].patient, it[1], it[2] ] }
+        // JaBbA accepts a missing supplementary-junction input. Seed every tumor with
+        // its NULL sentinel, then replace it when a raw VCF is available.
+        unfiltered_som_sv_for_merge = inputs_unlaned
+            .filter { it.meta.status.toString() == "1" }
+            .map { it -> [it.meta.patient, 'NULL', []] }
+            .unique { patient, _vcf, _tbi -> patient }
+            .join(
+                vcf_raw_from_gridss_gridss.map { meta, vcf, tbi -> [meta.patient, vcf, tbi] },
+                remainder: true
+            )
+            .map { row ->
+                row.size() == 4 ? row[0..2] : [row[0], row[3], row[4]]
+            }
     }
 
 

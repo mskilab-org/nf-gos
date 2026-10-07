@@ -44,6 +44,7 @@ process PURPLE {
     def args = task.ext.args ?: ''
 
     def reference_arg = meta.containsKey('normal_id') ? "-reference ${meta.normal_id}" : ''
+    def reference_cobalt_prefix_condition = meta.containsKey('normal_id') ? " && [ \"\$prefix\" != \"${meta.normal_id}\" ]" : ''
 
     def sv_tumor_vcf_arg = sv_tumor_vcf ? "-somatic_sv_vcf ${sv_tumor_vcf}" : ''
     // def sv_normal_vcf_arg = sv_normal_vcf ? "-germline_sv_vcf ${sv_normal_vcf}" : ''
@@ -122,7 +123,7 @@ process PURPLE {
                 if [[ "\$filename" == *.* ]]; then
                     prefix="\${filename%%.*}"
                     suffix="\${filename#*.}"
-                    if [[ "\$suffix" == cobalt.* ]] && [ "\$prefix" != "${meta.tumor_id}" ]; then
+                    if [[ "\$suffix" == cobalt.* ]] && [ "\$prefix" != "${meta.tumor_id}" ]${reference_cobalt_prefix_condition}; then
                         has_different_prefix=true
                         break
                     fi
@@ -143,7 +144,7 @@ process PURPLE {
                     if [[ "\$filename" == *.* ]]; then
                         prefix="\${filename%%.*}"
                         suffix="\${filename#*.}"
-                        if [[ "\$suffix" == cobalt.* ]] && [ "\$prefix" != "${meta.tumor_id}" ]; then
+                        if [[ "\$suffix" == cobalt.* ]] && [ "\$prefix" != "${meta.tumor_id}" ]${reference_cobalt_prefix_condition}; then
                             ln -sfn "\$link_source" "cobalt_links/${meta.tumor_id}.\$suffix"
                         else
                             ln -sfn "\$link_source" "cobalt_links/\$filename"
@@ -164,7 +165,7 @@ process PURPLE {
         ${reference_arg} \\
         -amber \$local_amber \\
         -cobalt \$local_cobalt \\
-        ${sv_tumor_vcf_arg} \\
+        `# ${sv_tumor_vcf_arg}` \\
         ${smlv_tumor_vcf_arg} \\
         ${smlv_normal_vcf_arg} \\
         ${highly_diploid_percentage_arg} \\

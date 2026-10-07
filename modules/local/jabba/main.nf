@@ -3,10 +3,11 @@ process JABBA {
     label 'process_high'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/jabba:0.0.9':
-        'mskilab/jabba:0.0.9' }"
+        'docker://mskilab/jabba:0.0.10':
+        'mskilab/jabba:0.0.10' }"
 
     input:
+    path jabba_optimized
     tuple val(meta), path(junction), path(cov_rds), val(j_supp), val(het_pileups_wgs), val(purity), val(ploidy), val(cbs_seg_rds), val(cbs_nseg_rds)
     val(blacklist_junctions)    // this is declared as val to allow for "NULL" default value, but is treated like a path
     val(geno)
@@ -88,8 +89,8 @@ process JABBA {
 
     echo "USING LIBRARIES: \$(Rscript -e 'print(.libPaths())')"
 
-    export jabPath=\$(Rscript -e 'cat(suppressWarnings(find.package("JaBbA")))')
-    export jba=\${jabPath}/extdata/jba
+    export jba=\$(realpath $jabba_optimized)
+    test -x "\$jba"
     echo \$jba
     set +x
 
@@ -172,8 +173,8 @@ process COERCE_SEQNAMES {
     label 'process_low'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/jabba:0.0.8':
-        'mskilab/jabba:0.0.8' }"
+        'docker://mskilab/jabba:0.0.10':
+        'mskilab/jabba:0.0.10' }"
 
     input:
     tuple val(meta), path(file)
@@ -183,51 +184,104 @@ process COERCE_SEQNAMES {
 
     script:
     """
-    #!/usr/bin/env Rscript
+    #!/bin/bash
+    set -e
 
-    change_bndalt_style = function(x, style = "NCBI") {  
-        mat = stringr::str_split_fixed(x, "(?<=\\\\[)|(?<=\\\\])", n = 3)
-        coordmat = stringr::str_split_fixed(mat[,2], "(?=:)", 2)
-        # GenomeInfoDb::seqlevelsStyle(coordmat[,1]) = style
-        coordmat[,1] = gUtils:::remap_seqlevels(coordmat[,1], style)
-        out = paste(
-            mat[,1],
-            coordmat[,1],
-            coordmat[,2],
-            mat[,3], sep = ""
-        )
-        return(out)
+    fn="${file}"
+    outputfn="coerced_chr_${file.name}"
+
+    case "\$fn" in
+        *.rds|*.RDS)
+            Rscript --vanilla - "\$fn" "\$outputfn" <<'RSCRIPT'
+suppressMessages(library(GenomicRanges))
+a <- commandArgs(trailingOnly = TRUE)
+saveRDS(gUtils::change_seqlevels_style(readRDS(a[1]), style = "NCBI"), file = a[2])
+RSCRIPT
+            ;;
+        *.vcf|*.vcf.gz|*.vcf.bgz)
+            ## Streaming seqlevel coercion: the previous implementation round-tripped the
+            ## whole VCF through readVcf()/writeVcf() and ran a per-record lapply() over
+            ## ALT, costing ~40 s per 5e3 records. Only the seqlevels need gUtils, and
+            ## there are ~100 of them, so map those in R and rewrite the body with awk.
+            case "\$fn" in
+                *.gz|*.bgz) DECOMP="gzip -cd" ;;
+                *)          DECOMP="cat"      ;;
+            esac
+
+            AWK=awk
+            command -v mawk > /dev/null && AWK=mawk
+
+            ## bgzip when available; otherwise emit plaintext, which is what the old
+            ## writeVcf() path produced even for *.gz outputs (readVcf sniffs content,
+            ## and plain gzip is *not* seekable by htslib, so never gzip here).
+            BGZIP=\$(command -v bgzip || true)
+
+            ## 1) collect the seqlevels (header contigs, else the observed CHROM values)
+            \$DECOMP "\$fn" | sed -n '/^#CHROM/q;p' > vcf_header.txt
+            if grep -q '^##contig=' vcf_header.txt; then
+                sed -n 's/^##contig=<.*ID=\\([^,>]*\\).*\$/\\1/p' vcf_header.txt | sort -u > seqnames.txt
+            else
+                \$DECOMP "\$fn" | grep -v '^#' | cut -f 1 | uniq | sort -u > seqnames.txt
+            fi
+
+            ## 2) ask gUtils for the NCBI style of those few seqlevels
+            Rscript --vanilla - seqnames.txt seqmap.tsv <<'RSCRIPT'
+suppressMessages(library(gUtils))
+a <- commandArgs(trailingOnly = TRUE)
+sn <- unique(readLines(a[1]))
+writeLines(paste(sn, gUtils:::remap_seqlevels(sn, "NCBI"), sep = "\\t"), a[2])
+RSCRIPT
+
+            ## 3) stream the VCF, rewriting ##contig IDs, CHROM, and BND mates inside ALT
+            cat > coerce_seqnames.awk <<'AWKSCRIPT'
+BEGIN { FS = OFS = "\\t" }
+NR == FNR { map[\$1] = \$2; next }
+/^##contig=/ {
+    if (match(\$0, /ID=[^,>]+/)) {
+        id = substr(\$0, RSTART + 3, RLENGTH - 3)
+        if (id in map) \$0 = substr(\$0, 1, RSTART + 2) map[id] substr(\$0, RSTART + RLENGTH)
     }
-
-
-    fn <- "${file}"
-    outputfn <- "coerced_chr_${file.name}"
-
-    if(grepl('.rds', "${file.name}")){
-        library(GenomicRanges)
-        data <- readRDS(fn)
-        # seqlevels(data, pruning.mode = "coarse") <- gsub("chr","",seqlevels(data))
-        data <- gUtils::change_seqlevels_style(data, style = "NCBI")
-        saveRDS(data, file = outputfn)
-    } else if (grepl('.vcf|.vcf.gz|.vcf.bgz', "${file.name}")) {
-        library(VariantAnnotation)
-        data <- readVcf(fn)
-        ##seqlevelsStyle(data) <- 'NCBI'
-        # seqlevels(data) <- sub("^chr", "", seqlevels(data))
-        data = gUtils::change_seqlevels_style(data, style = "NCBI")
-        header = header(data)
-        # rownames(header@header\$contig) = sub("^chr", "", rownames(header@header\$contig))
-        header(data) <- header
-        data@fixed\$ALT <- lapply(data@fixed\$ALT, function(x) change_bndalt_style(x))
-        writeVcf(data, file = outputfn)
-    } else {
-        data <- read.table(fn, header=T)
-        # data[[1]] <- gsub("chr","",data[[1]])
-        sn = as.character(data[[1]])
-        sn = gUtils:::remap_seqlevels(sn, "NCBI")
-        data[[1]] = sn
-        write.table(data, file = outputfn, sep = "\\t", row.names = F, quote = F)
+    print; next
+}
+/^#/ { print; next }
+{
+    if (\$1 in map) \$1 = map[\$1]
+    if (\$5 ~ /\\[/ || \$5 ~ /\\]/) {
+        n = split(\$5, alt, ",")
+        for (i = 1; i <= n; i++) {
+            s = alt[i]
+            p = index(s, "[")
+            if (p == 0) p = index(s, "]")
+            if (p > 0) {
+                q = index(substr(s, p + 1), ":")
+                if (q > 0) {
+                    c = substr(s, p + 1, q - 1)
+                    if (c in map) s = substr(s, 1, p) map[c] substr(s, p + q)
+                }
+            }
+            \$5 = (i == 1) ? s : \$5 "," s
+        }
     }
+    print
+}
+AWKSCRIPT
+
+            if [ -n "\$BGZIP" ]; then
+                \$DECOMP "\$fn" | LC_ALL=C \$AWK -f coerce_seqnames.awk seqmap.tsv - | "\$BGZIP" -c -@ ${task.cpus} > "\$outputfn"
+            else
+                \$DECOMP "\$fn" | LC_ALL=C \$AWK -f coerce_seqnames.awk seqmap.tsv - > "\$outputfn"
+            fi
+            ;;
+        *)
+            Rscript --vanilla - "\$fn" "\$outputfn" <<'RSCRIPT'
+suppressMessages(library(gUtils))
+a <- commandArgs(trailingOnly = TRUE)
+data <- read.table(a[1], header = TRUE)
+data[[1]] <- gUtils:::remap_seqlevels(as.character(data[[1]]), "NCBI")
+write.table(data, file = a[2], sep = "\\t", row.names = FALSE, quote = FALSE)
+RSCRIPT
+            ;;
+    esac
     """
 }
 

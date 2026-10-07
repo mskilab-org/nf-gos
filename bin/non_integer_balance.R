@@ -25,6 +25,8 @@ if (!exists('opt'))
     make_option("--build", type = "character", default = "hg19", help = "either hg19 or hg38"),
     make_option("--epgap", type = "numeric", default = 1e-6, help = "epgap"),
     make_option("--tilim", type = "numeric", default = 100, help = "time limit for optimization"),
+    make_option("--threads", type = "integer", default = 1, help = "CPLEX threads used by non_integer_balance_optimized.R"),
+    make_option("--mipemphasis", type = "integer", default = 0, help = "CPLEX emphasis used by the optimized wrapper: 0 balanced, 1 feasibility, 2 optimality, 3 best bound, 4 hidden feasibility"),
     make_option("--gurobi", type = "logical", default = TRUE, help = "use gurobi?"), ## because why the hell not
     make_option("--fasta", type = "character", help = "path to fasta file",
                 default = "/gpfs/commons/groups/imielinski_lab/DB/GATK/human_g1k_v37_decoy.fasta"),

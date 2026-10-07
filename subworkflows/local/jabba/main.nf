@@ -13,6 +13,7 @@ whitelist_genes             = WorkflowNfcasereports.create_file_channel(params.w
 
 blacklist_coverage		    = WorkflowNfcasereports.create_file_channel(params.blacklist_coverage_jabba)
 blacklist_junctions        = WorkflowNfcasereports.create_value_channel(params.blacklist_junctions_jabba)
+optimized_jabba            = WorkflowNfcasereports.create_file_channel("${projectDir}/bin/jabba_optimized.R")
 geno					     = WorkflowNfcasereports.create_value_channel(params.geno_jabba)
 indel					     = WorkflowNfcasereports.create_value_channel(params.indel_jabba)
 tfield					 = WorkflowNfcasereports.create_value_channel(params.tfield_jabba)
@@ -113,6 +114,7 @@ workflow COV_JUNC_TUMOR_ONLY_JABBA {
                     }
 
     JABBA(
+        optimized_jabba,
         final_inputs,
         blacklist_junctions,
         geno,
@@ -221,17 +223,17 @@ workflow COV_JUNC_JABBA {
     }
 
     j_supp = inputs_map.map { sample ->
-        [sample.meta, sample.j_supp]
+        [sample.meta, sample.j_supp ?: 'NULL']
     }
-    j_supp_empty = j_supp
-        .filter { it -> it[1].isEmpty() }
-    j_supp_nonempty = j_supp
-        .filter { it -> !it[1].isEmpty() }
+    j_supp_missing = j_supp
+        .filter { _meta, j_supp -> j_supp == 'NULL' }
+    j_supp_present = j_supp
+        .filter { _meta, j_supp -> j_supp != 'NULL' }
 
     if (!params.tumor_only) {
-        COERCE_SEQNAMES_UNFIL_SOM_SV(j_supp_nonempty)
+        COERCE_SEQNAMES_UNFIL_SOM_SV(j_supp_present)
         chr_coerced_j_supp = COERCE_SEQNAMES_UNFIL_SOM_SV.out.file
-            .mix(j_supp_empty)
+            .mix(j_supp_missing)
         chr_coerced_j_supp = chr_coerced_j_supp.map { meta, j_supp ->
             [meta.patient, j_supp]
         }
@@ -273,6 +275,7 @@ workflow COV_JUNC_JABBA {
                     }
 
     JABBA(
+        optimized_jabba,
         final_inputs,
         blacklist_junctions,
         geno,

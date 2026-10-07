@@ -71,7 +71,7 @@ process GRIDSS_GRIDSS {
     def steps = args.contains("-s ") ? args.split('-s ')[-1].split(" ")[0] :
                 args.contains("--steps ") ? args.split('--steps ')[-1].split(" ")[0] :
                 "all"
-    def vcf = steps.contains("call") || steps.contains("all") ? "touch ${prefix}.vcf*" : ""
+    def vcf = steps.contains("call") || steps.contains("all") ? "touch ${prefix}.vcf.gz ${prefix}.vcf.gz.tbi ${prefix}.filtered.vcf.gz ${prefix}.filtered.vcf.gz.tbi" : ""
     def assembly_bam = steps.contains("assembly") || steps.contains("all") ? "touch ${meta.id}.assembly.bam" : ""
     """
     ${vcf}
@@ -155,8 +155,8 @@ process GRIDSS_PREPROCESS {
     def vcf = steps.contains("call") || steps.contains("all") ? "touch ${prefix}.vcf*" : ""
     def assembly_bam = steps.contains("assembly") || steps.contains("all") ? "touch ${meta.id}.assembly.bam" : ""
     """
-    ${vcf}
-    ${assembly_bam}
+    mkdir -p ${meta.sample}.bam.gridss.working
+
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -239,8 +239,10 @@ process GRIDSS_ASSEMBLE_SCATTER {
     def vcf = steps.contains("call") || steps.contains("all") ? "touch ${prefix}.vcf*" : ""
     def assembly_bam = steps.contains("assembly") || steps.contains("all") ? "touch ${meta.id}.assembly.bam" : ""
     """
-    ${vcf}
-    ${assembly_bam}
+    mkdir -p ${meta.id}.assembly.bam.gridss.working
+    touch ${meta.id}.assembly.bam.gridss.working/${meta.id}.assembly.chunk${jobindex}.bam
+    touch ${meta.id}.assembly.bam
+
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -328,8 +330,10 @@ process GRIDSS_ASSEMBLE_GATHER {
     def vcf = steps.contains("call") || steps.contains("all") ? "touch ${prefix}.vcf*" : ""
     def assembly_bam = steps.contains("assembly") || steps.contains("all") ? "touch ${meta.id}.assembly.bam" : ""
     """
-    ${vcf}
-    ${assembly_bam}
+    mkdir -p ${meta.id}.assembly.bam.gridss.working
+    touch ${meta.id}.assembly.bam.gridss.working/${meta.id}.assembly.bam.sv.bam
+    touch ${meta.id}.assembly.bam
+
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -423,8 +427,9 @@ process GRIDSS_CALL {
     def vcf = steps.contains("call") || steps.contains("all") ? "touch ${prefix}.vcf*" : ""
     def assembly_bam = steps.contains("assembly") || steps.contains("all") ? "touch ${meta.id}.assembly.bam" : ""
     """
-    ${vcf}
-    ${assembly_bam}
+    touch ${prefix}.gridss.vcf.gz ${prefix}.gridss.vcf.gz.tbi
+    touch ${prefix}.gridss.filtered.vcf.gz ${prefix}.gridss.filtered.vcf.gz.tbi
+
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

@@ -58,8 +58,8 @@ process GRIPSS_SOMATIC_FILTER {
     def prefix = task.ext.prefix ?: "${meta.id}"
     def VERSION = '2.13.2' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
     """
-    touch ${prefix}.high_confidence_somatic.vcf.bgz
-    touch ${prefix}.high_and_low_confidence_somatic.vcf.bgz
+    touch ${prefix}.gripss.filtered.vcf.gz ${prefix}.gripss.filtered.vcf.gz.tbi
+    touch ${prefix}.gripss.vcf.gz ${prefix}.gripss.vcf.gz.tbi
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
