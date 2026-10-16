@@ -19,6 +19,7 @@ process CHIMERA_FILTER {
     def prefix = task.ext.prefix ?: "${meta.id}"
     def out_bam = bam.getName().replaceFirst(/\.bam$/, '.ffpe_filtered.bam')
     """
+    
     python \${NEXTFLOW_BIN_DIR}/pysam_chimera_filter.py \\
         --max-qnames ${params.chimera_filter_max_qnames} \\
         ${bam} ${out_bam}

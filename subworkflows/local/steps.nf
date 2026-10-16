@@ -984,6 +984,7 @@ workflow DRYCLEAN_STEP {
 }
 
 include { COV_CBS } from './cov_cbs/main'
+include { VALIDATE_CBS_BUNDLE } from '../../modules/local/cbs/main'
 workflow CBS_STEP {
     take:
     inputs_unlaned
@@ -992,73 +993,139 @@ workflow CBS_STEP {
     tools_used
 
     main:
-    versions = Channel.empty()
-
-    cbs_existing_seg = inputs_unlaned
-        .map { it -> [it.meta, it.seg] }
-        .filter { !it[1].isEmpty() }
-
-    cbs_existing_nseg = inputs_unlaned
-        .map { it -> [it.meta, it.nseg] }
-        .filter { !it[1].isEmpty() }
-
-    cbs_seg_rds = cbs_existing_seg
-    cbs_nseg_rds = cbs_existing_nseg
-
-    cbs_inputs = inputs_unlaned
-        .filter { it.seg.isEmpty() || it.nseg.isEmpty() }
-        .map { it -> [it.meta.patient, it.meta] }
-        .unique{ it -> it[1].patient + "___sep___" + it[1].sample } // unique by patient and sample
-        .branch{
-            normal: it[1].status.toString() == "0"
-            tumor:  it[1].status.toString() == "1"
+    // A patient key identifies one tumor/normal pair throughout these workflows.
+    // Never combine an imported partial bundle with newly generated CBS files.
+    cbs_fields = ['cbs_cov', 'seg', 'nseg']
+    graph_fields = ['jabba_rds', 'jabba_gg', 'ni_balanced_gg', 'lp_balanced_gg']
+    graph_tools = ['cbs', 'jabba', 'non_integer_balance', 'allelic_cn', 'lp_phased_balance',
+        'events', 'fusions', 'snv_multiplicity', 'oncokb', 'hrdetect', 'onenesstwoness']
+    validate_imports = tools_used.isEmpty() || tools_used.contains('all') ||
+        graph_tools.any { tools_used.contains(it) }
+    ni_descendants = ['events', 'fusions', 'altedge_annotations', 'snv_multiplicity',
+        'snv_multiplicity_germline', 'snv_multiplicity_hets', 'oncokb_fusions',
+        'oncokb_cna', 'onenesstwoness']
+    jabba_descendants = ['hrdetect', 'onenesstwoness']
+    present = { value ->
+        value != null && !(value instanceof Collection && value.isEmpty()) &&
+            !(value.toString().trim() in ['', 'NA', 'NULL', '/dev/null'])
+    }
+    checked_rows = inputs_unlaned.map { row ->
+        if (!validate_imports) return row
+        if (row.meta.status.toString() != '1') {
+            // gOSh repeats pair-level outputs on the normal row. The tumor row
+            // owns the bundle; never emit those repeated graph outputs twice.
+            def pair_fields = (cbs_fields + graph_fields + ni_descendants + jabba_descendants).unique()
+            return row + pair_fields.collectEntries { field -> [(field): []] }
         }
-    
-    
-    if (tools_used.contains("all") || tools_used.contains("cbs")) {
-        cbs_tumor_input = cbs_inputs.tumor
-            .join(dryclean_tumor_cov_for_merge)
-            .map{ it -> [ it[0], it[1], it[2] ] } // meta.patient, meta, dryclean tumor cov
+        def descendants = (ni_descendants + jabba_descendants).unique().findAll { present.call(row[it]) }
+        def imported_graphs = graph_fields.findAll { present.call(row[it]) }
+        if ((imported_graphs || descendants) && !cbs_fields.every { present.call(row[it]) }) {
+            error "CBS coverage migration for ${row.meta.patient}/${row.meta.sample}: imported graphs or graph descendants require a complete compatible cbs_cov/seg/nseg bundle. Remove legacy imports and regenerate CBS and downstream graphs."
+        }
+        if ((ni_descendants.any { present.call(row[it]) } || present.call(row.lp_balanced_gg)) && !present.call(row.ni_balanced_gg)) {
+            error "CBS coverage migration for ${row.meta.patient}/${row.meta.sample}: imported NI graph descendants require their compatible ni_balanced_gg source graph. Supply it or regenerate the descendants."
+        }
+        if (jabba_descendants.any { present.call(row[it]) } && !present.call(row.jabba_rds)) {
+            error "CBS coverage migration for ${row.meta.patient}/${row.meta.sample}: imported HRDetect/onenesstwoness requires its compatible jabba_rds source. Supply it or regenerate the descendants."
+        }
+        row
+    }
+    cbs_tumors = checked_rows
+        .filter { validate_imports && it.meta.status.toString() == '1' }
+        .map { row -> [row.meta.patient, row] }
+        .groupTuple()
+        .map { patient, rows ->
+            if (rows.collect { it.meta.sample }.unique().size() != 1) {
+                error "CBS requires one tumor per patient/pair key; assign distinct pair keys for ${patient}."
+            }
+            if ((cbs_fields + graph_fields).any { field -> rows.collect { it[field] }.unique().size() != 1 }) {
+                error "Conflicting CBS or graph imports across rows for ${patient}. Supply one coherent bundle per pair."
+            }
+            [patient, rows[0]]
+        }
+        .branch {
+            imported: cbs_fields.every { field -> present.call(it[1][field]) }
+            regenerate: true
+        }
 
+    cbs_imports = cbs_tumors.imported.map { patient, row ->
+        def imported_graphs = graph_fields.findAll { present.call(row[it]) }
+        [row.meta + [id: row.meta.sample], row, row.cbs_cov, row.seg, row.nseg,
+            imported_graphs, imported_graphs.collect { row[it] }]
+    }
+    VALIDATE_CBS_BUNDLE(
+        file("${projectDir}/bin/validate_cbs_bundle.R"),
+        file("${projectDir}/bin/cbs_coverage.R"),
+        cbs_imports,
+        params.tumor_only ? 'tumor_only' : 'paired'
+    )
+    cbs_bundle = VALIDATE_CBS_BUNDLE.out.bundle
+    validated_inputs_unlaned = checked_rows.filter { !validate_imports || it.meta.status.toString() != '1' }
+        .mix(cbs_tumors.regenerate.map { patient, row -> row })
+        .mix(VALIDATE_CBS_BUNDLE.out.validated_rows)
+
+    if (tools_used.contains('all') || tools_used.contains('cbs') ||
+            tools_used.contains('jabba') || tools_used.contains('non_integer_balance')) {
+        cbs_tumor_input = cbs_tumors.regenerate
+            .join(dryclean_tumor_cov_for_merge, remainder: true)
+            .filter { patient, row, cov -> row != null }
+            .map { patient, row, cov ->
+                if (cov == null) {
+                    error "Cannot regenerate CBS for ${patient}/${row.meta.sample}: tumor dryclean coverage is missing."
+                }
+                [patient, row.meta, cov]
+            }
         if (params.tumor_only) {
-            cov_cbs = cbs_tumor_input.map { patient, meta, tumor_cov -> [ meta, tumor_cov, [] ] }
+            cov_cbs = cbs_tumor_input.map { patient, meta, cov ->
+                [meta + [id: meta.sample, tumor_id: meta.sample], cov, []]
+            }
         } else {
-            cbs_normal_input = cbs_inputs.normal
-                .join(dryclean_normal_cov_for_merge)
-                .map{ it -> [ it[0], it[1], it[2] ] } // meta.patient, meta, dryclean normal cov
-
-            cov_cbs = cbs_tumor_input.cross(cbs_normal_input)
-                .map { tumor, normal ->
-                    def meta = [:]
-                        meta.id             = "${tumor[1].sample}_vs_${normal[1].sample}".toString()
-                        meta.sample         = "${tumor[1].sample}".toString()
-                        meta.normal_id      = normal[1].sample
-                        meta.patient        = normal[0]
-                        meta.sex            = normal[1].sex
-                        meta.tumor_id       = tumor[1].sample
-
-                        [ meta, tumor[2], normal[2] ]
-                }.unique { meta, tumor_cov, normal_cov ->
-                    meta.patient
+            // Use every normal row, including shared normals with imported CBS columns.
+            cbs_normal_meta = checked_rows
+                .filter { it.meta.status.toString() == '0' }
+                .map { row -> [row.meta.patient, row.meta] }
+                .groupTuple()
+                .map { patient, metas ->
+                    if (metas.collect { it.sample }.unique().size() != 1) {
+                        error "CBS requires exactly one matched normal for pair ${patient}."
+                    }
+                    [patient, metas[0]]
+                }
+            cbs_normal_input = cbs_normal_meta
+                .join(dryclean_normal_cov_for_merge, remainder: true)
+                .filter { patient, meta, cov -> meta != null }
+                .map { patient, meta, cov -> [patient, [meta, cov]] }
+            cov_cbs = cbs_tumor_input
+                .map { patient, meta, cov -> [patient, [meta, cov]] }
+                .join(cbs_normal_input, remainder: true)
+                .filter { patient, tumor, normal -> tumor != null }
+                .map { patient, tumor, normal ->
+                    def meta = tumor[0]
+                    if (normal == null || normal[1] == null) {
+                        error "Cannot regenerate paired CBS for ${patient}/${meta.sample}: matched normal metadata and dryclean coverage are required. Supply the normal or explicitly use tumor-only mode."
+                    }
+                    def normal_meta = normal[0]
+                    [meta + [id: "${meta.sample}_vs_${normal_meta.sample}".toString(),
+                        tumor_id: meta.sample, normal_id: normal_meta.sample, sex: normal_meta.sex],
+                        tumor[1], normal[1]]
                 }
         }
         COV_CBS(cov_cbs)
-
-        versions = versions.mix(COV_CBS.out.versions)
-
-        cbs_seg_rds = Channel.empty()
-            .mix(COV_CBS.out.cbs_seg_rds)
-            .mix(cbs_existing_seg)
-
-        cbs_nseg_rds = Channel.empty()
-            .mix(COV_CBS.out.cbs_nseg_rds)
-            .mix(cbs_existing_nseg)
+        generated_bundle = COV_CBS.out.cbs_cov_rds
+            .join(COV_CBS.out.cbs_seg_rds)
+            .join(COV_CBS.out.cbs_nseg_rds)
+        cbs_bundle = cbs_bundle.mix(generated_bundle)
     }
 
+    cbs_cov_rds = cbs_bundle.map { meta, cov, seg, nseg -> [meta, cov] }
+    cbs_seg_rds = cbs_bundle.map { meta, cov, seg, nseg -> [meta, seg] }
+    cbs_nseg_rds = cbs_bundle.map { meta, cov, seg, nseg -> [meta, nseg] }
+
     emit:
+    cbs_cov_rds
     cbs_seg_rds
     cbs_nseg_rds
-
+    validated_inputs_unlaned
 }
 
 
@@ -1078,6 +1145,9 @@ include {
 // include { GRIDSS_ASSEMBLE_GATHER   } from '../../modules/local/gridss/gridss/main.nf'
 // include { GRIDSS_CALL   } from '../../modules/local/gridss/gridss/main.nf'
 
+// Esvee
+include { ESVEE } from '../../modules/local/esvee/main.nf'
+
 workflow SV_CALLING_STEP {
     take:
     inputs_unlaned
@@ -1088,6 +1158,7 @@ workflow SV_CALLING_STEP {
     main:
     fasta                               = WorkflowNfcasereports.create_file_channel(params.fasta)
     fasta_fai                           = WorkflowNfcasereports.create_file_channel(params.fasta_fai)
+    fasta_dict                          = WorkflowNfcasereports.create_file_channel(params.dict)
     blacklist_gridss                    = WorkflowNfcasereports.create_file_channel(params.blacklist_gridss)
 
 
@@ -1097,6 +1168,7 @@ workflow SV_CALLING_STEP {
     // assembly_bam           = Channel.empty()
     vcf_from_gridss_gridss = Channel.empty()
     vcf_raw_from_gridss_gridss = Channel.empty()
+    esvee_germline_vcf = Channel.empty()
 
 
     parallelize_gridss = params.parallelize_gridss ?: true
@@ -1150,7 +1222,71 @@ workflow SV_CALLING_STEP {
 
     // SV Calling
     // ##############################
-    if (tools_used.contains("all") || tools_used.contains("gridss") || params.is_run_junction_filter) {
+    def is_esvee = params.sv_caller == 'esvee'
+    def is_sv_caller_gated = tools_used.contains("all") || tools_used.contains("gridss") || tools_used.contains("esvee") || params.is_run_junction_filter
+
+    if (is_sv_caller_gated && is_esvee) {
+        ( esvee_pon_sgl, esvee_pon_sv, esvee_known_hotspots, esvee_repeat_mask, fasta_img, esvee_ref_genome_version ) = WorkflowNfcasereports.create_channels(
+            params: params,
+            spec: [
+                "file": ['esvee_pon_sgl', 'esvee_pon_sv', 'esvee_known_hotspots', 'esvee_repeat_mask', 'fasta_img'],
+                "value": ['ref_genome_version']
+            ],
+            ignore_must_exist: null
+        )
+
+        bam_sv_calling = alignment_bams_final
+            .combine(bam_sv_inputs, by: 0)
+            .map { it -> [ it[1], it[2], it[3] ] }
+            .dump(tag: "BAM SV calling input (esvee)", pretty: true)
+
+        bam_sv_calling_status = bam_sv_calling.branch {
+            normal: it[0].status.toString() == "0"
+            tumor: it[0].status.toString() == "1"
+        }
+
+        if (params.tumor_only) {
+            esvee_input = bam_sv_calling_status.tumor
+                .map { meta, bam, bai ->
+                    [ meta + [ id: meta.sample, tumor_id: meta.sample ], bam, bai, [], [] ]
+                }
+        } else {
+            esvee_normal_for_crossing = bam_sv_calling_status.normal
+                .map { meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
+            esvee_tumor_for_crossing = bam_sv_calling_status.tumor
+                .map { meta, bam, bai -> [ meta.patient, meta, bam, bai ] }
+
+            esvee_input = esvee_tumor_for_crossing
+                .cross(esvee_normal_for_crossing) { v -> v[0] }
+                .map { tumor, normal ->
+                    def meta = tumor[1] + [
+                        id: "${tumor[1].sample}_vs_${normal[1].sample}".toString(),
+                        tumor_id: tumor[1].sample,
+                        normal_id: normal[1].sample
+                    ]
+                    [ meta, tumor[2], tumor[3], normal[2], normal[3] ]
+                }
+        }
+
+        esvee_input = esvee_input.dump(tag: "esvee input", pretty: true)
+
+        ESVEE(
+            esvee_input,
+            fasta,
+            fasta_fai,
+            fasta_dict,
+            fasta_img,
+            esvee_pon_sgl,
+            esvee_pon_sv,
+            esvee_known_hotspots,
+            esvee_repeat_mask,
+            esvee_ref_genome_version
+        )
+
+        vcf_from_gridss_gridss = ESVEE.out.somatic_vcf.mix(gridss_existing_outputs)
+        vcf_raw_from_gridss_gridss = ESVEE.out.unfiltered_vcf.mix(gridss_raw_existing_outputs)
+        esvee_germline_vcf = ESVEE.out.germline_vcf
+    } else if (is_sv_caller_gated) {
 
         // Filter out bams for which SV calling has already been done
         // FIXME: vcf to vcf_raw
@@ -1508,6 +1644,7 @@ workflow SV_CALLING_STEP {
     emit:
     vcf_from_gridss_gridss
     vcf_raw_from_gridss_gridss
+    esvee_germline_vcf
 
 }
 
@@ -2559,7 +2696,7 @@ include { RETIER_JUNCTIONS } from './jabba/main'
 workflow JABBA_STEP {
     take:
     inputs_unlaned
-    dryclean_tumor_cov_for_merge
+    cbs_cov_for_merge
     hets_sites_for_merge
     cbs_seg_for_merge
     cbs_nseg_for_merge
@@ -2576,8 +2713,13 @@ workflow JABBA_STEP {
     main:
     versions = Channel.empty()
     // Existing
-    jabba_rds_existing_outputs = inputs_unlaned.map { it -> [it.meta + [id: it.meta.sample], it.jabba_rds] }.filter { !it[1].isEmpty() }
-    jabba_gg_existing_outputs = inputs_unlaned.map { it -> [it.meta + [id: it.meta.sample], it.jabba_gg] }.filter { !it[1].isEmpty() }
+    jabba_reused_rows = inputs_unlaned.filter { row ->
+        row.meta.status.toString() == '1' &&
+            (!(tools_used.contains('all') || tools_used.contains('jabba')) ||
+                (!row.jabba_rds.isEmpty() && !row.jabba_gg.isEmpty()))
+    }
+    jabba_rds_existing_outputs = jabba_reused_rows.map { it -> [it.meta + [id: it.meta.sample], it.jabba_rds] }.filter { !it[1].isEmpty() }
+    jabba_gg_existing_outputs = jabba_reused_rows.map { it -> [it.meta + [id: it.meta.sample], it.jabba_gg] }.filter { !it[1].isEmpty() }
     // Emit
     jabba_rds = jabba_rds_existing_outputs
     jabba_gg = jabba_gg_existing_outputs
@@ -2655,7 +2797,7 @@ workflow JABBA_STEP {
             .map { it -> [ it[0], it[1] ] } // meta.patient, hets
             .dump(tag: "jabba_inputs_hets", pretty: true)
 
-        jabba_inputs_cov = dryclean_tumor_cov_for_merge
+        jabba_inputs_cov = cbs_cov_for_merge
             .join(jabba_inputs)
             .map { it -> [ it[0], it[1] ] } // meta.patient, cov
             .dump(tag: "jabba_inputs_cov", pretty: true)
@@ -2763,7 +2905,7 @@ workflow NON_INTEGER_BALANCE_STEP {
     inputs_unlaned
     jabba_gg_for_merge
     hets_sites_for_merge
-    dryclean_tumor_cov_for_merge
+    cbs_cov_for_merge
     tools_used
 
     main:
@@ -2772,13 +2914,20 @@ workflow NON_INTEGER_BALANCE_STEP {
     index_alignment = bwa
 
     // Existing
-    non_integer_balance_existing_outputs = inputs_unlaned.map { it -> [it.meta, it.ni_balanced_gg] }.filter { !it[1].isEmpty() }
+    non_integer_balance_existing_outputs = inputs_unlaned
+        .filter { it.meta.status.toString() == "1" && !it.ni_balanced_gg.isEmpty() }
+        .map { it -> [it.meta, it.ni_balanced_gg] }
+        .unique { it[0].patient }
 
     // Emit
     non_integer_balance_balanced_gg = non_integer_balance_existing_outputs
 
     // Inputs
-    non_integer_balance_inputs = inputs_unlaned.filter { it.ni_balanced_gg.isEmpty() }.map { it -> [it.meta.patient, it.meta + [id: it.meta.sample]] }
+    // One tumor per patient key, matching JaBbA and LP-phased balance.
+    non_integer_balance_inputs = inputs_unlaned
+        .filter { it.meta.status.toString() == "1" && it.ni_balanced_gg.isEmpty() }
+        .map { it -> [it.meta.patient, it.meta + [id: it.meta.sample]] }
+        .unique { it[0] }
 
     non_integer_balance_inputs_jabba_gg = jabba_gg_for_merge
         .join(non_integer_balance_inputs)
@@ -2788,7 +2937,7 @@ workflow NON_INTEGER_BALANCE_STEP {
         .join(non_integer_balance_inputs)
         .map { it -> [ it[0], it[1] ] } // meta.patient, hets
 
-    non_integer_balance_inputs_cov = dryclean_tumor_cov_for_merge
+    non_integer_balance_inputs_cov = cbs_cov_for_merge
         .join(non_integer_balance_inputs)
         .map { it -> [ it[0], it[1] ] } // meta.patient, cov
 

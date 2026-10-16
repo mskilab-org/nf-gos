@@ -3,7 +3,6 @@
 //
 
 include { JABBA } from '../../../modules/local/jabba/main.nf'
-include { COERCE_SEQNAMES as COERCE_SEQNAMES_COV } from '../../../modules/local/jabba/main.nf'
 include { COERCE_SEQNAMES as COERCE_SEQNAMES_SOM_SV } from '../../../modules/local/jabba/main.nf'
 include { COERCE_SEQNAMES as COERCE_SEQNAMES_UNFIL_SOM_SV } from '../../../modules/local/jabba/main.nf'
 include { COERCE_SEQNAMES as COERCE_SEQNAMES_HETS } from '../../../modules/local/jabba/main.nf'
@@ -13,6 +12,8 @@ whitelist_genes             = WorkflowNfcasereports.create_file_channel(params.w
 
 blacklist_coverage		    = WorkflowNfcasereports.create_file_channel(params.blacklist_coverage_jabba)
 blacklist_junctions        = WorkflowNfcasereports.create_value_channel(params.blacklist_junctions_jabba)
+optimized_jabba            = WorkflowNfcasereports.create_file_channel("${projectDir}/bin/jabba_optimized.R")
+cbs_coverage_helper        = WorkflowNfcasereports.create_file_channel("${projectDir}/bin/cbs_coverage.R")
 geno					     = WorkflowNfcasereports.create_value_channel(params.geno_jabba)
 indel					     = WorkflowNfcasereports.create_value_channel(params.indel_jabba)
 tfield					 = WorkflowNfcasereports.create_value_channel(params.tfield_jabba)
@@ -23,7 +24,6 @@ nudgebalanced				 = WorkflowNfcasereports.create_value_channel(params.nudgebalan
 edgenudge					 = WorkflowNfcasereports.create_value_channel(params.edgenudge_jabba)
 strict					 = WorkflowNfcasereports.create_value_channel(params.strict_jabba)
 allin					     = WorkflowNfcasereports.create_value_channel(params.allin_jabba)
-field					     = WorkflowNfcasereports.create_value_channel(params.field_jabba)
 maxna					     = WorkflowNfcasereports.create_value_channel(params.maxna_jabba)
 pp_method					 = WorkflowNfcasereports.create_value_channel(params.pp_method_jabba)
 cnsignif					 = WorkflowNfcasereports.create_value_channel(params.cnsignif_jabba)
@@ -54,9 +54,6 @@ workflow COV_JUNC_TUMOR_ONLY_JABBA {
     jabba_seg           = Channel.empty()
     karyograph          = Channel.empty()
 
-    // Add channels for the outputs of COERCE_SEQNAMES
-    chr_coerced_cov_rds          = Channel.empty()
-
     // put inputs into a map for easier retrieval
     inputs_map = inputs.map { samples ->
         [
@@ -82,27 +79,17 @@ workflow COV_JUNC_TUMOR_ONLY_JABBA {
         [meta.patient, som_sv]
     }
 
-    cov_rds = inputs_map.map { sample ->
-        [sample.meta, sample.cov]
-    }
-    COERCE_SEQNAMES_COV(cov_rds)
-    chr_coerced_cov_rds = COERCE_SEQNAMES_COV.out.file
-    chr_coerced_cov_rds = chr_coerced_cov_rds.map { meta, cov ->
-        [meta.patient, cov]
-    }
-
     // join coerced inputs into a single channel on key: meta.patient
     inputs = inputs.map { sample ->
         [sample[0].patient] + sample
     }
     final_inputs = inputs
                     .join(chr_coerced_junction)
-                    .join(chr_coerced_cov_rds)
                     .map { sample ->
                         [
                             sample[1],  // meta (because sample[0] is meta.patient)
                             sample[10],  // chr_coerced_junction
-                            sample[11], // chr_coerced_cov_rds
+                            sample[3], // authoritative CBS coverage
                             sample[4],  // j_supp
                             sample[5], // het_pileups_wgs
                             sample[6],  // purity
@@ -113,6 +100,8 @@ workflow COV_JUNC_TUMOR_ONLY_JABBA {
                     }
 
     JABBA(
+        optimized_jabba,
+        cbs_coverage_helper,
         final_inputs,
         blacklist_junctions,
         geno,
@@ -125,7 +114,6 @@ workflow COV_JUNC_TUMOR_ONLY_JABBA {
         edgenudge,
         strict,
         allin,
-        field,
         maxna,
         blacklist_coverage,
         pp_method,
@@ -180,7 +168,6 @@ workflow COV_JUNC_JABBA {
     karyograph          = Channel.empty()
 
     // Add channels for the outputs of COERCE_SEQNAMES
-    chr_coerced_cov_rds          = Channel.empty()
     chr_coerced_junction         = Channel.empty()
     chr_coerced_j_supp           = Channel.empty()
     chr_coerced_het_pileups_wgs  = Channel.empty()
@@ -211,27 +198,18 @@ workflow COV_JUNC_JABBA {
         [meta.patient, som_sv]
     }
 
-    cov_rds = inputs_map.map { sample ->
-        [sample.meta, sample.cov]
-    }
-    COERCE_SEQNAMES_COV(cov_rds)
-    chr_coerced_cov_rds = COERCE_SEQNAMES_COV.out.file
-    chr_coerced_cov_rds = chr_coerced_cov_rds.map { meta, cov ->
-        [meta.patient, cov]
-    }
-
     j_supp = inputs_map.map { sample ->
-        [sample.meta, sample.j_supp]
+        [sample.meta, sample.j_supp ?: 'NULL']
     }
-    j_supp_empty = j_supp
-        .filter { it -> it[1].isEmpty() }
-    j_supp_nonempty = j_supp
-        .filter { it -> !it[1].isEmpty() }
+    j_supp_missing = j_supp
+        .filter { _meta, j_supp -> j_supp == 'NULL' }
+    j_supp_present = j_supp
+        .filter { _meta, j_supp -> j_supp != 'NULL' }
 
     if (!params.tumor_only) {
-        COERCE_SEQNAMES_UNFIL_SOM_SV(j_supp_nonempty)
+        COERCE_SEQNAMES_UNFIL_SOM_SV(j_supp_present)
         chr_coerced_j_supp = COERCE_SEQNAMES_UNFIL_SOM_SV.out.file
-            .mix(j_supp_empty)
+            .mix(j_supp_missing)
         chr_coerced_j_supp = chr_coerced_j_supp.map { meta, j_supp ->
             [meta.patient, j_supp]
         }
@@ -255,16 +233,15 @@ workflow COV_JUNC_JABBA {
     }
     final_inputs = inputs
                     .join(chr_coerced_junction)
-                    .join(chr_coerced_cov_rds)
                     .join(chr_coerced_j_supp)
                     .join(chr_coerced_het_pileups_wgs)
                     .map { sample ->
                         [
                             sample[1],  // meta (because sample[0] is meta.patient)
                             sample[10],  // chr_coerced_junction
-                            sample[11], // chr_coerced_cov_rds
-                            sample[12],  // chr_coerced_j_supp
-                            sample[13], // chr_coerced_het_pileups_wgs
+                            sample[3], // authoritative CBS coverage
+                            sample[11],  // chr_coerced_j_supp
+                            sample[12], // chr_coerced_het_pileups_wgs
                             sample[6],  // purity
                             sample[7],  // ploidy
                             sample[8],  // seg_cbs
@@ -273,6 +250,8 @@ workflow COV_JUNC_JABBA {
                     }
 
     JABBA(
+        optimized_jabba,
+        cbs_coverage_helper,
         final_inputs,
         blacklist_junctions,
         geno,
@@ -285,7 +264,6 @@ workflow COV_JUNC_JABBA {
         edgenudge,
         strict,
         allin,
-        field,
         maxna,
         blacklist_coverage,
         pp_method,

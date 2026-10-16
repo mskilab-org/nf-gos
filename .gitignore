@@ -38,3 +38,14 @@ execution_timeline*
 execution_trace*
 execution_report*
 pipeline_dag*
+
+ESVEE*
+GRIDSS_*
+null/coerce/coerced.txt
+null/smoke/jabba/jabba.raw.rds
+null/smoke/jabba/jabba.seg
+null/smoke/jabba/jabba.simple.gg.rds
+null/smoke/jabba/jabba.simple.rds
+null/smoke/jabba/jabba.simple.vcf
+null/smoke/jabba/karyograph.rds
+null/smoke/jabba/opt.report.rds
