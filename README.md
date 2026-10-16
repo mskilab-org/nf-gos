@@ -173,6 +173,7 @@ outputs.
 | amber_dir           | Full path to AMBER output directory.                                                                                                          |
 | frag_cov            | Full path to the fragCounter coverage file.                                                                                                   |
 | dryclean_cov        | Full path to the Dryclean corrected coverage file.                                                                                            |
+| cbs_cov             | CBS model coverage (`cbs/cov.rds`): paired-ratio-adjusted foreground in tumor coverage units; import with matching `seg` and `nseg`. |
 | ploidy              | Ploidies for each sample.                                                                                                                     |
 | seg                 | Full path to the CBS segmented file.                                                                                                          |
 | nseg                | Full path to the CBS segmented file for normal samples.                                                                                       |
@@ -201,6 +202,12 @@ outputs.
 ## Tumor-Only Samples
 
 For tumor-only samples, simply add the flag `--tumor_only true` to the nextflow command. The pipeline will then run in tumor-only mode.
+
+### Copy-number coverage contract
+
+CBS, JaBbA, and NON_INTEGER_BALANCE use one coherent coverage signal. Paired CBS emits a normal-adjusted `foreground`, globally rescaled to retain the original tumor coverage units; tumor-only CBS preserves valid foreground values unchanged. The original dryclean files remain available separately. Graph stages always select CBS `foreground`; the independent `field_jabba` and `field_non_integer_balance` options have been removed.
+
+Restart imports must provide a compatible `cbs_cov`, `seg`, and `nseg` triplet, including the empty `nseg.rds` file in tumor-only mode. Legacy paired graphs must be regenerated rather than mixed with the new coverage. See [coverage/restart details](docs/usage.md#copy-number-coverage-and-restarts) and [output fields](docs/output.md#cbs).
 
 For more information regarding the pipeline usage and the inputs necesaary for each step, please follow the [Usage](docs//usage.md) documentation.
 

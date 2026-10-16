@@ -77,7 +77,7 @@ run$balance <- function(...) {
     patched_balance(..., mipemphasis = opt$mipemphasis)
 }
 
-# Both files are staged as Nextflow path inputs, so changes invalidate task cache.
+# The driver and CBS helper are staged path inputs, so edits invalidate cache.
 script.arg <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
 script.dir <- dirname(sub("^--file=", "", script.arg))
 source(file.path(script.dir, "non_integer_balance.R"), local = run, chdir = FALSE)

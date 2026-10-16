@@ -1178,6 +1178,9 @@ workflow NFTAPS {
         dryclean_normal_cov_for_merge,
         tools_used
     )
+    graph_inputs_unlaned = CBS_STEP.out.validated_inputs_unlaned
+    cbs_cov_for_merge = CBS_STEP.out.cbs_cov_rds
+        .map { meta, cov -> [meta.patient, cov] }
 
     cbs_seg_for_merge = CBS_STEP.out.cbs_seg_rds
         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, cbs_seg
@@ -1252,8 +1255,8 @@ workflow NFTAPS {
         .dump(tag: "ICHORCNA_STEP.out ploidy", pretty: true)
 
     JABBA_STEP(
-        inputs_unlaned,
-        dryclean_tumor_cov_for_merge,
+        graph_inputs_unlaned,
+        cbs_cov_for_merge,
         hets_sites_for_merge,
         cbs_seg_for_merge,
         cbs_nseg_for_merge,
@@ -1273,24 +1276,24 @@ workflow NFTAPS {
     
 
     NON_INTEGER_BALANCE_STEP(
-        inputs_unlaned,
+        graph_inputs_unlaned,
         jabba_gg_for_merge,
         hets_sites_for_merge,
-        dryclean_tumor_cov_for_merge,
+        cbs_cov_for_merge,
         tools_used
     )
     non_integer_balance_balanced_gg_for_merge = NON_INTEGER_BALANCE_STEP.out.non_integer_balance_balanced_gg
         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, non integer balanced ggraph
     
     LP_PHASED_BALANCE_STEP(
-        inputs_unlaned,
+        graph_inputs_unlaned,
         non_integer_balance_balanced_gg_for_merge,
         hets_sites_for_merge,
         tools_used
     )
 
     EVENTS_STEP(
-        inputs_unlaned,
+        graph_inputs_unlaned,
         non_integer_balance_balanced_gg_for_merge,
         tools_used
     )
@@ -1298,7 +1301,7 @@ workflow NFTAPS {
     events_for_merge = EVENTS_STEP.out.events.map { it -> [ it[0].patient, it[1] ] } // meta.patient, events
 
     FUSIONS_STEP(
-        inputs_unlaned,
+        graph_inputs_unlaned,
         non_integer_balance_balanced_gg_for_merge,
         vcf_from_sv_calling_for_merge,
         tools_used
@@ -1329,7 +1332,7 @@ workflow NFTAPS {
     
 
     MULTIPLICITY_STEP(
-        inputs_unlaned,
+        graph_inputs_unlaned,
         annotated_vcf_ffpe_impact_or_snpeff_for_merge,
         non_integer_balance_balanced_gg_for_merge,
         hets_sites_for_merge,
@@ -1349,7 +1352,7 @@ workflow NFTAPS {
     }
 
     ONCOKB_STEP(
-        inputs_unlaned,
+        graph_inputs_unlaned,
         annotated_vcf_ffpe_impact_or_snpeff_for_merge,
         non_integer_balance_balanced_gg_for_merge,
         fusions_for_merge,
@@ -1357,7 +1360,7 @@ workflow NFTAPS {
     )
 
     HRDETECT_STEP(
-        inputs_unlaned,
+        graph_inputs_unlaned,
         vcf_from_sv_calling_for_merge,
         hets_sites_for_merge,
         annotated_vcf_ffpe_impact_or_snpeff_for_merge,
@@ -1369,7 +1372,7 @@ workflow NFTAPS {
                 .map { it -> [ it[0].patient, it[1] ] } // meta.patient, hrdetect rds
 
     ONENESS_TWONESS_STEP(
-        inputs_unlaned,
+        graph_inputs_unlaned,
         events_for_merge,
         hrdetect_rds_for_merge,
         tools_used

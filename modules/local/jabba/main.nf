@@ -8,7 +8,8 @@ process JABBA {
 
     input:
     path jabba_optimized
-    tuple val(meta), path(junction), path(cov_rds), val(j_supp), val(het_pileups_wgs), val(purity), val(ploidy), val(cbs_seg_rds), val(cbs_nseg_rds)
+    path cbs_coverage_helper
+    tuple val(meta), path(junction), path(cov_rds), val(j_supp), val(het_pileups_wgs), val(purity), val(ploidy), path(cbs_seg_rds, stageAs: 'cbs_seg.rds'), path(cbs_nseg_rds, stageAs: 'cbs_nseg.rds')
     val(blacklist_junctions)    // this is declared as val to allow for "NULL" default value, but is treated like a path
     val(geno)
     val(indel)
@@ -20,7 +21,6 @@ process JABBA {
     val(edgenudge)
     val(strict)
     val(allin)
-    val(field)
     val(maxna)
     path(blacklist_coverage)
     val(pp_method)
@@ -57,10 +57,10 @@ process JABBA {
     def allin_switch = allin == "TRUE" ? "--allin" : ""
     def linear_switch = linear == "TRUE" ? "--linear" : ""
     def verbose_switch = verbose == "TRUE" ? "--verbose" : ""
-    def cbs_seg_rds = cbs_seg_rds == '/dev/null' || cbs_seg_rds == 'NA' || cbs_seg_rds == 'NULL' ? "" : "--seg ${cbs_seg_rds}"
-    def cbs_nseg_rds = cbs_nseg_rds == '/dev/null' || cbs_nseg_rds == 'NA' || cbs_nseg_rds == 'NULL' ? "" : "--nseg ${cbs_nseg_rds}"
-    def het_pileups_wgs = het_pileups_wgs == '/dev/null' || het_pileups_wgs == 'NA' || het_pileups_wgs == 'NULL' ? "" : "--hets ${het_pileups_wgs}"
-    def j_supp = j_supp == '/dev/null' || j_supp == 'NA' || j_supp == 'NULL' ? "" : "--j.supp ${j_supp}"
+    def cbs_seg_flag = cbs_seg_rds ? "--seg ${cbs_seg_rds}" : ""
+    def cbs_nseg_flag = cbs_nseg_rds ? "--nseg ${cbs_nseg_rds}" : ""
+    def het_pileups_wgs = !het_pileups_wgs || het_pileups_wgs == '/dev/null' || het_pileups_wgs == 'NA' || het_pileups_wgs == 'NULL' ? "" : "--hets ${het_pileups_wgs}"
+    def j_supp = !j_supp || j_supp == '/dev/null' || j_supp == 'NA' || j_supp == 'NULL' ? "" : "--j.supp ${j_supp}"
     def trelim_mem = (task.memory.toGiga() * 0.80).toInteger()
 
 
@@ -89,7 +89,7 @@ process JABBA {
 
     echo "USING LIBRARIES: \$(Rscript -e 'print(.libPaths())')"
 
-    export jba=\$(realpath $jabba_optimized)
+    export jba="$jabba_optimized"
     test -x "\$jba"
     echo \$jba
     set +x
@@ -105,8 +105,8 @@ process JABBA {
     $het_pileups_wgs \\
     --purity $purity \\
     --ploidy $ploidy \\
-    $cbs_seg_rds \\
-    $cbs_nseg_rds \\
+    $cbs_seg_flag \\
+    $cbs_nseg_flag \\
     --blacklist.junctions $blacklist_junctions \\
     $geno_switch \\
     --indel $indel \\
@@ -118,7 +118,7 @@ process JABBA {
     --edgenudge $edgenudge \\
     $strict_switch \\
     $allin_switch \\
-    --field $field \\
+    --field foreground \\
     --maxna $maxna \\
     --blacklist.coverage $blacklist_coverage \\
     --ppmethod $pp_method \\

@@ -22,7 +22,11 @@ workflow COV_CBS {
     cbs_nseg_rds            = Channel.empty()
     versions                = Channel.empty()
 
-    CBS(cov, cnsignif, field, name)
+    CBS(
+        file("${projectDir}/bin/cbsFH_ZC.R"),
+        file("${projectDir}/bin/cbs_coverage.R"),
+        cov, cnsignif, field, name
+    )
 
     cbs_cov_rds              = CBS.out.cbs_cov_rds
     cbs_seg_rds              = CBS.out.cbs_seg_rds

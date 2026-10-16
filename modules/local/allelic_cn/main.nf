@@ -14,8 +14,8 @@ process NON_INTEGER_BALANCE {
     input:
     path non_integer_balance_optimized
     path non_integer_balance_script
-    tuple val(meta), path(jabba_gg), path(decomposed_cov), path(het_pileups_wgs)
-    val(field)
+    path cbs_coverage_helper
+    tuple val(meta), path(jabba_gg), path(cbs_cov_rds), path(het_pileups_wgs)
     val(hets_thresh)
     path(mask)
     val(overwrite)
@@ -66,8 +66,8 @@ process NON_INTEGER_BALANCE {
     Rscript "$non_integer_balance_optimized" \\
         --id $id \\
         --jab $jabba_gg \\
-        --cov $decomposed_cov \\
-        --field $field \\
+        --cov $cbs_cov_rds \\
+        --field foreground \\
         ${hets_flag} \\
         ${hets_thres_flag} \\
         --mask $mask \\

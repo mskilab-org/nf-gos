@@ -656,12 +656,6 @@
                     "hidden": true,
                     "fa_icon": "fas fa-wrench"
                 },
-                "field_jabba": {
-                    "type": "string",
-                    "default": "foreground",
-                    "description": "name of the metadata column of coverage that contains the data. Default 'ratio' (coverage ratio between tumor and normal). If using dryclean, it is 'foreground'.",
-                    "fa_icon": "fas fa-font"
-                },
                 "maxna_jabba": {
                     "type": "number",
                     "default": 0.9,

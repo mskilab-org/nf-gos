@@ -11,8 +11,8 @@ workflow COV_GGRAPH_NON_INTEGER_BALANCE {
     main:
     optimized_non_integer_balance = WorkflowNfcasereports.create_file_channel("${projectDir}/bin/non_integer_balance_optimized.R")
     non_integer_balance_script = WorkflowNfcasereports.create_file_channel("${projectDir}/bin/non_integer_balance.R")
+    cbs_coverage_helper = WorkflowNfcasereports.create_file_channel("${projectDir}/bin/cbs_coverage.R")
     mask_non_integer_balance            = WorkflowNfcasereports.create_file_channel(params.mask_non_integer_balance)
-    field_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.field_non_integer_balance)
     hets_thresh_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.hets_thresh_non_integer_balance)
     overwrite_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.overwrite_non_integer_balance)
     lambda_non_integer_balance  = WorkflowNfcasereports.create_value_channel(params.lambda_non_integer_balance)
@@ -36,8 +36,8 @@ workflow COV_GGRAPH_NON_INTEGER_BALANCE {
     NON_INTEGER_BALANCE(
         optimized_non_integer_balance,
         non_integer_balance_script,
+        cbs_coverage_helper,
         inputs_non_integer_balance,
-        field_non_integer_balance,
         hets_thresh_non_integer_balance,
         mask_non_integer_balance,
         overwrite_non_integer_balance,

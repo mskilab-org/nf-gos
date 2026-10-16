@@ -48,19 +48,12 @@ class Globals {
         "amber": [ inputs: ['bam'], outputs: ['hets', 'amber_dir'] ],
         "fragcounter": [ inputs: ['bam'], outputs: ['frag_cov'] ],
         "dryclean": [ inputs: ['frag_cov'], outputs: ['dryclean_cov'] ],
-        "cbs": [ inputs: ['dryclean_cov'], outputs: ['seg', 'nseg'] ],
+        "cbs": [ inputs: ['dryclean_cov'], outputs: ['cbs_cov', 'seg', 'nseg'] ],
         "sage": [ inputs: ['bam'], outputs: ['snv_somatic_vcf', 'snv_germline_vcf'] ],
         "cobalt": [ inputs: ['bam'], outputs: ['cobalt_dir'] ],
         "purple": [ inputs: ['cobalt_dir', 'amber_dir'], outputs: ['purity', 'ploidy'] ],
-        // "jabba": [
-        // 	inputs: [
-        // 		['vcf', 'sv_retier'],
-        // 		['hets', 'dryclean_cov', 'ploidy', 'seg', 'nseg']
-        // 	],
-        // 	outputs: ['jabba_rds', 'jabba_gg']
-        // ],
-        "jabba": [ inputs: [ 'vcf', 'hets', 'dryclean_cov', 'purity', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
-        "non_integer_balance": [ inputs: ['jabba_gg'], outputs: ['ni_balanced_gg'] ],
+        "jabba": [ inputs: [ 'vcf', 'hets', 'cbs_cov', 'purity', 'ploidy', 'seg', 'nseg'], outputs: ['jabba_rds', 'jabba_gg'] ],
+        "non_integer_balance": [ inputs: ['jabba_gg', 'cbs_cov'], outputs: ['ni_balanced_gg'] ],
         "lp_phased_balance": [ inputs: ['ni_balanced_gg'], outputs: ['lp_balanced_gg'] ],
         "events": [ inputs: ['ni_balanced_gg'], outputs: ['events'] ],
         "fusions": [ inputs: ['ni_balanced_gg'], outputs: ['fusions'] ],

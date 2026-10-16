@@ -196,7 +196,19 @@ Dryclean is a robust principal component analysis (rPCA) based method. It uses a
 For reference, check [info](https://github.com/mskilab-org/dryclean)
 
 ## CBS
-Segmentation is done by circular binary segmentation (CBS) algorithm after getting tumor/normal ratios of corrected read counts. We use a custom module script, check [here](../bin/cbsFH.R)
+CBS produces a coherent model-coverage bundle under `<patient>/cbs/` using [cbsFH_ZC.R](../bin/cbsFH_ZC.R):
+
+- `cov.rds`: GRanges with `foreground`, `ratio`, original `tum.counts`, paired-only `norm.counts`, and normal-copy baseline `ncn`.
+- `seg.rds`: CBS segmentation of the positive finite log-ratio signal, with segment `ncn`.
+- `nseg.rds`: matched-normal copy-number segmentation in paired mode; an empty GRanges in tumor-only mode.
+
+In paired mode, `ratio` is tumor coverage divided by normal coverage per normal copy, with a deterministic global depth normalization. `foreground = ratio * foreground_scale`, where the scale restores the width-weighted mean of the original tumor signal on the same valid bins. The shape follows the paired ratio, but the units match the selected CBS input field (`--field_cbs foreground` by default). Nonfinite or nonpositive normal denominators are masked; valid zero tumor observations remain zero for graph fitting and are excluded only from log segmentation.
+
+In tumor-only mode, valid `foreground` values are unchanged, `ratio` is identical to them, and `ncn=2` is the unmeasured default used by both graph stages. This is not a measured normal sex/karyotype call.
+
+JaBbA and NON_INTEGER_BALANCE both consume this `cov.rds$foreground`; they no longer fit raw tumor dryclean coverage against paired-ratio segments. The original dryclean RDS files and their `coverage_tumor`/`coverage_normal` exports remain unchanged. `cbs_cov` exports the model-coverage path separately: use it for graph-aligned coverage overlays, and label the original sample tracks as unpaired dryclean coverage. Existing report builds are not rewritten automatically.
+
+All three bundle objects carry `metadata(x)$cbs_coverage`, including mode, source field, scale, and a content-derived bundle ID. JaBbA, non-integer, and LP graphs retain that provenance in their graph metadata. Imported files must belong to the same bundle; see [restart instructions](usage.md#copy-number-coverage-and-restarts).
 
 ## HetPileups
 Pileup mutational calls are done using a custom module script called HetPileups. We use a custom module script, check [here](../bin/Pileups.R)

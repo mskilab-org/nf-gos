@@ -2684,6 +2684,9 @@ if(!opt$from_maf) {
                                   count.field = "count",
                                   allele.field = "allele")
 }
+if (!is.null(gg$meta$cbs_coverage)) {
+    binstats.gg$set(cbs_coverage = gg$meta$cbs_coverage)
+}
 
 binstats.gg$edges[(cnloh)]$mark(reward = -opt$lambda * 1.5, type = "ALT")
 
@@ -2788,6 +2791,9 @@ res = balance(binstats.gg,
               debug = TRUE)
 
 balanced.gg = res$gg
+if (!is.null(gg$meta$cbs_coverage)) {
+    balanced.gg$set(cbs_coverage = gg$meta$cbs_coverage)
+}
 sol = res$sol
 balanced.gg$nodes$mark(epgap = sol$epgap, status = sol$status)
 message("Number of cnloh edges: ", length(balanced.gg$junctions[(cnloh) & cn > 0]))

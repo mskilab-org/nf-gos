@@ -56,6 +56,22 @@ tools:  'svaba,hetpileups,...,jabba'
 
 You can also generate such `YAML`/`JSON` files via [nf-core/launch](https://nf-co.re/launch).
 
+## Copy-number coverage and restarts
+
+The WGS and TAPS workflows route `cbs/cov.rds$foreground` to both JaBbA and NON_INTEGER_BALANCE. Paired mode uses CBS-normal-adjusted coverage rescaled to the original tumor depth units; `--tumor_only true` preserves valid tumor coverage values without matched-normal correction. `--field_cbs` selects the original signal (default `foreground`); downstream graph field selection is fixed to CBS `foreground`.
+
+For a restart, supply `cbs_cov`, `seg`, and `nseg` together on the tumor row. The files must carry the same CBS coverage identity and match the selected mode. Tumor-only still requires its empty `nseg.rds` file. Repeated pair-level columns on the normal row, as emitted by gOSh, are ignored; the tumor row is authoritative. Raw coverage and normal sample metadata remain sample-specific.
+
+- A complete imported bundle is validated before downstream use.
+- A partial bundle without imported graph results is regenerated in full from dryclean inputs; imported partials are not mixed with new files.
+- Paired regeneration requires matched-normal metadata and coverage; missing normal evidence is an error, not an implicit tumor-only fallback.
+- Imported JaBbA/non-integer/LP graphs must carry the same coverage provenance. Graph-derived table imports require compatible source graphs; table contents are not independently provenance-checked.
+- To migrate an old run, keep reusable BAM, dryclean, SV, and purity/ploidy inputs, remove old CBS/graph/graph-derived annotation references from the restart sheet, and rerun CBS through downstream graph annotations in a new output directory. Do not pair newly corrected coverage with old graphs or annotation tables.
+
+The current gOSh `run outputs` and `run samplesheet` commands export `cbs_cov` separately from original `coverage_tumor`/`coverage_normal`. An old `cov.rds` path discovered by export is not automatically upgraded: validation requires the new bundle metadata. In the older direct `nfjabba.nf` graph-restart interface, the `cov` tuple field now means this same CBS model-coverage file.
+
+The CBS driver/helper and graph segmentation inputs are staged as Nextflow paths so changes invalidate dependent cached tasks. Ordinary `-resume` reuse remains available for unchanged compatible inputs.
+
 ## Samplesheet input configurations (along with `--step`)
 
 You need to create a samplesheet with information regarding the samples that you want to run the pipeline on. You need to specify the path of your **samplesheet** using the `--input` flag to specify the location. Make sure the input file is a *comma-separated* file and contains headers with the info discussed below. *It is highly recommended to provide the **absolute path** for inputs inside the samplesheet rather than relative paths.*
