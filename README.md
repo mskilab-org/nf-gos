@@ -98,6 +98,63 @@ nextflow run mskilab-org/nf-gos \
 > provided by the `-c` Nextflow option can be used to provide any configuration _**except for parameters**_;
 > see [docs](https://nf-co.re/usage/configuration#custom-configuration-files).
 
+### Selecting tools and invalidating existing outputs
+
+Tool selection is implemented in [`workflows/prepare.nf`](workflows/prepare.nf).
+`params.only_tools` and `params.force_tools` accept comma-separated tool names
+(surrounding whitespace is trimmed); on the CLI, use `--only_tools` and
+`--force_tools`. Names must match the keys in `Globals.tool_input_output_map`
+in [`lib/Globals.groovy`](lib/Globals.groovy).
+
+- **`params.only_tools`** restricts selection to the named tools. It does not
+  force them to run: a tool still needs available inputs and at least one output
+  missing from at least one sample. Upstream prerequisites are not automatically
+  added to this list.
+- **`params.force_tools`** adds the named tools to the same selection list and
+  bypasses their output-needed check, even when outputs are already supplied.
+  **The input-availability check still applies.** Forcing a tool does not itself
+  clear existing samplesheet outputs or invalidate downstream results, and does
+  not guarantee execution for every sample.
+- **`params.overwrite_subsequent`** (`--overwrite_subsequent true`) invalidates
+  outputs of the explicitly requested tools and their downstream dependents,
+  following the input/output dependency map transitively. Before selection, the
+  corresponding output fields are replaced with empty lists across **all sample
+  rows**, including lane-aware and unlaned input channels. Downstream tools
+  discovered by this traversal become eligible even outside the explicit list;
+  they still need available inputs. This changes the in-memory samplesheet
+  representations, not the source CSV, and does not delete existing files.
+  With neither `only_tools` nor `force_tools` populated, this flag has no effect.
+
+When either tool list is populated, their deduplicated union is the allowlist:
+`force_tools` alone therefore also restricts the run, rather than adding tools
+to the default automatic selection. Without either list, the pipeline selects
+tools with available inputs and missing outputs, excluding `skip_tools`.
+Explicitly requested tools, and downstream tools made eligible by
+`overwrite_subsequent`, take precedence over `skip_tools`.
+
+Inputs count as available if their fields are populated in at least one
+samplesheet row or can be produced transitively by eligible tools whose own
+inputs are available. This is a workflow-level check, not a guarantee that
+every sample has the required inputs. Supply prerequisite outputs in the
+samplesheet or explicitly include the prerequisite tools when restricting a run.
+
+For example, append these options to the Nextflow command above:
+
+```bash
+# Consider only JaBbA; select it only if inputs are available and outputs are missing.
+--only_tools jabba
+
+# Consider only JaBbA, bypassing the output-needed check (inputs are still required).
+--force_tools jabba
+
+# Invalidate JaBbA and downstream output fields, allowing their regeneration.
+--only_tools jabba --overwrite_subsequent true
+```
+
+These parameters control pipeline selection and reuse of samplesheet outputs;
+they do not disable Nextflow's task cache. With `-resume`, matching cached tasks
+may still be reused.
+
 #### JaBbA Pipeline
 
 If you want to run only the JaBbA pipeline, you can use the following command:
