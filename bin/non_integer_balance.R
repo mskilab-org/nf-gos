@@ -128,17 +128,16 @@ hets.gg.fn = paste0(opt$outdir, '/', 'hets.gg.rds')
 
 message("Reading coverage!")
 cov = readRDS(opt$cov)
-coverage.info = cbs_coverage_info(cov)
 if (!identical(opt$field, "foreground")) {
     stop("NON_INTEGER_BALANCE requires --field foreground from the CBS coverage bundle")
 }
 
 message("Reading gGraph!")
 jab = readRDS(opt$jab)
-validate_cbs_graph(jab, cov)
+coverage.info = validate_cbs_graph(jab, cov)
 if (!inherits(jab, "gGraph")) {
     jab = if (inherits(jab$gg, "gGraph")) jab$gg else gG(jabba = jab)
-    jab$set(cbs_coverage = coverage.info)
+    if (!is.null(coverage.info)) jab$set(cbs_coverage = coverage.info)
 }
 
 message("Loading reference!")
@@ -152,8 +151,23 @@ if (file.exists(opt$mask) & file.info(opt$mask)$size) {
     bins = bins %Q% (!(bins %^% mask))
 }
 
-## CBS supplies the normal-derived ncn baseline; never infer it from tumor CN.
-has.x.bins = any(as.character(seqnames(bins)) %in% c("chrX", "X") & is.finite(bins$foreground))
+if (is.null(coverage.info)) {
+    # Legacy NI inferred the sex-chromosome baseline from the JaBbA graph.
+    # Preserve that path without changing the original foreground signal.
+    ncn.x = jab$nodes$dt[seqnames %in% c("X", "chrX"),
+                        weighted.mean(cn, w = end - start + 1, na.rm = TRUE)]
+    message("mean CN of X: ", ncn.x)
+    bins$ncn = rep(2, length(bins))
+    if (isTRUE(ncn.x < 1.4)) {
+        message("Adjusting ncn for XY")
+        bins$ncn[as.character(seqnames(bins)) %in% c("chrX", "chrY", "X", "Y")] = 1
+    }
+    has.x.bins = is.finite(ncn.x) && ncn.x != 0
+} else {
+    # Tagged CBS supplies the normal baseline; never infer it from tumor CN.
+    has.x.bins = any(as.character(seqnames(bins)) %in% c("chrX", "X") &
+                     is.finite(bins$foreground))
+}
 
 if ((opt$overwrite) | (!file.exists(binstats.gg.fn))) {
 
@@ -162,7 +176,7 @@ if ((opt$overwrite) | (!file.exists(binstats.gg.fn))) {
                                  field = "foreground", lp = TRUE, loess = has.x.bins)
 
     ## save binstats
-    binstats.gg$set(cbs_coverage = coverage.info)
+    if (!is.null(coverage.info)) binstats.gg$set(cbs_coverage = coverage.info)
     saveRDS(binstats.gg, binstats.gg.fn)
 
 } else {
@@ -286,7 +300,7 @@ if (opt$overwrite | (!file.exists(balanced.gg.fn))) {
 
     balanced.gg = gGnome:::loosefix(balanced.gg)
     ## save results
-    balanced.gg$set(cbs_coverage = coverage.info)
+    if (!is.null(coverage.info)) balanced.gg$set(cbs_coverage = coverage.info)
     saveRDS(balanced.gg, balanced.gg.fn)
 
 
@@ -341,7 +355,7 @@ if (TRUE) {
     }
 
     jab = gGnome:::loosefix(gG(jabba = jab))
-    jab$set(cbs_coverage = coverage.info)
+    if (!is.null(coverage.info)) jab$set(cbs_coverage = coverage.info)
     saveRDS(jab, hets.gg.fn)
 
 } else {

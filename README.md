@@ -264,7 +264,7 @@ For tumor-only samples, simply add the flag `--tumor_only true` to the nextflow 
 
 CBS, JaBbA, and NON_INTEGER_BALANCE use one coherent coverage signal. Paired CBS emits a normal-adjusted `foreground`, globally rescaled to retain the original tumor coverage units; tumor-only CBS preserves valid foreground values unchanged. The original dryclean files remain available separately. Graph stages always select CBS `foreground`; the independent `field_jabba` and `field_non_integer_balance` options have been removed.
 
-Restart imports must provide a compatible `cbs_cov`, `seg`, and `nseg` triplet, including the empty `nseg.rds` file in tumor-only mode. Legacy paired graphs must be regenerated rather than mixed with the new coverage. See [coverage/restart details](docs/usage.md#copy-number-coverage-and-restarts) and [output fields](docs/output.md#cbs).
+Tagged restart imports require matching `cbs_cov`, `seg`, and `nseg`, including the empty tumor-only `nseg.rds`. Legacy untagged imports remain supported: existing graphs/results can be reused without their upstream CBS bundle, and legacy graph fitting uses original dryclean foreground when `cbs_cov` is absent. Never mix legacy inputs with newly tagged coverage. See [coverage/restart details](docs/usage.md#copy-number-coverage-and-restarts) and [output fields](docs/output.md#cbs).
 
 For more information regarding the pipeline usage and the inputs necesaary for each step, please follow the [Usage](docs//usage.md) documentation.
 

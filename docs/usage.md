@@ -60,15 +60,16 @@ You can also generate such `YAML`/`JSON` files via [nf-core/launch](https://nf-c
 
 The WGS and TAPS workflows route `cbs/cov.rds$foreground` to both JaBbA and NON_INTEGER_BALANCE. Paired mode uses CBS-normal-adjusted coverage rescaled to the original tumor depth units; `--tumor_only true` preserves valid tumor coverage values without matched-normal correction. `--field_cbs` selects the original signal (default `foreground`); downstream graph field selection is fixed to CBS `foreground`.
 
-For a restart, supply `cbs_cov`, `seg`, and `nseg` together on the tumor row. The files must carry the same CBS coverage identity and match the selected mode. Tumor-only still requires its empty `nseg.rds` file. Repeated pair-level columns on the normal row, as emitted by gOSh, are ignored; the tumor row is authoritative. Raw coverage and normal sample metadata remain sample-specific.
+In the main WGS workflow, tagged restart inputs require `cbs_cov`, `seg`, and `nseg` together on the tumor row, with the same CBS identity and selected mode. Tumor-only tagged bundles still include their empty `nseg.rds`. Repeated pair-level fields on normal rows are ignored; the tumor row is authoritative.
 
-- A complete imported bundle is validated before downstream use.
-- A partial bundle without imported graph results is regenerated in full from dryclean inputs; imported partials are not mixed with new files.
-- Paired regeneration requires matched-normal metadata and coverage; missing normal evidence is an error, not an implicit tumor-only fallback.
-- Imported JaBbA/non-integer/LP graphs must carry the same coverage provenance. Graph-derived table imports require compatible source graphs; table contents are not independently provenance-checked.
-- To migrate an old run, keep reusable BAM, dryclean, SV, and purity/ploidy inputs, remove old CBS/graph/graph-derived annotation references from the restart sheet, and rerun CBS through downstream graph annotations in a new output directory. Do not pair newly corrected coverage with old graphs or annotation tables.
+- Legacy untagged graphs and graph-derived results can be reused without importing upstream coverage, segments, or source graphs solely for provenance checks.
+- To refit JaBbA with legacy segments and no `cbs_cov`, retain the original `dryclean_cov`. The workflow uses that foreground unchanged with the imported segments; legacy tumor-only `nseg` may be absent.
+- To run non-integer balance on an untagged graph, retain its original coverage (`dryclean_cov` when `cbs_cov` is absent). CBS segments are not required for this restart. The historical graph-derived sex-chromosome baseline is retained.
+- Wholly untagged coverage/segment imports remain untagged. Their common origin cannot be verified from metadata; use files from the same historical run. Tagged and untagged members cannot be mixed in a coverage fit.
+- New CBS generation still produces the tagged model-coverage bundle. Paired generation requires matched-normal metadata and coverage; there is no implicit tumor-only fallback.
+- To deliberately migrate an old run to the new paired model, remove old CBS/graph/graph-derived references and rerun CBS through downstream graph annotations. Migration is not required merely to reuse legacy results.
 
-The current gOSh `run outputs` and `run samplesheet` commands export `cbs_cov` separately from original `coverage_tumor`/`coverage_normal`. An old `cov.rds` path discovered by export is not automatically upgraded: validation requires the new bundle metadata. In the older direct `nfjabba.nf` graph-restart interface, the `cov` tuple field now means this same CBS model-coverage file.
+The gOSh `run outputs` and `run samplesheet` commands export `cbs_cov` separately from original `coverage_tumor`/`coverage_normal`. Exporting an old `cov.rds` does not convert it to the new model or add provenance.
 
 The CBS driver/helper and graph segmentation inputs are staged as Nextflow paths so changes invalidate dependent cached tasks. Ordinary `-resume` reuse remains available for unchanged compatible inputs.
 

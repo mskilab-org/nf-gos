@@ -2,7 +2,7 @@
 
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 4L || !args[[1L]] %in% c("paired", "tumor_only")) {
-    stop("Usage: validate_cbs_bundle.R paired|tumor_only cov.rds seg.rds nseg.rds [graph_name=graph.rds ...]",
+    stop("Usage: validate_cbs_bundle.R paired|tumor_only cov.rds seg.rds|NULL nseg.rds|NULL [graph_name=graph.rds ...]",
          call. = FALSE)
 }
 script_arg <- grep("^--file=", commandArgs(), value = TRUE)
@@ -11,7 +11,19 @@ source(file.path(script_dir, "cbs_coverage.R"))
 
 tryCatch({
     cov <- readRDS(args[[2L]])
-    validate_cbs_bundle(cov, readRDS(args[[3L]]), readRDS(args[[4L]]), mode = args[[1L]])
+    seg <- if (args[[3L]] == "NULL") NULL else readRDS(args[[3L]])
+    nseg <- if (args[[4L]] == "NULL") NULL else readRDS(args[[4L]])
+    cbs_numeric_field(cov, "foreground", "CBS coverage")
+    if (is.null(seg) && is.null(S4Vectors::metadata(cov)$cbs_coverage)) {
+        # NI can resume an untagged graph from raw coverage without CBS segments.
+        if (!is.null(nseg)) {
+            if (!methods::is(nseg, "GRanges")) stop("CBS nseg must be a GRanges object")
+            if (!is.null(S4Vectors::metadata(nseg)$cbs_coverage))
+                stop("Mixed CBS tagged and untagged coverage/segmentation provenance")
+        }
+    } else {
+        validate_cbs_bundle(cov, seg, nseg, mode = args[[1L]])
+    }
     if (length(args) > 4L) {
         suppressPackageStartupMessages(library(gGnome))
         for (argument in args[-seq_len(4L)]) {
@@ -25,7 +37,7 @@ tryCatch({
         }
     }
 }, error = function(e) {
-    stop("CBS coverage migration: ", conditionMessage(e),
-         ". Supply cov/seg/nseg and graph outputs from the same CBS bundle, or remove the legacy imports and regenerate CBS and all graph descendants.",
+    stop("CBS input validation: ", conditionMessage(e),
+         ". Use wholly untagged legacy inputs, or cov/seg/nseg and graph outputs from the same tagged CBS bundle.",
          call. = FALSE)
 })

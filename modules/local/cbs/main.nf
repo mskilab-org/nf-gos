@@ -85,6 +85,6 @@ process VALIDATE_CBS_BUNDLE {
     def graph_files = graphs instanceof List ? graphs : [graphs]
     def graph_args = graph_files.withIndex().collect { graph, index -> "'${graph_names[index]}=${graph}'" }.join(' ')
     """
-    Rscript ${validator} '${mode}' '${cov}' '${seg}' '${nseg}' ${graph_args}
+    Rscript ${validator} '${mode}' '${cov}' '${seg ?: "NULL"}' '${nseg ?: "NULL"}' ${graph_args}
     """
 }

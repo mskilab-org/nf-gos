@@ -453,6 +453,9 @@ workflow TOOLS {
             }
         }
     }
+    // Historical graph fits consume dryclean foreground. CBS_STEP resolves the
+    // actual coverage per row and rejects mixed legacy/tagged inputs at runtime.
+    if (available_inputs.contains('dryclean_cov')) available_inputs.add('cbs_cov')
 
     log.info "Provided inputs (samplesheet only): ${available_inputs}"
 

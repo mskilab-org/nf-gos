@@ -1036,6 +1036,8 @@ workflow NFGOS {
             .dump(tag: "dryclean_normal_cov_for_merge", pretty: true)
 
 
+    // CBS_STEP retains legacy graph imports and resolves their original dryclean
+    // foreground only for refitting; tagged coverage keeps strict bundle checks.
     CBS_STEP(
         inputs_unlaned,
         dryclean_tumor_cov_for_merge,

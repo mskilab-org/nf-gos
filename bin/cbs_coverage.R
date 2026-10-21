@@ -225,7 +225,24 @@ finalize_cbs_bundle <- function(cov, seg, nseg, mode, input_field, foreground_sc
     list(cov = cov, seg = seg, nseg = nseg)
 }
 
-validate_cbs_bundle <- function(cov, seg, nseg, mode = NULL) {
+validate_cbs_bundle <- function(cov, seg, nseg = NULL, mode = NULL) {
+    if (!methods::is(cov, "GRanges")) stop("CBS coverage must be a GRanges object")
+    if (!methods::is(seg, "GRanges")) stop("CBS seg must be a GRanges object")
+    if (!is.null(nseg) && !methods::is(nseg, "GRanges"))
+        stop("CBS nseg must be a GRanges object")
+    if (!length(seg)) stop("CBS tumor segmentation must not be empty")
+    tagged <- c(!is.null(S4Vectors::metadata(cov)$cbs_coverage),
+                !is.null(S4Vectors::metadata(seg)$cbs_coverage),
+                !is.null(nseg) && !is.null(S4Vectors::metadata(nseg)$cbs_coverage))
+    if (!any(tagged)) {
+        # Historical coverage is already the requested foreground signal. Do not
+        # normalize it or require fields introduced with the tagged CBS model.
+        cbs_numeric_field(cov, "foreground", "Legacy CBS coverage")
+        if (identical(mode, "paired") && !length(nseg))
+            stop("Paired CBS coverage requires normal segmentation")
+        return(invisible(NULL))
+    }
+    if (!all(tagged)) stop("Mixed CBS tagged and untagged coverage/segmentation provenance")
     info <- cbs_coverage_info(cov)
     if (!is.null(mode) && !identical(mode, info$mode))
         stop("CBS coverage mode does not match the requested sample mode")
@@ -236,7 +253,6 @@ validate_cbs_bundle <- function(cov, seg, nseg, mode = NULL) {
         cbs_validate_info(other, paste("CBS", name))
         if (!identical(info, other)) stop("Mixed CBS coverage/segmentation provenance: ", name)
     }
-    if (!length(seg)) stop("CBS tumor segmentation must not be empty")
     segment.ncn <- cbs_numeric_field(seg, "ncn", "CBS tumor segmentation")
     if (any(!is.finite(segment.ncn) | segment.ncn <= 0))
         stop("CBS tumor segmentation is missing a finite positive normal baseline")
@@ -252,7 +268,12 @@ validate_cbs_bundle <- function(cov, seg, nseg, mode = NULL) {
 }
 
 validate_cbs_graph <- function(graph, cov) {
-    info <- cbs_coverage_info(cov)
+    if (!methods::is(cov, "GRanges")) stop("CBS coverage must be a GRanges object")
+    info <- S4Vectors::metadata(cov)$cbs_coverage
+    if (is.null(info))
+        cbs_numeric_field(cov, "foreground", "Legacy CBS coverage")
+    else
+        info <- cbs_coverage_info(cov)
     if (!inherits(graph, "gGraph") && is.list(graph) && !is.null(graph$gg)) {
         outer.info <- graph$meta$cbs_coverage
         if (!is.null(outer.info) && !identical(info, outer.info))
@@ -260,6 +281,9 @@ validate_cbs_graph <- function(graph, cov) {
         graph <- graph$gg
     }
     graph.info <- tryCatch(graph$meta$cbs_coverage, error = function(e) NULL)
+    if (is.null(info) && is.null(graph.info)) return(invisible(NULL))
+    if (is.null(info) || is.null(graph.info))
+        stop("Graph and coverage have mixed CBS tagged and untagged provenance")
     cbs_validate_info(graph.info, "Graph")
     if (!identical(info, graph.info)) stop("Graph and coverage have mixed CBS provenance")
     invisible(info)

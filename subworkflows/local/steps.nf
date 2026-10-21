@@ -993,8 +993,8 @@ workflow CBS_STEP {
     tools_used
 
     main:
-    // A patient key identifies one tumor/normal pair throughout these workflows.
-    // Never combine an imported partial bundle with newly generated CBS files.
+    // Validate coverage only when supplied or consumed. Imported graph results
+    // remain usable without reconstructing their historical upstream bundle.
     cbs_fields = ['cbs_cov', 'seg', 'nseg']
     graph_fields = ['jabba_rds', 'jabba_gg', 'ni_balanced_gg', 'lp_balanced_gg']
     graph_tools = ['cbs', 'jabba', 'non_integer_balance', 'allelic_cn', 'lp_phased_balance',
@@ -1009,6 +1009,13 @@ workflow CBS_STEP {
         value != null && !(value instanceof Collection && value.isEmpty()) &&
             !(value.toString().trim() in ['', 'NA', 'NULL', '/dev/null'])
     }
+    selected = { tool -> tools_used.contains('all') || tools_used.contains(tool) }
+    needs_jabba = { row -> selected.call('jabba') &&
+        (!present.call(row.jabba_rds) || !present.call(row.jabba_gg)) }
+    needs_ni = { row -> (selected.call('non_integer_balance') || selected.call('allelic_cn')) &&
+        !present.call(row.ni_balanced_gg) }
+    needs_cbs = { row -> selected.call('cbs') &&
+        !(graph_fields + ni_descendants + jabba_descendants).any { present.call(row[it]) } }
     checked_rows = inputs_unlaned.map { row ->
         if (!validate_imports) return row
         if (row.meta.status.toString() != '1') {
@@ -1016,17 +1023,6 @@ workflow CBS_STEP {
             // owns the bundle; never emit those repeated graph outputs twice.
             def pair_fields = (cbs_fields + graph_fields + ni_descendants + jabba_descendants).unique()
             return row + pair_fields.collectEntries { field -> [(field): []] }
-        }
-        def descendants = (ni_descendants + jabba_descendants).unique().findAll { present.call(row[it]) }
-        def imported_graphs = graph_fields.findAll { present.call(row[it]) }
-        if ((imported_graphs || descendants) && !cbs_fields.every { present.call(row[it]) }) {
-            error "CBS coverage migration for ${row.meta.patient}/${row.meta.sample}: imported graphs or graph descendants require a complete compatible cbs_cov/seg/nseg bundle. Remove legacy imports and regenerate CBS and downstream graphs."
-        }
-        if ((ni_descendants.any { present.call(row[it]) } || present.call(row.lp_balanced_gg)) && !present.call(row.ni_balanced_gg)) {
-            error "CBS coverage migration for ${row.meta.patient}/${row.meta.sample}: imported NI graph descendants require their compatible ni_balanced_gg source graph. Supply it or regenerate the descendants."
-        }
-        if (jabba_descendants.any { present.call(row[it]) } && !present.call(row.jabba_rds)) {
-            error "CBS coverage migration for ${row.meta.patient}/${row.meta.sample}: imported HRDetect/onenesstwoness requires its compatible jabba_rds source. Supply it or regenerate the descendants."
         }
         row
     }
@@ -1044,13 +1040,26 @@ workflow CBS_STEP {
             [patient, rows[0]]
         }
         .branch {
-            imported: cbs_fields.every { field -> present.call(it[1][field]) }
-            regenerate: true
+            imported: present.call(it[1].cbs_cov)
+            legacy: ((needs_jabba.call(it[1]) || needs_cbs.call(it[1])) && present.call(it[1].seg)) ||
+                (!needs_jabba.call(it[1]) && needs_ni.call(it[1]) && present.call(it[1].jabba_gg))
+            regenerate: needs_jabba.call(it[1]) || needs_cbs.call(it[1])
+            passthrough: true
         }
 
-    cbs_imports = cbs_tumors.imported.map { patient, row ->
+    legacy_imports = cbs_tumors.legacy
+        .join(dryclean_tumor_cov_for_merge, remainder: true)
+        .filter { patient, row, cov -> row != null }
+        .map { patient, row, cov ->
+            if (cov == null) {
+                error "Cannot reuse legacy CBS for ${patient}/${row.meta.sample}: tumor dryclean coverage is required for JaBbA/non-integer fitting."
+            }
+            [patient, row + [cbs_cov: cov]]
+        }
+    cbs_imports = cbs_tumors.imported.mix(legacy_imports).map { patient, row ->
         def imported_graphs = graph_fields.findAll { present.call(row[it]) }
-        [row.meta + [id: row.meta.sample], row, row.cbs_cov, row.seg, row.nseg,
+        [row.meta + [id: row.meta.sample], row, row.cbs_cov,
+            present.call(row.seg) ? row.seg : [], present.call(row.nseg) ? row.nseg : [],
             imported_graphs, imported_graphs.collect { row[it] }]
     }
     VALIDATE_CBS_BUNDLE(
@@ -1062,6 +1071,7 @@ workflow CBS_STEP {
     cbs_bundle = VALIDATE_CBS_BUNDLE.out.bundle
     validated_inputs_unlaned = checked_rows.filter { !validate_imports || it.meta.status.toString() != '1' }
         .mix(cbs_tumors.regenerate.map { patient, row -> row })
+        .mix(cbs_tumors.passthrough.map { patient, row -> row })
         .mix(VALIDATE_CBS_BUNDLE.out.validated_rows)
 
     if (tools_used.contains('all') || tools_used.contains('cbs') ||

@@ -206,9 +206,9 @@ In paired mode, `ratio` is tumor coverage divided by normal coverage per normal 
 
 In tumor-only mode, valid `foreground` values are unchanged, `ratio` is identical to them, and `ncn=2` is the unmeasured default used by both graph stages. This is not a measured normal sex/karyotype call.
 
-JaBbA and NON_INTEGER_BALANCE both consume this `cov.rds$foreground`; they no longer fit raw tumor dryclean coverage against paired-ratio segments. The original dryclean RDS files and their `coverage_tumor`/`coverage_normal` exports remain unchanged. `cbs_cov` exports the model-coverage path separately: use it for graph-aligned coverage overlays, and label the original sample tracks as unpaired dryclean coverage. Existing report builds are not rewritten automatically.
+For newly generated tagged bundles, JaBbA and NON_INTEGER_BALANCE both consume this `cov.rds$foreground`. Legacy restarts retain historical foreground semantics rather than silently converting their coverage. The original dryclean RDS files and their `coverage_tumor`/`coverage_normal` exports remain unchanged. `cbs_cov` exports the model-coverage path separately: use it for graph-aligned coverage overlays, and label original sample tracks as unpaired dryclean coverage. Existing report builds are not rewritten automatically.
 
-All three bundle objects carry `metadata(x)$cbs_coverage`, including mode, source field, scale, and a content-derived bundle ID. JaBbA, non-integer, and LP graphs retain that provenance in their graph metadata. Imported files must belong to the same bundle; see [restart instructions](usage.md#copy-number-coverage-and-restarts).
+All newly generated bundle objects carry `metadata(x)$cbs_coverage`, including mode, source field, scale, and a content-derived bundle ID. JaBbA, non-integer, and LP graphs retain that provenance. Tagged imports must belong to the same bundle; wholly untagged legacy imports remain supported without fabricated provenance. See [restart instructions](usage.md#copy-number-coverage-and-restarts).
 
 ## HetPileups
 Pileup mutational calls are done using a custom module script called HetPileups. We use a custom module script, check [here](../bin/Pileups.R)
