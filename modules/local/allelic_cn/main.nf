@@ -8,12 +8,14 @@ process NON_INTEGER_BALANCE {
     //     'mskilab/jabba:0.0.3' }"
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/jabba:0.0.8':
-        'mskilab/jabba:0.0.8' }"
+        'docker://mskilab/jabba:0.0.10':
+        'mskilab/jabba:0.0.10' }"
 
     input:
-    tuple val(meta), path(jabba_gg), path(decomposed_cov), path(het_pileups_wgs)
-    val(field)
+    path non_integer_balance_optimized
+    path non_integer_balance_script
+    path cbs_coverage_helper
+    tuple val(meta), path(jabba_gg), path(cbs_cov_rds), path(het_pileups_wgs)
     val(hets_thresh)
     path(mask)
     val(overwrite)
@@ -25,6 +27,7 @@ process NON_INTEGER_BALANCE {
     val(build)
     val(epgap)
     val(tilim)
+    val(mipemphasis)
     val(gurobi)
     path(fasta)     // path to decoy fasta
     path(fasta_fai)     // path to decoy fasta
@@ -60,13 +63,11 @@ process NON_INTEGER_BALANCE {
     unset R_HOME
     echo "USING LIBRARIES: \$(Rscript -e 'print(.libPaths())')"
 
-    export RSCRIPT_PATH=\$(echo "\${NEXTFLOW_PROJECT_DIR}/bin/non_integer_balance.R")
-
-    Rscript \$RSCRIPT_PATH \\
+    Rscript "$non_integer_balance_optimized" \\
         --id $id \\
         --jab $jabba_gg \\
-        --cov $decomposed_cov \\
-        --field $field \\
+        --cov $cbs_cov_rds \\
+        --field foreground \\
         ${hets_flag} \\
         ${hets_thres_flag} \\
         --mask $mask \\
@@ -79,6 +80,8 @@ process NON_INTEGER_BALANCE {
         --build $build \\
         --epgap $epgap \\
         --tilim $tilim \\
+        --threads ${task.cpus} \\
+        --mipemphasis $mipemphasis \\
         --gurobi $gurobi \\
         --fasta $fasta \\
         --pad $pad
@@ -95,7 +98,7 @@ process NON_INTEGER_BALANCE {
     prefix = task.ext.prefix ?: "${meta.id}"
     def VERSION = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
     """
-    touch balanced.gg.rds hets.gg.rds
+    touch non_integer.balanced.gg.rds hets.gg.rds
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -114,8 +117,8 @@ process LP_PHASED_BALANCE {
     //     'mskilab/jabba:0.0.3' }"
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/jabba:0.0.8':
-        'mskilab/jabba:0.0.8' }"
+        'docker://mskilab/jabba:0.0.10':
+        'mskilab/jabba:0.0.10' }"
 
     input:
     tuple val(meta), path(hets_gg, stageAs: "non_integer_balanced.gg.rds"), path(hets) // output from non_integer_balance, sites.txt from hetpileups

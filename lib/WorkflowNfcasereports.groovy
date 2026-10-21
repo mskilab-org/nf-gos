@@ -68,7 +68,7 @@ class WorkflowNfcasereports {
     }
 
     public static create_value_channel(parameter) {
-        if (parameter instanceof Boolean) {
+        if (parameter instanceof Boolean || parameter instanceof Number) {
             return Channel.value(parameter)
         }
         return parameter ? Channel.value(parameter) : Channel.empty()

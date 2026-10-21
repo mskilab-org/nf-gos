@@ -3,6 +3,10 @@ library(optparse)
 options(bitmapType='cairo')
 ## options(error = function() {traceback(2); quit("no", 1)})
 
+script.arg <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
+script.dir <- dirname(sub("^--file=", "", script.arg))
+source(file.path(script.dir, "cbs_coverage.R"), local = TRUE, chdir = FALSE)
+
 if (!exists('opt'))
 {
     option_list = list(
@@ -25,6 +29,8 @@ if (!exists('opt'))
     make_option("--build", type = "character", default = "hg19", help = "either hg19 or hg38"),
     make_option("--epgap", type = "numeric", default = 1e-6, help = "epgap"),
     make_option("--tilim", type = "numeric", default = 100, help = "time limit for optimization"),
+    make_option("--threads", type = "integer", default = 1, help = "CPLEX threads used by non_integer_balance_optimized.R"),
+    make_option("--mipemphasis", type = "integer", default = 0, help = "CPLEX emphasis used by the optimized wrapper: 0 balanced, 1 feasibility, 2 optimality, 3 best bound, 4 hidden feasibility"),
     make_option("--gurobi", type = "logical", default = TRUE, help = "use gurobi?"), ## because why the hell not
     make_option("--fasta", type = "character", help = "path to fasta file",
                 default = "/gpfs/commons/groups/imielinski_lab/DB/GATK/human_g1k_v37_decoy.fasta"),
@@ -120,51 +126,48 @@ balanced.gg.fn = paste0(opt$outdir, '/', 'balanced.gg.rds')
 binstats.gg.fn = paste0(opt$outdir, '/', 'binstats.gg.rds')
 hets.gg.fn = paste0(opt$outdir, '/', 'hets.gg.rds')
 
-message("Reading gGraph!")
-jab = gG(jabba = opt$jab)
-
 message("Reading coverage!")
 cov = readRDS(opt$cov)
+coverage.info = cbs_coverage_info(cov)
+if (!identical(opt$field, "foreground")) {
+    stop("NON_INTEGER_BALANCE requires --field foreground from the CBS coverage bundle")
+}
+
+message("Reading gGraph!")
+jab = readRDS(opt$jab)
+validate_cbs_graph(jab, cov)
+if (!inherits(jab, "gGraph")) {
+    jab = if (inherits(jab$gg, "gGraph")) jab$gg else gG(jabba = jab)
+    jab$set(cbs_coverage = coverage.info)
+}
 
 message("Loading reference!")
 ref = RSeqLib::BWA(fasta = opt$fasta)
+bins = cov
 
 if (file.exists(opt$mask) & file.info(opt$mask)$size) {
     message("Checking coverage mask")
     mask = readRDS(opt$mask)
     ## remove masked bins
-    cov = cov %Q% (!(cov %^% mask))
+    bins = bins %Q% (!(bins %^% mask))
 }
 
-## add ncn field to bins
-## first get gender of the sample from the JaBbA graph
-ncn.x = jab$nodes$dt[(seqnames == "X" | seqnames == "chrX"),
-                        weighted.mean(cn,
-                                    w = end - start + 1,
-                                    na.rm = TRUE)]
-message("mean CN of X: ", ncn.x)
-ncn.vec = rep(2, length(cov))
-if (ncn.x < 1.4) {
-    message("Adjusting ncn for XY")
-    ncn.vec[which(as.character(seqnames(cov)) %in% c("chrX", "chrY", "X", "Y"))] = 1
-}
-
-values(cov)[, "ncn"] = ncn.vec
+## CBS supplies the normal-derived ncn baseline; never infer it from tumor CN.
+has.x.bins = any(as.character(seqnames(bins)) %in% c("chrX", "X") & is.finite(bins$foreground))
 
 if ((opt$overwrite) | (!file.exists(binstats.gg.fn))) {
 
     message("Starting binstats")
-    if (ncn.x == 0) { # handle no sex chr case by disabling loess
-        binstats.gg = gGnome::binstats(jab, bins = JaBbA:::seqlevels_to_ncbi(cov), field = opt$field, lp = TRUE, loess=FALSE)
-    } else {
-        binstats.gg = gGnome::binstats(jab, bins = JaBbA:::seqlevels_to_ncbi(cov), field = opt$field, lp = TRUE)
-    }
+    binstats.gg = gGnome::binstats(jab, bins = JaBbA:::seqlevels_to_ncbi(bins),
+                                 field = "foreground", lp = TRUE, loess = has.x.bins)
 
     ## save binstats
+    binstats.gg$set(cbs_coverage = coverage.info)
     saveRDS(binstats.gg, binstats.gg.fn)
 
 } else {
     binstats.gg = readRDS(binstats.gg.fn)
+    validate_cbs_graph(binstats.gg, cov)
 }
 
 if (opt$overwrite | (!file.exists(balanced.gg.fn))) {
@@ -283,11 +286,13 @@ if (opt$overwrite | (!file.exists(balanced.gg.fn))) {
 
     balanced.gg = gGnome:::loosefix(balanced.gg)
     ## save results
+    balanced.gg$set(cbs_coverage = coverage.info)
     saveRDS(balanced.gg, balanced.gg.fn)
 
 
 } else {
     balanced.gg = readRDS(balanced.gg.fn)
+    validate_cbs_graph(balanced.gg, cov)
 }
 
 ## if (opt$overwrite | (!file.exists(hets.gg.fn))) {
@@ -336,6 +341,7 @@ if (TRUE) {
     }
 
     jab = gGnome:::loosefix(gG(jabba = jab))
+    jab$set(cbs_coverage = coverage.info)
     saveRDS(jab, hets.gg.fn)
 
 } else {

@@ -21,7 +21,7 @@ if (!exists('opt')) ## if opt already exists allow over-ride of command line arg
         make_option("--undo_prune", type = "numeric", default = 0.1, help = "undo prune SSE thres"),
         make_option("--undo_SD", type = "numeric", default = 3, help = "undo splits SD thres"),
         make_option(c("-o", "--outdir"), type = "character", default = './', help = "Directory to dump output into"),
-        make_option(c("-f", "--field"), type = "character", default = 'records', help = "Column of tumor and normal coverage which to use for downstream processing")
+        make_option(c("-f", "--field"), type = "character", default = 'foreground', help = "Required source field in tumor and normal coverage; CBS emits depth-preserving model foreground")
     )
     parseobj = OptionParser(option_list=option_list)
     opt = parse_args(parseobj)
@@ -10847,6 +10847,10 @@ require(parallel)
 require(sequenza)
 library(data.table)
 
+script.arg = grep('^--file=', commandArgs(trailingOnly = FALSE), value = TRUE)
+script.dir = dirname(sub('^--file=', '', script.arg))
+source(file.path(script.dir, 'cbs_coverage.R'), chdir = FALSE)
+
 set.seed(42)
 
 seqinfo2gr = si2gr
@@ -10860,6 +10864,8 @@ out.file.rds = paste(opt$outdir, 'seg.rds', sep = '/')
 out.file.nseg.rds = paste(opt$outdir, 'nseg.rds', sep = '/')
 out.file.txt = paste(opt$outdir, 'seg.txt', sep = '/')
 out.file.nozzle = paste(opt$outdir, 'nozzle', sep = '/')
+if (any(file.exists(c(out.file.cov, out.file.rds, out.file.nseg.rds))))
+    stop('CBS bundle output already exists; generate cov/seg/nseg together in a clean output directory')
 
 .getcov = function(fn, field, mask)
     {
@@ -10887,6 +10893,7 @@ out.file.nozzle = paste(opt$outdir, 'nozzle', sep = '/')
 
                 cov = seg2gr(tmp)
             }
+        cbs_numeric_field(cov, field, 'Input coverage')
 
         if (length(mask.gr)) {
             mask.ix = which(cov %^% mask.gr)
@@ -10901,17 +10908,17 @@ tcov = .getcov(opt$tcov, opt$field, opt$mask)
 if (is.null(opt$ncov))
     opt$ncov = ''
 
-if (file.exists(opt$ncov) & file.size(opt$ncov) > 0)
+paired = nzchar(opt$ncov) && opt$ncov != 'NULL'
+if (paired && (!file.exists(opt$ncov) || is.na(file.size(opt$ncov)) || file.size(opt$ncov) <= 0))
+    stop('Requested normal coverage is missing or empty: ', opt$ncov)
+
+if (paired)
     {
         ncov = .getcov(opt$ncov, opt$field, opt$mask)
 
         cat('reading', opt$tcov, 'and', opt$ncov, '\n')
 
-#        if (!identical(width(tcov), width(ncov)))
-#            stop('Tumor and normal Coverage GRanges objects must be of equal length and width')
-
-        if (!(opt$field %in% names(values(tcov)))| !(opt$field %in% names(values(ncov))))
-            stop(sprintf('Opt$Field %s not included in either tumor or normal coverage GRanges object', opt$field))
+        ncov = ncov[cbs_normal_index(tcov, ncov)]
 
         tmp.s = as.character(seqnames(ncov))
         tmp.e = end(ncov)
@@ -10928,7 +10935,7 @@ if (file.exists(opt$ncov) & file.size(opt$ncov) > 0)
         map = gr.tile.map(tmp.chunktile, ncov, verbose = T); gc() ## Removed mc.cores = 1
         ## Valo = values(ncov)[, opt$field]; gc()
         val = values(ncov)[, opt$field]; gc()
-        val[val==0] = NA
+        val[!is.finite(val) | val <= 0] = NA
         tmp.chunktile$mean = sapply(map, function(x,y) if (length(x)==0) NA else if ((sum(is.na(y[x]))/length(x))<.10) mean(y[x], na.rm = T) else NA, val)
         new.sl = sl[names(sl) %in% as.character(seqnames(tmp.chunktile))[!is.na(tmp.chunktile$mean)]] ## limit genome to only chromosomes with at least a "piece" seen in normal
         rm(list=ls(pattern="tmp"))
@@ -10938,7 +10945,7 @@ if (file.exists(opt$ncov) & file.size(opt$ncov) > 0)
         gr.nseg = seqinfo2gr(new.sl)
         tmp.ncov = ncov
         val = values(tmp.ncov)[, opt$field]
-        val[val==0] = NA
+        val[!is.finite(val) | val <= 0] = NA
         values(tmp.ncov)[, opt$field] = val
         gc()
         ss.n = segstats(gr.nseg, tmp.ncov, opt$field, mc.cores = 1, na.thresh = 0.9)
@@ -10967,58 +10974,23 @@ if (file.exists(opt$ncov) & file.size(opt$ncov) > 0)
         map = gr.tile.map(ss.n, ncov, verbose = T)
         gc()
         ix = rep(NA, length(ncov))
-        ix[unlist(map)] = rep(1:length(map), sapply(map, length))
-                                        # ncounts = values(ncov)[, opt$field]
+        ix[unlist(map)] = rep(seq_along(map), lengths(map))
+        ncov$ncn = ss.n$cn[ix]
 
-        gc()
-                                        #normFactor = ncounts / (1+ss.n$cn[ix]); ## normalize local copy number from normFactor (ie allow 'ratio' to maintain copy number)
-
-
-        normFactor = values(ncov)[, opt$field] / (ss.n$cn[ix]); ## Inf when ncn is 0
-        inf.ix = which(is.infinite(normFactor))
-        ## normalize local copy number from normFactor (ie allow 'ratio' to maintain copy number)
-        gc()
-        tcounts = values(tcov)[, opt$field]
-        gc()
-
-        six = sample(setdiff(seq_along(tcov), inf.ix), 1e4)
-        reScale = mean(normFactor[six], na.rm = T)/mean(tcounts[six], na.rm = T) ## scalar to get values around 1 if total read depth for tumor != normal
-        values(tcov) = data.frame(ratio = tcounts / normFactor * reScale,
-                                  tum.counts = values(tcov)[, opt$field],
-                                  norm.counts = values(ncov)[, opt$field])
-
-
-
-
-        ## normFactor = values(ncov)[, opt$field] / (1+ss.n$cn[ix]); ## normalize local copy number from normFactor (ie allow 'ratio' to maintain copy number)
-        ## gc()
-        ## tcounts = values(tcov)[, opt$field]
-        ## gc()
-
-        ## six = sample(length(tcov), 1e4)
-        ## reScale = mean(normFactor[six], na.rm = T)/mean(tcounts[six], na.rm = T) ## scalar to get values around 1 if total read depth for tumor != normal
-        ## values(tcov) = data.frame(ratio = tcounts / normFactor * reScale,
-        ## tum.counts = values(tcov)[, opt$field], norm.counts = values(ncov)[, opt$field])
+        ## Restrict both inputs before computing the same-valid-bin scalar.
+        tcov = gr.fix(tcov, new.sl, drop = T)
+        ncov = gr.fix(ncov, new.sl, drop = T)
+        model = prepare_cbs_coverage(tcov, ncov, ncov$ncn, input_field = opt$field)
+        tcov = model$cov
         rm(ncov)
         gc()
 
-        cat('removing normal coverage from memory\n')
-
-        ## remove any pieces of tcov not in new.sl (ie chromosomes that have (virtually) 0 read support in normal)
-
-        cat('trimming tcov to final seqlengths\n')
-
-        tcov = gr.fix(tcov, new.sl, drop = T)
-
-        ## save "normal segs" for use downstream
         names(ss.n) = NULL
-        saveRDS(ss.n, out.file.nseg.rds)
-        gc()
     } else {
-        tcov$ratio = values(tcov)[, opt$field]
-        ss.n = NULL
+        model = prepare_cbs_coverage(tcov, input_field = opt$field)
+        tcov = model$cov
+        ss.n = GRanges()
         new.sl = seqlengths(tcov)
-        saveRDS(GRanges(), out.file.nseg.rds)
         if (any(is.na(new.sl)))
             {
                 library(data.table)
@@ -11028,8 +11000,6 @@ if (file.exists(opt$ncov) & file.size(opt$ncov) > 0)
             }
     }
 
-cat('saving RDS files\n')
-saveRDS(tcov, out.file.cov)
 
 ## read hets if supplied
 if (file.exists(opt$hets) && (file.size(opt$hets) > 0)) {
@@ -11058,11 +11028,11 @@ if (file.exists(opt$hets) && (file.size(opt$hets) > 0)) {
 }
 
 
-if (!file.exists(out.file.rds))
-    {
-        ix = which(!is.na(tcov$ratio))
-        cat('sending ', length(ix), ' segments\n')
-        cna = CNA(log(tcov$ratio[ix]), as.character(seqnames(tcov))[ix], start(tcov)[ix], data.type = 'logratio')
+{
+        log.signal = cbs_log_signal(tcov)
+        ix = log.signal$index
+        cat('sending ', length(ix), ' bins\n')
+        cna = CNA(log.signal$value, as.character(seqnames(tcov))[ix], start(tcov)[ix], data.type = 'logratio')
         gc()
         cat('finished making cna\n')
         seg = segment(smooth.CNA(cna), alpha = opt$cnsignif, verbose = T,
@@ -11098,12 +11068,19 @@ if (!file.exists(out.file.rds))
         out = gr.fix(out, new.sl, drop = T)
         cat(length(out), ' segments produced\n')
         names(out) = NULL
+        out$ncn = cbs_segment_ncn(out, tcov)
+        bundle = finalize_cbs_bundle(tcov, out, ss.n, model$mode,
+                                     model$input_field, model$foreground_scale)
+        tcov = bundle$cov
+        out = bundle$seg
+        ss.n = bundle$nseg
+        saveRDS(tcov, out.file.cov)
         saveRDS(out, out.file.rds)
+        saveRDS(ss.n, out.file.nseg.rds)
         write.tab(as.data.frame(out), out.file.txt)
         cat('finished dumping to file, now making plots\n')
         gc()
-    } else
-    out = readRDS(out.file.rds)
+}
 
 ## ix = sample(1:length(tcov), 1e5)
 ## if (!is.null(ss.n))

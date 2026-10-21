@@ -165,6 +165,11 @@ include {
     SV_CHIMERA_FILTER as SV_CHIMERA_FILTER_VCF
 } from '../modules/local/process.nf'
 
+include {
+    SV_CHIMERA_FILTER_ESVEE as SV_CHIMERA_FILTER_ESVEE_RAWVCF;
+    SV_CHIMERA_FILTER_ESVEE as SV_CHIMERA_FILTER_ESVEE_VCF
+} from '../modules/local/esvee/chimera_filter.nf'
+
 
 // workflow SETUP {
 
@@ -771,8 +776,8 @@ workflow NFGOS {
 
     // Intervals for speed up preprocessing/variant calling by spread/gather
     // [interval.bed] all intervals in one file
-    intervals_bed_combined = WorkflowNfcasereports.create_file_channel(params.no_intervals, PREPARE_INTERVALS.out.intervals_bed_combined)
-    intervals_bed_gz_tbi_combined = WorkflowNfcasereports.create_file_channel(params.no_intervals, PREPARE_INTERVALS.out.intervals_bed_gz_tbi_combined)
+    intervals_bed_combined = params.no_intervals ? Channel.value([]) : PREPARE_INTERVALS.out.intervals_bed_combined
+    intervals_bed_gz_tbi_combined = params.no_intervals ? Channel.value([]) : PREPARE_INTERVALS.out.intervals_bed_gz_tbi_combined
 
     // For QC during preprocessing, we don't need any intervals (MOSDEPTH doesn't take them for WGS)
     intervals_for_preprocessing = params.wes ?
@@ -838,6 +843,7 @@ workflow NFGOS {
 
     vcf_from_gridss_gridss = SV_CALLING_STEP.out.vcf_from_gridss_gridss
     vcf_raw_from_gridss_gridss = SV_CALLING_STEP.out.vcf_raw_from_gridss_gridss
+    esvee_germline_vcf = SV_CALLING_STEP.out.esvee_germline_vcf
 
     do_sv_filter_ffpe_chimera = params.sv_filter_ffpe_chimera ?: false
     println "do_sv_filter_ffpe_chimera: ${do_sv_filter_ffpe_chimera}"
@@ -856,18 +862,24 @@ workflow NFGOS {
         chimera_raw_existing_outputs = chimera_raw_outputs.filter { it -> !it[1].isEmpty() && !it[2].isEmpty() }
         chimera_raw_inputs = chimera_raw_outputs.filter { it -> it[1].isEmpty() || it[2].isEmpty() }.map {it -> [ it[0].patient ] }.unique()
 
-        SV_CHIMERA_FILTER_VCF(
-            vcf_from_gridss_gridss.map { it -> [ it[0].patient, it[0], it[1], it[2] ] } // meta.patient, meta, vcf, tbi
+        chimera_vcf_input = vcf_from_gridss_gridss.map { it -> [ it[0].patient, it[0], it[1], it[2] ] } // meta.patient, meta, vcf, tbi
             .join(chimera_inputs)
             .map { _patient, meta, vcf, tbi -> [ meta, vcf, tbi ] }
-        )
-        SV_CHIMERA_FILTER_RAWVCF(
-            vcf_raw_from_gridss_gridss.map { it -> [ it[0].patient, it[0], it[1], it[2] ] } // meta.patient, meta, vcf, tbi
+        chimera_raw_vcf_input = vcf_raw_from_gridss_gridss.map { it -> [ it[0].patient, it[0], it[1], it[2] ] } // meta.patient, meta, vcf, tbi
             .join(chimera_raw_inputs)
             .map { _patient, meta, vcf, tbi -> [ meta, vcf, tbi ] }
-        )
-        vcf_from_gridss_gridss = SV_CHIMERA_FILTER_VCF.out.vcftbi.mix(chimera_existing_outputs)
-        vcf_raw_from_gridss_gridss = SV_CHIMERA_FILTER_RAWVCF.out.vcftbi.mix(chimera_raw_existing_outputs)
+
+        if (params.sv_caller == 'esvee') {
+            SV_CHIMERA_FILTER_ESVEE_VCF(chimera_vcf_input)
+            SV_CHIMERA_FILTER_ESVEE_RAWVCF(chimera_raw_vcf_input)
+            vcf_from_gridss_gridss = SV_CHIMERA_FILTER_ESVEE_VCF.out.vcftbi.mix(chimera_existing_outputs)
+            vcf_raw_from_gridss_gridss = SV_CHIMERA_FILTER_ESVEE_RAWVCF.out.vcftbi.mix(chimera_raw_existing_outputs)
+        } else {
+            SV_CHIMERA_FILTER_VCF(chimera_vcf_input)
+            SV_CHIMERA_FILTER_RAWVCF(chimera_raw_vcf_input)
+            vcf_from_gridss_gridss = SV_CHIMERA_FILTER_VCF.out.vcftbi.mix(chimera_existing_outputs)
+            vcf_raw_from_gridss_gridss = SV_CHIMERA_FILTER_RAWVCF.out.vcftbi.mix(chimera_raw_existing_outputs)
+        }
     }
 
     /* FIXME: Junction Filtering step
@@ -915,7 +927,7 @@ workflow NFGOS {
                     .unique()
             )
 
-    } else if (params.gridss_somatic_filter) {
+    } else if (params.gridss_somatic_filter && params.sv_caller != 'esvee') {
         //somatic filter for GRIDSS
 
         // output_gridss_somatic_filter = vcf_from_gridss_gridss.map { meta, vcf, tbi -> [ meta.patient , [ meta, vcf, tbi ] ] }
@@ -953,10 +965,19 @@ workflow NFGOS {
                 [ it[0].patient, it[1], it[2] ]  // meta.patient, vcf, tbi
             }
             .dump(tag: "sv output for paired run starting from 'vcf' column", pretty: true)
-        // unfiltered_som_sv_for_merge = inputs_unlaned.map{ it ->
-        //     [ it.meta.patient, [] ]
-        // }
-        unfiltered_som_sv_for_merge = vcf_raw_from_gridss_gridss.map { it -> [ it[0].patient, it[1], it[2] ] }
+        // JaBbA accepts a missing supplementary-junction input. Seed every tumor with
+        // its NULL sentinel, then replace it when a raw VCF is available.
+        unfiltered_som_sv_for_merge = inputs_unlaned
+            .filter { it.meta.status.toString() == "1" }
+            .map { it -> [it.meta.patient, 'NULL', []] }
+            .unique { patient, _vcf, _tbi -> patient }
+            .join(
+                vcf_raw_from_gridss_gridss.map { meta, vcf, tbi -> [meta.patient, vcf, tbi] },
+                remainder: true
+            )
+            .map { row ->
+                row.size() == 4 ? row[0..2] : [row[0], row[3], row[4]]
+            }
     }
 
 
@@ -1021,6 +1042,9 @@ workflow NFGOS {
         dryclean_normal_cov_for_merge,
         tools_used
     )
+    graph_inputs_unlaned = CBS_STEP.out.validated_inputs_unlaned
+    cbs_cov_for_merge = CBS_STEP.out.cbs_cov_rds
+        .map { meta, cov -> [meta.patient, cov] }
 
     cbs_seg_for_merge = CBS_STEP.out.cbs_seg_rds
         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, cbs_seg
@@ -1089,8 +1113,8 @@ workflow NFGOS {
         .dump(tag: "PURPLE_STEP.out ploidy", pretty: true)
 
     JABBA_STEP(
-        inputs_unlaned,
-        dryclean_tumor_cov_for_merge,
+        graph_inputs_unlaned,
+        cbs_cov_for_merge,
         hets_sites_for_merge,
         cbs_seg_for_merge,
         cbs_nseg_for_merge,
@@ -1110,24 +1134,24 @@ workflow NFGOS {
     
 
     NON_INTEGER_BALANCE_STEP(
-        inputs_unlaned,
+        graph_inputs_unlaned,
         jabba_gg_for_merge,
         hets_sites_for_merge,
-        dryclean_tumor_cov_for_merge,
+        cbs_cov_for_merge,
         tools_used
     )
     non_integer_balance_balanced_gg_for_merge = NON_INTEGER_BALANCE_STEP.out.non_integer_balance_balanced_gg
         .map { it -> [ it[0].patient, it[1] ] } // meta.patient, non integer balanced ggraph
     
     LP_PHASED_BALANCE_STEP(
-        inputs_unlaned,
+        graph_inputs_unlaned,
         non_integer_balance_balanced_gg_for_merge,
         hets_sites_for_merge,
         tools_used
     )
 
     EVENTS_STEP(
-        inputs_unlaned,
+        graph_inputs_unlaned,
         non_integer_balance_balanced_gg_for_merge,
         tools_used
     )
@@ -1135,7 +1159,7 @@ workflow NFGOS {
     events_for_merge = EVENTS_STEP.out.events.map { it -> [ it[0].patient, it[1] ] } // meta.patient, events
 
     FUSIONS_STEP(
-        inputs_unlaned,
+        graph_inputs_unlaned,
         non_integer_balance_balanced_gg_for_merge,
         vcf_from_sv_calling_for_merge,
         tools_used
@@ -1166,7 +1190,7 @@ workflow NFGOS {
     
 
     MULTIPLICITY_STEP(
-        inputs_unlaned,
+        graph_inputs_unlaned,
         annotated_vcf_ffpe_impact_or_snpeff_for_merge,
         non_integer_balance_balanced_gg_for_merge,
         hets_sites_for_merge,
@@ -1186,7 +1210,7 @@ workflow NFGOS {
     }
 
     ONCOKB_STEP(
-        inputs_unlaned,
+        graph_inputs_unlaned,
         annotated_vcf_ffpe_impact_or_snpeff_for_merge,
         non_integer_balance_balanced_gg_for_merge,
         fusions_for_merge,
@@ -1194,7 +1218,7 @@ workflow NFGOS {
     )
 
     HRDETECT_STEP(
-        inputs_unlaned,
+        graph_inputs_unlaned,
         vcf_from_sv_calling_for_merge,
         hets_sites_for_merge,
         annotated_vcf_ffpe_impact_or_snpeff_for_merge,
@@ -1206,7 +1230,7 @@ workflow NFGOS {
                 .map { it -> [ it[0].patient, it[1] ] } // meta.patient, hrdetect rds
 
     ONENESS_TWONESS_STEP(
-        inputs_unlaned,
+        graph_inputs_unlaned,
         events_for_merge,
         hrdetect_rds_for_merge,
         tools_used

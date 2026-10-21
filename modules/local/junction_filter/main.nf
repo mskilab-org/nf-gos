@@ -104,7 +104,7 @@ process JUNCTION_FILTER_BEDTOOLS {
     prefix = task.ext.prefix ?: "${meta.id}"
     def VERSION = '0.1' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
     """
-    touch somatic.filtered.gnoMAD.sv.rds somatic.filtered.sv.rds
+    touch somatic.filtered.gnoMAD.sv.rds somatic.filtered.sv.no.gnomAD.rds
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         Junction_Filter: ${VERSION}
@@ -162,7 +162,7 @@ process JUNCTION_FILTER {
     prefix = task.ext.prefix ?: "${meta.id}"
     def VERSION = '0.16' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
     """
-    touch somatic.filtered.gnoMAD.sv.rds somatic.filtered.sv.rds
+    touch somatic.filtered.gnomAD.sv.rds somatic.filtered.sv.rds
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         Junction_Filter: ${VERSION}
