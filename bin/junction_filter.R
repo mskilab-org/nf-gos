@@ -36,7 +36,27 @@ if (file.exists(opt$pon)) {
     pon_object = readRDS(opt$pon)
     this_path = opt$sv
     message("Reading in the filtered SV file from:", this_path)
+    ## ESVEE writes every SV in breakend notation (bracket ALT + MATEID) but labels
+    ## the records SVTYPE=DEL/DUP/INV/INS and gives no END, which read.juncs cannot
+    ## parse (it only pairs SVTYPE=BND records). Relabel bracket-ALT records as BND.
+    ## No-op for VCFs whose breakend records are already BND (e.g. GRIDSS); single
+    ## breakends (no bracket in ALT) are left as they are.
+    if (grepl("\\.vcf(\\.b?gz)?$", this_path)) {
+        vcf_lines = readLines(this_path)
+        svtype_rx = "^((?:[^\t]*\t){7}(?:[^\t]*;)?)SVTYPE=[^;\t]*"
+        is_bracket_alt = grepl("^[^#](?:[^\t]*\t){4}[^\t]*[][]", vcf_lines, perl = TRUE)
+        is_bnd = grepl("^(?:[^\t]*\t){7}(?:[^\t]*;)?SVTYPE=BND(?:[;\t]|$)", vcf_lines, perl = TRUE)
+        relabel = which(is_bracket_alt & !is_bnd)
+        if (length(relabel) > 0) {
+            message("Relabelling ", length(relabel), " breakend-notation records as SVTYPE=BND")
+            vcf_lines[relabel] = sub(svtype_rx, "\\1SVTYPE=BND", vcf_lines[relabel], perl = TRUE)
+            this_path = tempfile("sv_bnd_relabelled.", tmpdir = opt$outfile_path, fileext = ".vcf")
+            writeLines(vcf_lines, this_path)
+        }
+        rm(vcf_lines, is_bracket_alt, is_bnd, relabel)
+    }
     this_filt = gGnome:::read.juncs(this_path, verbose=TRUE)
+    if (this_path != opt$sv) unlink(this_path)
     mc = S4Vectors::mcols(this_filt)
     env = as.environment(as.list(mc))
     is_tier_absent_or_invalid = ! ( all(exists("tier", env)) && is.numeric(get("tier", envir = env))) 
