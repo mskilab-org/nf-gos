@@ -142,6 +142,9 @@ process JUNCTION_FILTER {
 
     """
     #!/bin/bash
+    # The explicit shebang above overrides process.shell (bash -euo pipefail), so set it here:
+    # without it an R error is masked by the exit status of the versions.yml heredoc.
+    set -euo pipefail
 
     set -o allexport
     export RSCRIPT_PATH=\$(echo "\${NEXTFLOW_PROJECT_DIR}/bin/junction_filter.R")
