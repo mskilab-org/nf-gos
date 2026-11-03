@@ -553,8 +553,8 @@ process RETIER_WHITELIST_JUNCTIONS {
     label 'process_low'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/unified:0.0.16':
-        'mskilab/unified:0.0.16' }"
+        'docker://mskilab/unified:0.0.30-ggnome-esvee':
+        'mskilab/unified:0.0.30-ggnome-esvee' }"
 
     input:
     tuple val(meta), path(junctions)
@@ -639,7 +639,7 @@ process RETIER_WHITELIST_JUNCTIONS {
     filtervals = mcunl\$FILTER
     is_in_whitelist = gUtils::`%^%`(grlunl, heme_gen)
     is_filterpass = rep_len(FALSE, NROW(grlunl))
-    if (!is.null(filtervals)) 
+    if (!is.null(filtervals))
         is_filterpass = filtervals == "PASS"
     grlix_to_retier = unique(mcunl[is_in_whitelist & is_filterpass,]\$grl.ix)
     nr_grlix_to_retier = NROW(grlix_to_retier)
@@ -678,7 +678,7 @@ process RETIER_WHITELIST_JUNCTIONS {
         ,
         distance_pad = 1e4
         ,
-        return_inputs = TRUE  
+        return_inputs = TRUE
     )
 
     ra.raw.reciprocals = ra.raw.reciprocals.lst\$jun_recip_pairs

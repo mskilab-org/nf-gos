@@ -4,8 +4,8 @@ process JUNCTION_FILTER_BEDTOOLS {
     label 'process_medium'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/unified:0.0.16': 
-        'mskilab/unified:0.0.16' }"
+        'docker://mskilab/unified:0.0.30-ggnome-esvee':
+        'mskilab/unified:0.0.30-ggnome-esvee' }"
 
     input:
     tuple val(meta), path(sv_vcf), path(sv_vcf_tbi)
@@ -32,7 +32,7 @@ process JUNCTION_FILTER_BEDTOOLS {
     #!/bin/bash
 
     export LIBDIR=\${NEXTFLOW_BIN_DIR}/R
-    
+
     if [ "${low_memory}" = "true" ]; then
         export LOW_MEMORY=true
     else
@@ -42,7 +42,7 @@ process JUNCTION_FILTER_BEDTOOLS {
     export PADDING=${padding}
     printf "Converting SV VCF to BED format with padding %s\n" "\$PADDING"
 	Rscript --vanilla \${LIBDIR}/sv2bed.R --sv ${sv_vcf} --padding \${PADDING} --cores ${ncpus * 2}
-	
+
 
 	printf "Sorting SV bed files\n"
 	## bed-ops
@@ -54,7 +54,7 @@ process JUNCTION_FILTER_BEDTOOLS {
 
 	tabix -f -0 -p bed ra_A.sorted.bed.gz
 	tabix -f -0 -p bed ra_B.sorted.bed.gz
-    
+
     printf "Intersecting SV BED files with PON files\n"
     # pondir_a=\$(find ${junction_pon_dir}/*A.sorted.bed.gz)
 	# pondir_b=\$(find ${junction_pon_dir}/*B.sorted.bed.gz)
@@ -92,7 +92,7 @@ process JUNCTION_FILTER_BEDTOOLS {
 		echo "Failed to produce filtered SV file"
 		exit 1
 	fi
-    
+
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -118,8 +118,8 @@ process JUNCTION_FILTER {
     label 'process_medium'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://mskilab/unified:0.0.16':  // using unified container since it has all dependencies
-        'mskilab/unified:0.0.16' }"
+        'docker://mskilab/unified:0.0.30-ggnome-esvee':  // using unified container since it has all dependencies
+        'mskilab/unified:0.0.30-ggnome-esvee' }"
 
     input:
     tuple val(meta), path(filtered_sv_vcf), path(filtered_sv_vcf_tbi)
